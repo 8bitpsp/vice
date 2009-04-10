@@ -31,9 +31,12 @@
 #include "uiapi.h"
 #include "cmdline.h"
 #include "resources.h"
+#include "keyboard.h"
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
 
 static const cmdline_option_t cmdline_options[] = {
     { NULL },
@@ -74,10 +77,6 @@ void ui_display_volume(int vol)
 
 /* Display a mesage without interrupting emulation */
 void ui_display_statustext(const char *text, int fade_out)
-{
-}
-
-void ui_display_speed(float percent, float framerate, int warp_flag)
 {
 }
 
@@ -159,16 +158,21 @@ void archdep_ui_init()
 {
 }
 
-void kbd_arch_keyname_to_keynum()
-{
+signed long kbd_arch_keyname_to_keynum(char *keyname) {
+	return (signed long)atoi(keyname);
 }
 
-void kbd_arch_keynum_to_keyname()
-{
+const char *kbd_arch_keynum_to_keyname(signed long keynum) {
+	static char keyname[20];
+
+	memset(keyname, 0, 20);
+	sprintf(keyname, "%li", keynum);
+	return keyname;
 }
 
 void kbd_arch_init()
 {
+  keyboard_clear_keymatrix();
 }
 
 int ui_resources_init(void)

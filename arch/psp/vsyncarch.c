@@ -70,8 +70,11 @@ void vsyncarch_display_speed(double speed, double frame_rate, int warp_enabled)
 /* Sleep a number of timer units. */
 void vsyncarch_sleep(signed long delay)
 {
-    // AKTODO: 
-    // usleep(delay);
+  u64 tick1, tick2;
+  sceRtcGetCurrentTick(&tick1);
+
+  do { sceRtcGetCurrentTick(&tick2); }
+  while (tick2 - tick1 < delay);
 }
 
 void vsyncarch_presync(void)
