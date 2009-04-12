@@ -131,7 +131,8 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
   if (!Screen)
   {
     Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
-    Screen->Viewport.Y = 20;
+
+    Screen->Viewport.Y = 19;
     Screen->Viewport.Height = 272;
     Screen->Viewport.Width = 384;
   }
@@ -181,6 +182,8 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
 
   /* Update the display */
   pspVideoBegin();
+
+pspVideoFillRect(0, 0, SCR_WIDTH, SCR_HEIGHT, PSP_COLOR_WHITE);
 
   {
     int height = pspFontGetLineHeight(&PspStockFont);
