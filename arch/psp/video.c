@@ -5,6 +5,7 @@
 #include "palette.h"
 #include "viewport.h"
 #include "keyboard.h"
+#include "lib.h"
 
 #include "lib/video.h"
 #include "lib/pl_perf.h"
@@ -16,7 +17,7 @@
 #include <string.h>
 
 PspImage *Screen = NULL;
-static float last_framerate = 0; /* AKTODO: reinitialize this */
+static float last_framerate = 0; /* TODO: reinitialize this */
 static float last_percent = 0;   /* when reentering menu */
 
 /* Video-related command-line options.  */
@@ -44,8 +45,8 @@ video_canvas_t *video_canvas_create(video_canvas_t *canvas,
     unsigned int *width, unsigned int *height, int mapped)
 {
   canvas->depth = Screen->Depth;
-  canvas->width = *width;//Screen->Viewport.Width;
-  canvas->height = *height;//Screen->Height;//200;
+  canvas->width = *width;
+  canvas->height = *height;
 
   video_canvas_set_palette(canvas, canvas->palette);
 
@@ -92,13 +93,6 @@ static void video_frame_buffer_clear(video_canvas_t *canvas,
 
 void video_arch_canvas_init(struct video_canvas_s *canvas)
 {
-/*
-  canvas->depth = Screen->Depth;
-  canvas->width = Screen->Viewport.Width;
-  canvas->height = Screen->Viewport.Height;//200;
-
-  video_canvas_set_palette(canvas, canvas->palette);
-*/
   canvas->video_draw_buffer_callback
         = lib_malloc(sizeof(video_draw_buffer_callback_t));
   canvas->video_draw_buffer_callback->draw_buffer_alloc
@@ -107,19 +101,6 @@ void video_arch_canvas_init(struct video_canvas_s *canvas)
         = video_frame_buffer_free;
   canvas->video_draw_buffer_callback->draw_buffer_clear
         = video_frame_buffer_clear;
-/*
-
-  memset(&(canvas->fb), 0, sizeof(video_frame_buffer_t));
-  wlsprite_plot_init(&(canvas->fb.normplot));
-  wlsprite_plot_init(&(canvas->fb.palplot));
-
-  canvas->name = NULL;
-  canvas->window = NULL;
-  canvas->current_palette = NULL;
-  canvas->redraw_wimp = NULL;
-  canvas->redraw_full = NULL;
-*/
-//  canvas->video_draw_buffer_callback = NULL;
 }
 
 static int video_frame_buffer_alloc(video_canvas_t *canvas, 
@@ -132,7 +113,7 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
   {
     Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
 
-    Screen->Viewport.Y = 19;
+    Screen->Viewport.Y = 16; /* TODO: determine these values properly */
     Screen->Viewport.Height = 272;
     Screen->Viewport.Width = 384;
   }
@@ -182,8 +163,6 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
 
   /* Update the display */
   pspVideoBegin();
-
-pspVideoFillRect(0, 0, SCR_WIDTH, SCR_HEIGHT, PSP_COLOR_WHITE);
 
   {
     int height = pspFontGetLineHeight(&PspStockFont);
