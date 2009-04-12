@@ -109,8 +109,8 @@ void raster_draw_buffer_ptr_update(raster_t *raster)
             && raster->geometry->screen_size.height <= raster->geometry->last_displayed_line ?
             raster->geometry->screen_size.height : 0
            ) + raster->current_line
-          ) * raster_calc_frame_buffer_width(raster)
-        + raster->geometry->extra_offscreen_border_left;
+          ) * raster->canvas->draw_buffer->draw_buffer_pitch // raster_calc_frame_buffer_width(raster)
+        ;//+ raster->geometry->extra_offscreen_border_left;
 }
 
 static int raster_realize_frame_buffer(raster_t *raster)

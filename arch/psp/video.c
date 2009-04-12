@@ -9,6 +9,7 @@
 #include "lib/video.h"
 #include "lib/pl_perf.h"
 #include "lib/ctrl.h"
+#include "lib/pl_gfx.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -35,22 +36,16 @@ void fullscreen_capability()//cap_fullscreen_t *cap_fullscreen)
 void video_canvas_resize(struct video_canvas_s *canvas,
                                 unsigned int width, unsigned int height)
 {
+  canvas->width = width;
+  canvas->height = height;
 }
 
 video_canvas_t *video_canvas_create(video_canvas_t *canvas, 
     unsigned int *width, unsigned int *height, int mapped)
 {
-  if (!(Screen = pspImageCreateVram(512, 272, PSP_IMAGE_INDEXED)))
-      return NULL;
-
-  Screen->Viewport.X = 40;
-  Screen->Viewport.Y = 40;
-  Screen->Viewport.Width = 360;
-  Screen->Viewport.Height = 252;
-
   canvas->depth = Screen->Depth;
-  canvas->width = Screen->Viewport.Width;
-  canvas->height = Screen->Viewport.Height;//200;
+  canvas->width = *width;//Screen->Viewport.Width;
+  canvas->height = *height;//Screen->Height;//200;
 
   video_canvas_set_palette(canvas, canvas->palette);
 
@@ -60,6 +55,7 @@ video_canvas_t *video_canvas_create(video_canvas_t *canvas,
 void video_canvas_destroy(struct video_canvas_s *canvas)
 {
   if (Screen) pspImageDestroy(Screen);
+  lib_free(canvas->video_draw_buffer_callback);
 }
 
 int video_init()
@@ -80,10 +76,87 @@ void video_arch_resources_shutdown()
 {
 }
 
+static int video_frame_buffer_alloc(video_canvas_t *canvas, 
+                                    BYTE **draw_buffer, 
+                                    unsigned int fb_width, 
+                                    unsigned int fb_height, 
+                                    unsigned int *fb_pitch);
+static void video_frame_buffer_free(video_canvas_t *canvas, 
+                                    BYTE *draw_buffer);
+static void video_frame_buffer_clear(video_canvas_t *canvas, 
+                                     BYTE *draw_buffer, 
+                                     BYTE value, 
+                                     unsigned int fb_width, 
+                                     unsigned int fb_height, 
+                                     unsigned int fb_pitch);
+
 void video_arch_canvas_init(struct video_canvas_s *canvas)
 {
-  canvas->video_draw_buffer_callback = NULL;
+/*
+  canvas->depth = Screen->Depth;
+  canvas->width = Screen->Viewport.Width;
+  canvas->height = Screen->Viewport.Height;//200;
+
+  video_canvas_set_palette(canvas, canvas->palette);
+*/
+  canvas->video_draw_buffer_callback
+        = lib_malloc(sizeof(video_draw_buffer_callback_t));
+  canvas->video_draw_buffer_callback->draw_buffer_alloc
+        = video_frame_buffer_alloc;
+  canvas->video_draw_buffer_callback->draw_buffer_free
+        = video_frame_buffer_free;
+  canvas->video_draw_buffer_callback->draw_buffer_clear
+        = video_frame_buffer_clear;
+/*
+
+  memset(&(canvas->fb), 0, sizeof(video_frame_buffer_t));
+  wlsprite_plot_init(&(canvas->fb.normplot));
+  wlsprite_plot_init(&(canvas->fb.palplot));
+
+  canvas->name = NULL;
+  canvas->window = NULL;
+  canvas->current_palette = NULL;
+  canvas->redraw_wimp = NULL;
+  canvas->redraw_full = NULL;
+*/
+//  canvas->video_draw_buffer_callback = NULL;
 }
+
+static int video_frame_buffer_alloc(video_canvas_t *canvas, 
+                                    BYTE **draw_buffer, 
+                                    unsigned int fb_width, 
+                                    unsigned int fb_height, 
+                                    unsigned int *fb_pitch)
+{
+  if (!Screen)
+  {
+    Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
+    Screen->Viewport.Y = 20;
+    Screen->Viewport.Height = 272;
+    Screen->Viewport.Width = 384;
+  }
+
+  *fb_pitch = (Screen->Depth / 8) * Screen->Width;
+  *draw_buffer = Screen->Pixels;
+
+  return 0;
+}
+
+static void video_frame_buffer_free(video_canvas_t *canvas, 
+                                    BYTE *draw_buffer)
+{
+}
+
+static void video_frame_buffer_clear(video_canvas_t *canvas, 
+                                     BYTE *draw_buffer, 
+                                     BYTE value, 
+                                     unsigned int fb_width, 
+                                     unsigned int fb_height, 
+                                     unsigned int fb_pitch)
+{
+  memset(draw_buffer, value, fb_pitch * fb_height);
+}
+
 
 int video_canvas_set_palette(struct video_canvas_s *canvas,
                              struct palette_s *palette)
@@ -103,25 +176,19 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
                                  unsigned int xi, unsigned int yi,
                                  unsigned int w, unsigned int h)
 {
-	if (canvas->width==0) return;
+	if (canvas->width == 0)
+    return;
 
   /* Update the display */
   pspVideoBegin();
 
-  // AKTODO: Direct write to VRAM buffer
-  int i, j;
-  for (i = 0; i < Screen->Viewport.Height; i++)
   {
-    u8 *src = (u8*)(canvas->draw_buffer->draw_buffer 
-                    + i * (canvas->draw_buffer->draw_buffer_pitch) + 96);
-    u8 *dest = (u8*)(Screen->Pixels + i * Screen->Width);
-
-    for (j = 0; j < Screen->Viewport.Width; j++, dest++, src++)
-      *dest = *src;
+    int height = pspFontGetLineHeight(&PspStockFont);
+    pspVideoFillRect(0, 0, SCR_WIDTH, height, PSP_COLOR_BLACK);
   }
 
   /* Draw the screen */
-  pspVideoPutImage(Screen, 
+  pl_gfx_put_image(Screen, 
                    0, 0, 
                    Screen->Viewport.Width,
                    Screen->Viewport.Height);
@@ -131,9 +198,7 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
     sprintf(fps_display, " %3.02f (%.02f%%)", last_framerate, last_percent);
 
     int width = pspFontGetTextWidth(&PspStockFont, fps_display);
-    int height = pspFontGetLineHeight(&PspStockFont);
 
-    pspVideoFillRect(0, 0, SCR_WIDTH, height, PSP_COLOR_BLACK);
     pspVideoPrint(&PspStockFont, SCR_WIDTH - width, 0, fps_display, PSP_COLOR_WHITE);
   }
 
@@ -146,8 +211,6 @@ keyboard_set_keyarr(7,4,1);
 
   /* Swap buffers */
   pspVideoSwapBuffers();
-
-  // AKTODO: check input here
 }
 
 void ui_display_speed(float percent, float framerate, int warp_flag)
