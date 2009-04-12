@@ -57,12 +57,15 @@
 #include "ui.h"
 #include "util.h"
 
+#include "lib/pl_psp.h"
 
 static char *argv0 = NULL;
 static char *boot_path = NULL;
 
 /* alternate storage of preferences */
 const char *archdep_pref_path = NULL; /* NULL -> use home_path + ".vice" */
+
+FILE *TODO = NULL;
 
 int archdep_init(int *argc, char **argv)
 {
@@ -103,29 +106,7 @@ const char *archdep_boot_path(void)
 
 const char *archdep_home_path(void)
 {
-#if defined(GP2X) || defined(PSP)
-    char *home;
-
-    home = ".";
-
-    return home;
-#else
-    char *home;
-
-    home = getenv("HOME");
-    if (home == NULL) {
-        struct passwd *pwd;
-
-        pwd = getpwuid(getuid());
-        if ((pwd == NULL)
-            || ((home = pwd->pw_dir) == NULL)) {
-            /* give up */
-            home = ".";
-        }
-    }
-
-    return home;
-#endif
+    return pl_psp_get_app_directory();
 }
 
 char *archdep_default_sysfile_pathlist(const char *emu_id)
@@ -170,34 +151,6 @@ char *archdep_default_sysfile_pathlist(const char *emu_id)
         lib_free(default_path_temp);
 
 #else 
-#if defined(MACOSX_BUNDLE)
-        /* Mac OS X Bundles keep their ROMS in Resources/bin/../ROM */
-#if defined(MACOSX_COCOA)
-        #define MACOSX_ROMDIR "/../Resources/ROM/"
-#else
-        #define MACOSX_ROMDIR "/../ROM/"
-#endif
-        default_path = util_concat(boot_path, MACOSX_ROMDIR, emu_id,
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   boot_path, "/", emu_id,
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   home_path, "/", VICEUSERDIR, "/", emu_id,
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-
-                                   boot_path, MACOSX_ROMDIR, "DRIVES",
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   boot_path, "/DRIVES",
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   home_path, "/", VICEUSERDIR, "/DRIVES",
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-
-                                   boot_path, MACOSX_ROMDIR, "PRINTER",
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   boot_path, "/PRINTER",
-                                   ARCHDEP_FINDPATH_SEPARATOR_STRING,
-                                   home_path, "/", VICEUSERDIR, "/PRINTER",
-                                   NULL);
-#else
         default_path = util_concat(LIBDIR, "/", emu_id,
                                    ARCHDEP_FINDPATH_SEPARATOR_STRING,
                                    home_path, "/", VICEUSERDIR, "/", emu_id,
@@ -216,7 +169,6 @@ char *archdep_default_sysfile_pathlist(const char *emu_id)
                                    ARCHDEP_FINDPATH_SEPARATOR_STRING,
                                    boot_path, "/PRINTER",
                                    NULL);
-#endif
 #endif
     }
 
@@ -279,18 +231,19 @@ char *archdep_default_save_resource_file_name(void)
     return fname;
 }
 
-#if defined(MACOSX_COCOA)
-FILE *default_log_file = NULL;
 FILE *archdep_open_default_log_file(void)
 {
-    return default_log_file;
+if (!TODO)
+{
+TODO=fopen("log.txt","w");
 }
-#else
-FILE *archdep_open_default_log_file(void)
+else
 {
+fflush(TODO);
+}
+return TODO;
     return stdout;
 }
-#endif
 
 int archdep_num_text_lines(void)
 {
@@ -453,7 +406,7 @@ char *archdep_tmpnam(void)
 
 FILE *archdep_mkstemp_fd(char **filename, const char *mode)
  {
-#ifdef GP2X
+#if defined(GP2X) || defined(PSP)
     static unsigned int tmp_string_counter = 0;
     char *tmp;
     FILE *fd;

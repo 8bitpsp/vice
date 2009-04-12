@@ -30,7 +30,7 @@ int main(int argc, char *argv[])
                            ExitCallback,
                            NULL);
   pl_psp_start_callback_thread();
-
+pl_psp_set_clock_freq(333);
   main_program(argc, argv);
 
 /* TODO
@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
     TrashMenu();
   }
 */
+pl_psp_set_clock_freq(222);
 
   /* Release PSP resources */
   pl_snd_shutdown();

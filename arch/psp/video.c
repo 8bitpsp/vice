@@ -152,7 +152,8 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
 
   return 0;
 }
-
+static int deleteMe=0;
+#include "autostart.h"
 void video_canvas_refresh(struct video_canvas_s *canvas,
                                  unsigned int xs, unsigned int ys,
                                  unsigned int xi, unsigned int yi,
@@ -170,8 +171,7 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
   }
 
   /* Draw the screen */
-  pl_gfx_put_image(Screen, 
-                   0, 0, 
+  pl_gfx_put_image(Screen, 0, 0, 
                    Screen->Viewport.Width,
                    Screen->Viewport.Height);
 
@@ -190,6 +190,11 @@ SceCtrlData pad;
 pspCtrlPollControls(&pad);
 if (pad.Buttons&PSP_CTRL_CROSS)
 keyboard_set_keyarr(7,4,1);
+else if ((pad.Buttons&PSP_CTRL_CIRCLE) && !deleteMe)
+{
+autostart_autodetect("giana sisters.d64", NULL, 0, AUTOSTART_MODE_RUN);
+deleteMe=1;
+}
 
   /* Swap buffers */
   pspVideoSwapBuffers();

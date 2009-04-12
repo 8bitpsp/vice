@@ -62,10 +62,5 @@ extern void kbd_initialize_numpad_joykeys(int *joykeys);
 #define KBD_INDEX_PLUS4_DEFAULT KBD_INDEX_PLUS4_SYM
 #define KBD_INDEX_CBM2_DEFAULT  KBD_INDEX_CBM2_BUKS
 
-extern void x11kbd_press(signed long key);
-extern void x11kbd_release(signed long key);
-extern void x11kbd_enter_leave(void);
-extern void x11kbd_focus_change(void);
-
 #endif
 

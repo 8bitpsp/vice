@@ -73,13 +73,13 @@ void vsyncarch_sleep(signed long delay)
   u64 tick1, tick2;
   sceRtcGetCurrentTick(&tick1);
 
-//  do { sceRtcGetCurrentTick(&tick2); }
-//  while (tick2 - tick1 < delay);
+  do { sceRtcGetCurrentTick(&tick2); }
+  while (tick2 - tick1 < delay);
 }
 
 void vsyncarch_presync(void)
 {
-  // AKTODO
+    kbdbuf_flush();
 }
 
 void_hook_t vsync_set_event_dispatcher(void_hook_t hook)
