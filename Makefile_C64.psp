@@ -155,10 +155,11 @@ BUILD_EMUL= \
 BUILD_PORT=sounddrv/sounddummy.o arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
            arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o arch/psp/blockdev.o \
            arch/psp/c64ui.o arch/psp/console.o arch/psp/uicmdline.o arch/psp/uimon.o \
-           arch/psp/signals.o arch/psp/vsyncarch.o sounddrv/soundpsp.o
+           arch/psp/signals.o arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
 OBJS=$(BUILD_EMUL) $(BUILD_PORT)
 
-DEFINES=-DPSP_DEBUG -DVERSION=\"2.0\"
+#sndbuf 368?
+DEFINES=-DVERSION=\"2.0\" -DSOUND_BUFFER_SIZE=768
 BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAME)\""
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti

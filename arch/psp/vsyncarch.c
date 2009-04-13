@@ -34,6 +34,7 @@
 #include <time.h>
 #include <psptypes.h>
 #include <psprtc.h>
+#include <pspkernel.h>
 
 /* hook to ui event dispatcher */
 static void_hook_t ui_dispatch_hook;
@@ -70,11 +71,7 @@ void vsyncarch_display_speed(double speed, double frame_rate, int warp_enabled)
 /* Sleep a number of timer units. */
 void vsyncarch_sleep(signed long delay)
 {
-  u64 tick1, tick2;
-  sceRtcGetCurrentTick(&tick1);
-
-  do { sceRtcGetCurrentTick(&tick2); }
-  while (tick2 - tick1 < delay);
+  sceKernelDelayThread(delay);
 }
 
 void vsyncarch_presync(void)

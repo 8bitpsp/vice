@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 {
   /* Initialize PSP */
   pl_psp_init(argv[0]);
-  pl_snd_init(512, 0);
+  pl_snd_init(SOUND_BUFFER_SIZE, 0);
   pspCtrlInit();
   pspVideoInit();
 
@@ -40,6 +40,7 @@ pl_psp_set_clock_freq(333);
     TrashMenu();
   }
 */
+//  main_exit();
 pl_psp_set_clock_freq(222);
 
   /* Release PSP resources */
