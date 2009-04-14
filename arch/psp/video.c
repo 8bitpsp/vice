@@ -6,9 +6,9 @@
 #include "viewport.h"
 #include "keyboard.h"
 #include "lib.h"
+#include "log.h"
 
 #include "lib/video.h"
-#include "lib/pl_perf.h"
 #include "lib/ctrl.h"
 #include "lib/pl_gfx.h"
 
@@ -111,8 +111,9 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
 {
   if (!Screen)
   {
-    Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
+    log_message(LOG_DEFAULT, "\nAllocating framebuffer");
 
+    Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
     Screen->Viewport.Y = 16; /* TODO: determine these values properly */
     Screen->Viewport.Height = 272;
     Screen->Viewport.Width = 384;
@@ -127,6 +128,12 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
 static void video_frame_buffer_free(video_canvas_t *canvas, 
                                     BYTE *draw_buffer)
 {
+  if (Screen)
+  {
+    log_message(LOG_DEFAULT, "\nFreeing framebuffer");
+    pspImageDestroy(Screen);
+    Screen = NULL;
+  }
 }
 
 static void video_frame_buffer_clear(video_canvas_t *canvas, 
@@ -152,6 +159,8 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
 
   return 0;
 }
+
+void psp_display_menu();
 static int deleteMe=0;
 #include "autostart.h"
 void video_canvas_refresh(struct video_canvas_s *canvas,
@@ -194,6 +203,10 @@ else if ((pad.Buttons&PSP_CTRL_CIRCLE) && !deleteMe)
 {
 autostart_autodetect("giana sisters.d64", NULL, 0, AUTOSTART_MODE_RUN);
 deleteMe=1;
+}
+else if (pad.Buttons&PSP_CTRL_TRIANGLE)
+{
+  psp_display_menu();
 }
 
   /* Swap buffers */

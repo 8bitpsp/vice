@@ -6,7 +6,7 @@ PSPLIB=$(PSPAPP)/lib
 PSP_FW_VERSION=200
 export PSP_FW_VERSION
 
-PSP_APP_NAME=VICE PSP: C64
+PSP_APP_NAME=VICE PSP C64
 PSP_APP_VER=2.1.1
 
 TARGET=vicepsp
@@ -143,7 +143,7 @@ BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            sounddrv/soundwav.o sounddrv/sounddump.o sounddrv/soundspeed.o \
            sounddrv/soundfs.o sounddrv/sounddummy.o \
            translate.o crc32.o 
-BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
+BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o arch/psp/stubs.o \
            arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o \
            arch/psp/blockdev.o arch/psp/c64ui.o arch/psp/console.o \
            arch/psp/uicmdline.o arch/psp/uimon.o arch/psp/signals.o \

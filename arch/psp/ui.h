@@ -11,6 +11,20 @@
 #include "types.h"
 #include "uiapi.h"
 
+#define DISPLAY_MODE_UNSCALED    0
+#define DISPLAY_MODE_FIT_HEIGHT  1
+#define DISPLAY_MODE_FILL_SCREEN 2
+
+typedef struct psp_options
+{
+  int display_mode;
+  int show_fps;
+  int control_mode;
+  int animate_menu;
+  int toggle_vk;
+  int clock_freq;
+} psp_options_t;
+
 extern int ui_vblank_sync_enabled();
 
 extern void ui_exit(void);

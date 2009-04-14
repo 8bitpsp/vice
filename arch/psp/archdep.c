@@ -56,6 +56,7 @@
 #include "machine.h"
 #include "ui.h"
 #include "util.h"
+#include "keyboard.h"
 
 #include "lib/pl_psp.h"
 
@@ -536,4 +537,21 @@ void archdep_shutdown(void)
 #endif
     lib_free(argv0);
     lib_free(boot_path);
+}
+
+signed long kbd_arch_keyname_to_keynum(char *keyname) {
+	return (signed long)atoi(keyname);
+}
+
+const char *kbd_arch_keynum_to_keyname(signed long keynum) {
+	static char keyname[20];
+
+	memset(keyname, 0, 20);
+	sprintf(keyname, "%li", keynum);
+	return keyname;
+}
+
+void kbd_arch_init()
+{
+  keyboard_clear_keymatrix();
 }
