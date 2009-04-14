@@ -1,8 +1,10 @@
 /*
- * sounddummy.c - Implementation of the dummy sound device
+ * soundpsp.c - Implementation of the PSP sound driver
+ *              Depends on psplib (http://svn.akop.org/psp/trunk/libpsp)
+ *              Uses FIFO by (c) 2000-2002, David Olofson (used orig. in Fuse)
  *
  * Written by
- *  Teemu Rantanen <tvr@cs.hut.fi>
+ *  Akop Karapetyan <dev@psp.akop.org>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -43,7 +45,7 @@ static int psp_sound_init(const char *param, int *speed,
 {
   *speed = 44100;
   *fragsize = 44100/60;
-  *fragnr = 2;
+  *fragnr = 368;
   *channels = 2;
 
   if (sfifo_init(&sound_fifo, (*fragnr) * (*channels) * (*fragsize) + 1))
@@ -77,20 +79,6 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
   return 0;
 }
 
-/* TODO: keep? */
-#if 0
-static int psp_sound_bufferspace(void)
-{
-/*
-    int		amount;
-    amount = sdl_inptr - sdl_outptr;
-    if (amount < 0)
-	amount += sdl_len;
-    return sdl_len - amount;
-*/
-}
-#endif
-
 static void psp_sound_close(void)
 {
   pl_snd_pause(0);
@@ -105,11 +93,11 @@ static sound_device_t psp_sound =
     psp_sound_write,
     NULL,
     NULL,
-    NULL, //psp_sound_bufferspace,
+    NULL,
     psp_sound_close,
     NULL,
     NULL,
-    1
+    0
 };
 
 int sound_init_psp_device(void)
@@ -119,7 +107,7 @@ int sound_init_psp_device(void)
 
 static void psp_sound_callback(pl_snd_sample* stream, unsigned int samples, void *userdata)
 {
-  int length = samples << 1; /* 2 bits per sample */
+  int length = samples << 1; /* 2 bytes per sample */
   if (sfifo_used(&sound_fifo) <= 0)
   {
     /* Render silence if not enough sound data */

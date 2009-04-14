@@ -158,7 +158,6 @@ BUILD_PORT=sounddrv/sounddummy.o arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
            arch/psp/signals.o arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
 OBJS=$(BUILD_EMUL) $(BUILD_PORT)
 
-#sndbuf 368?
 DEFINES=-DVERSION=\"2.0\" -DSOUND_BUFFER_SIZE=768
 BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAME)\""
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
