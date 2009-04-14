@@ -203,3 +203,8 @@ int ui_init_finalize()
 void ui_shutdown()
 {
 }
+
+char* ui_get_file(const char *format,...)
+{
+    return NULL;
+}

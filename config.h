@@ -164,7 +164,7 @@
 /* #undef HAVE_FULLSCREEN */
 
 /* Define to 1 if you have the `getcwd' function. */
-/* #define HAVE_GETCWD 1 */
+#define HAVE_GETCWD 1
 
 /* Define to 1 if you have the `getdtablesize' function. */
 /* #define HAVE_GETDTABLESIZE 1 */
@@ -652,7 +652,7 @@
 /* #undef USE_XF86_VIDMODE_EXT */
 
 /* Version number of package */
-#define VERSION "2.0"
+#define VERSION "2.1"
 
 /* Win32 Version string. */
 #define VERSION_RC "$VERSION_RC"

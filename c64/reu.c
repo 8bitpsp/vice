@@ -7,7 +7,10 @@
  * Written by
  *  Andreas Boose <viceteam@t-online.de>
  *  Spiro Trikaliotis <spiro.trikaliotis@gmx.de>
- * 
+ *
+ * Additions upon extensive REU hardware testing:
+ *  Wolfgang Moser <http://d81.de>
+ *
  * Based on old code by
  *  Jouko Valta <jopi@stekt.oulu.fi>
  *  Richard Hable <K3027E7@edvz.uni-linz.ac.at>
@@ -53,9 +56,7 @@
 #include "resources.h"
 #include "reu.h"
 #include "snapshot.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "types.h"
 #include "util.h"
 
@@ -101,6 +102,14 @@ enum {
     #define DEBUG_LOG( _level, _x )
 
 #endif
+
+/*! \brief Shortcut to check for masked bits being all set */
+#define BITS_ARE_ALL_SET(_where, _bits) \
+  ( (((_where) & (_bits)) == (_bits)) )
+
+/*! \brief Shortcut to check for masked bits being all cleared */
+#define BITS_ARE_ALL_UNSET(_where, _bits) \
+  ( (((_where) & (_bits)) == 0) )
 
 /*
  * Status and Command Registers
@@ -454,33 +463,30 @@ void reu_resources_shutdown(void)
 
 /* ------------------------------------------------------------------------- */
 
-#ifdef HAS_TRANSLATION
 static const cmdline_option_t cmdline_options[] =
 {
-    { "-reu", SET_RESOURCE, 0, NULL, NULL, "REU", (resource_value_t)1,
-      0, IDCLS_ENABLE_REU },
-    { "+reu", SET_RESOURCE, 0, NULL, NULL, "REU", (resource_value_t)0,
-      0, IDCLS_DISABLE_REU },
-    { "-reuimage", SET_RESOURCE, 1, NULL, NULL, "REUfilename", NULL,
-      IDCLS_P_NAME, IDCLS_SPECIFY_REU_NAME },
-    { "-reusize", SET_RESOURCE, 1, NULL, NULL, "REUsize", NULL,
-      IDCLS_P_SIZE_IN_KB, IDCLS_REU_SIZE },
+    { "-reu", SET_RESOURCE, 0,
+      NULL, NULL, "REU", (resource_value_t)1,
+      USE_PARAM_STRING, USE_DESCRIPTION_ID,
+      IDCLS_UNUSED, IDCLS_ENABLE_REU,
+      NULL, NULL },
+    { "+reu", SET_RESOURCE, 0,
+      NULL, NULL, "REU", (resource_value_t)0,
+      USE_PARAM_STRING, USE_DESCRIPTION_ID,
+      IDCLS_UNUSED, IDCLS_DISABLE_REU,
+      NULL, NULL },
+    { "-reuimage", SET_RESOURCE, 1,
+      NULL, NULL, "REUfilename", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_REU_NAME,
+      NULL, NULL },
+    { "-reusize", SET_RESOURCE, 1,
+      NULL, NULL, "REUsize", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_SIZE_IN_KB, IDCLS_REU_SIZE,
+      NULL, NULL },
     { NULL }
 };
-#else
-static const cmdline_option_t cmdline_options[] =
-{
-    { "-reu", SET_RESOURCE, 0, NULL, NULL, "REU", (resource_value_t)1,
-      NULL, N_("Enable the RAM expansion unit") },
-    { "+reu", SET_RESOURCE, 0, NULL, NULL, "REU", (resource_value_t)0,
-      NULL, N_("Disable the RAM expansion unit") },
-    { "-reuimage", SET_RESOURCE, 1, NULL, NULL, "REUfilename", NULL,
-      N_("<name>"), N_("Specify name of REU image") },
-    { "-reusize", SET_RESOURCE, 1, NULL, NULL, "REUsize", NULL,
-      N_("<size in KB>"), N_("Size of the RAM expansion unit") },
-    { NULL }
-};
-#endif
 
 /*! \brief initialize the command-line options'
  \return
@@ -647,12 +653,12 @@ static BYTE reu_read_without_sideeffects(WORD addr)
         break;
 
       case REU_REG_RW_INTERRUPT:
-        assert((rec.int_mask_reg & REU_REG_RW_INTERRUPT_UNUSED_MASK) == REU_REG_RW_INTERRUPT_UNUSED_MASK);
+        assert( BITS_ARE_ALL_SET(rec.int_mask_reg, REU_REG_RW_INTERRUPT_UNUSED_MASK) );
         retval = rec.int_mask_reg;
         break;
 
       case REU_REG_RW_ADDR_CONTROL:
-        assert((rec.address_control_reg & REU_REG_RW_ADDR_CONTROL_UNUSED_MASK) == REU_REG_RW_ADDR_CONTROL_UNUSED_MASK);
+        assert( BITS_ARE_ALL_SET(rec.address_control_reg, REU_REG_RW_ADDR_CONTROL_UNUSED_MASK) );
         retval = rec.address_control_reg;
         break;
     }
@@ -800,11 +806,39 @@ void REGPARM2 reu_store(WORD addr, BYTE byte)
 
         DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "store [$%02X] <= $%02X.", addr, (int)byte) );
 
-        /* write REC command register
-         * DMA only if execution bit (7) set  - RH */
-        if ((addr == REU_REG_RW_COMMAND) && (rec.command & REU_REG_RW_COMMAND_EXECUTE)) {
-            reu_dma(rec.command & REU_REG_RW_COMMAND_FF00_TRIGGER_DISABLED);
+        switch (addr)
+        {
+        case REU_REG_RW_COMMAND:
+            /* write REC command register
+             * DMA only if execution bit (7) set  - RH */
+            if (BITS_ARE_ALL_SET(rec.command, REU_REG_RW_COMMAND_EXECUTE)) {
+                reu_dma(rec.command & REU_REG_RW_COMMAND_FF00_TRIGGER_DISABLED);
+            }
+            break;
+
+        case REU_REG_RW_INTERRUPT:
+            if (BITS_ARE_ALL_SET(rec.int_mask_reg,
+                    REU_REG_RW_INTERRUPT_END_OF_BLOCK_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED)
+                && BITS_ARE_ALL_SET(rec.status, REU_REG_R_STATUS_END_OF_BLOCK))
+            {
+                DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "End-of-transfer interrupt pending") );
+                rec.status |= REU_REG_R_STATUS_INTERRUPT_PENDING;
+                maincpu_set_irq(reu_int_num, 1);
+            }
+            if (BITS_ARE_ALL_SET(rec.int_mask_reg,
+                    REU_REG_RW_INTERRUPT_VERIFY_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED)
+                && BITS_ARE_ALL_SET(rec.status, REU_REG_R_STATUS_VERIFY_ERROR))
+            {
+                DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "Verify interrupt pending") );
+                rec.status |= REU_REG_R_STATUS_INTERRUPT_PENDING;
+                maincpu_set_irq(reu_int_num, 1);
+            }
+            break;
+
+        default:
+            break;
         }
+
     }
 }
 
@@ -940,11 +974,11 @@ static void reu_dma_update_regs(WORD host_addr, unsigned int reu_addr,
          * address changes only if not fixed, correct reu base registers  -RH
          */
         DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "No autoload.") );
-        if ( (rec.address_control_reg & REU_REG_RW_ADDR_CONTROL_FIX_C64) == 0) {
+        if ( BITS_ARE_ALL_UNSET(rec.address_control_reg, REU_REG_RW_ADDR_CONTROL_FIX_C64) ) {
             rec.base_computer = host_addr;
         }
 
-        if ( (rec.address_control_reg & REU_REG_RW_ADDR_CONTROL_FIX_REC) == 0) {
+        if ( BITS_ARE_ALL_UNSET(rec.address_control_reg, REU_REG_RW_ADDR_CONTROL_FIX_REC) ) {
             rec.base_reu = reu_addr & 0xffff;
             rec.bank_reu = (reu_addr >> 16) & 0xff;
         }
@@ -960,19 +994,20 @@ static void reu_dma_update_regs(WORD host_addr, unsigned int reu_addr,
         DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "Autoload.") );
     }
 
-    if ((rec.int_mask_reg 
-            & (REU_REG_RW_INTERRUPT_END_OF_BLOCK_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED)) 
-           == (REU_REG_RW_INTERRUPT_END_OF_BLOCK_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED))
-    {
-        DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "Interrupt pending") );
-        rec.status |= REU_REG_R_STATUS_INTERRUPT_PENDING;
-        maincpu_set_irq(reu_int_num, 1);
+    if ( BITS_ARE_ALL_SET(new_status_or_mask, REU_REG_R_STATUS_END_OF_BLOCK) ) {
+        /* only check for interrupt, when the transfer ended correctly (no verify error) */
+        if ( BITS_ARE_ALL_SET(rec.int_mask_reg,
+             REU_REG_RW_INTERRUPT_END_OF_BLOCK_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED))
+        {
+            DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "Interrupt pending") );
+            rec.status |= REU_REG_R_STATUS_INTERRUPT_PENDING;
+            maincpu_set_irq(reu_int_num, 1);
+        }
     }
 
-    if ( new_status_or_mask | REU_REG_R_STATUS_VERIFY_ERROR ) {
-        if ((rec.int_mask_reg 
-               & (REU_REG_RW_INTERRUPT_VERIFY_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED))
-              == (REU_REG_RW_INTERRUPT_VERIFY_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED))
+    if ( BITS_ARE_ALL_SET(new_status_or_mask, REU_REG_R_STATUS_VERIFY_ERROR)) {
+        if ( BITS_ARE_ALL_SET(rec.int_mask_reg,
+             REU_REG_RW_INTERRUPT_VERIFY_ENABLED | REU_REG_RW_INTERRUPT_INTERRUPTS_ENABLED))
         {
             DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "Verify Interrupt pending") );
             rec.status |= REU_REG_R_STATUS_INTERRUPT_PENDING;
@@ -1180,12 +1215,13 @@ static void reu_dma_compare(WORD host_addr, unsigned int reu_addr,
             DEBUG_LOG( DEBUG_LEVEL_REGISTER, (reu_log, "VERIFY ERROR") );
             new_status_or_mask |= REU_REG_R_STATUS_VERIFY_ERROR;
 
-            /* weird behaviour of the 17xx: If the last or next-to-last byte
-             * failed, the "end of block transfer" bit is set, too (cf. below),
-             * and the reported length is 1
+            /* weird behaviour no. 1 of the 17xx:
+             * failed verify operations consume one extra cycle, except if
+             * the failed comparison happened on the last byte of the buffer.
              */
-            if (len <= 1) {
-                len = 1;
+            if( len >= 1 ) {
+                maincpu_clk++;
+                machine_handle_pending_alarms(0);
             }
             break;
         }
@@ -1194,15 +1230,30 @@ static void reu_dma_compare(WORD host_addr, unsigned int reu_addr,
     /* the length was decremented once too much, correct this */
     if (len == 0) {
         ++len;
-    }
 
-    assert( len >= 1 );
-
-    if (len == 1) {
+        /* weird behaviour no. 2 of the 17xx:
+         * If the last byte failed, the "end of block transfer" bit is set, too
+         */
         /* all bytes are equal, mark End Of Block */
         new_status_or_mask |= REU_REG_R_STATUS_END_OF_BLOCK;
     }
+    else if (len == 1) {
+        /* weird behaviour no. 3 of the 17xx:
+         * If the next-to-last byte failed, the "end of block transfer" bit is
+         * set, but only if the last byte compares equal
+         */
 
+        value_from_reu = read_from_reu(reu_addr);
+        value_from_c64 = mem_read(host_addr);
+        DEBUG_LOG( DEBUG_LEVEL_TRANSFER_LOW_LEVEL, (reu_log,
+                    "Comparing bytes after verify error: %x from main $%04X with %x from ext $%05X.",
+                    value_from_c64, host_addr, value_from_reu, reu_addr) );
+        if (value_from_reu == value_from_c64) {
+            new_status_or_mask |= REU_REG_R_STATUS_END_OF_BLOCK;
+        }
+    }
+
+    assert( len >= 1 );
     reu_dma_update_regs(host_addr, reu_addr, len, new_status_or_mask);
 }
 

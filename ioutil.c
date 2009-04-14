@@ -137,7 +137,6 @@ int ioutil_errno(unsigned int check)
 
 #if !defined(VMS) && !defined(__VAX)
 #if !defined(HAVE_GETCWD) && !defined(RISCOS)
-#if !defined(PSP)
 char *getcwd (char *buf, size_t len)
 {
   char ourbuf[PATH_MAX];
@@ -155,7 +154,6 @@ char *getcwd (char *buf, size_t len)
   }
   return buf;
 }
-#endif
 #endif
 #endif
 

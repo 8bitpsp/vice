@@ -98,6 +98,9 @@ static int set_sid_engine(int set_engine, void *param)
 #ifdef HAVE_RESID
         && engine != SID_ENGINE_RESID
 #endif
+#ifdef HAVE_RESID_FP
+        && engine != SID_ENGINE_RESID_FP
+#endif
 #ifdef HAVE_CATWEASELMKIII
         && engine != SID_ENGINE_CATWEASELMKIII
 #endif
@@ -140,8 +143,12 @@ static int set_sid_filters_enabled(int val, void *param)
 
 static int set_sid_stereo(int val, void *param)
 {
-    sid_stereo = val;
-    sound_state_changed = 1;
+    if (machine_class != VICE_MACHINE_C64DTV) {
+        sid_stereo = val;
+        sound_state_changed = 1;
+    } else {
+        sid_stereo = 0;
+    }
     return 0;
 }
 
@@ -161,12 +168,47 @@ int sid_set_sid_stereo_address(int val, void *param)
 
 static int set_sid_model(int val, void *param)
 {
+#if defined(HAVE_RESID) || defined(HAVE_RESID_FP)
+    int sidengine = 0;
+#endif
+
     sid_model = val;
+
+    if(sid_model == SID_MODEL_DEFAULT) {
+        if (machine_class == VICE_MACHINE_C64DTV) {
+            sid_model = SID_MODEL_DTVSID;
+        } else {
+            sid_model = SID_MODEL_6581;
+        }
+    }
+
+#if defined(HAVE_RESID) || defined(HAVE_RESID_FP)
+    /* Select ReSID or ReSID-FP based on the model number */
+    if (resources_get_int("SidEngine", &sidengine) < 0)
+        return -1;
+
+    /* DTVSID is only supported in ReSID */
+    if((sid_model == SID_MODEL_DTVSID) && (sidengine != SID_ENGINE_RESID)) {
+        set_sid_engine(SID_ENGINE_RESID, NULL);
+        return 0;
+    }
+#ifdef HAVE_RESID_FP
+    if((sid_model < SID_MODEL_6581R3_4885) && (sidengine == SID_ENGINE_RESID_FP)) {
+        set_sid_engine(SID_ENGINE_RESID, NULL);
+        return 0;
+    }
+
+    if((sid_model >= SID_MODEL_6581R3_4885) && (sidengine != SID_ENGINE_RESID_FP)) {
+        set_sid_engine(SID_ENGINE_RESID_FP, NULL);
+        return 0;
+    }
+#endif
+#endif
     sid_state_changed = 1;
     return 0;
 }
 
-#ifdef HAVE_RESID
+#if defined(HAVE_RESID) || defined(HAVE_RESID_FP)
 static int set_sid_resid_sampling(int val, void *param)
 {
     sid_resid_sampling = val;
@@ -272,7 +314,7 @@ static const resource_int_t sidengine_resources_int[] = {
     { NULL }
 };
 
-#ifdef HAVE_RESID
+#if defined(HAVE_RESID) || defined(HAVE_RESID_FP)
 static const resource_int_t resid_resources_int[] = {
     { "SidResidSampling", 0, RES_EVENT_NO, NULL,
       &sid_resid_sampling, set_sid_resid_sampling, NULL },
@@ -287,7 +329,7 @@ static const resource_int_t resid_resources_int[] = {
 static const resource_int_t common_resources_int[] = {
     { "SidFilters", 1, RES_EVENT_SAME, NULL,
       &sid_filters_enabled, set_sid_filters_enabled, NULL },
-    { "SidModel", 0, RES_EVENT_SAME, NULL,
+    { "SidModel", SID_MODEL_DEFAULT, RES_EVENT_SAME, NULL,
       &sid_model, set_sid_model, NULL },
     { "SidStereo", 0, RES_EVENT_SAME, NULL,
       &sid_stereo, set_sid_stereo, NULL },
@@ -317,7 +359,7 @@ int sid_resources_init(void)
     if (resources_register_int(sidengine_resources_int)<0)
         return -1;
 
-#ifdef HAVE_RESID
+#if defined(HAVE_RESID) || defined(HAVE_RESID_FP)
     if (resources_register_int(resid_resources_int)<0)
         return -1;
 #endif

@@ -36,6 +36,7 @@
 #include "attach.h"
 #include "clkguard.h"
 #include "cmdline.h"
+#include "crc32.h"
 #include "datasette.h"
 #include "debug.h"
 #include "event.h"
@@ -50,9 +51,7 @@
 #include "resources.h"
 #include "snapshot.h"
 #include "tape.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "types.h"
 #include "ui.h"
 #include "util.h"
@@ -93,6 +92,7 @@ static char *event_start_snapshot = NULL;
 static char *event_end_snapshot = NULL;
 static char *event_snapshot_path_str = NULL;
 static int event_start_mode;
+static int event_image_include;
 
 
 static char *event_snapshot_path(const char *snapshot_file)
@@ -118,14 +118,18 @@ static int event_image_append(const char *filename,
     while (event_image_list_ptr->next != NULL) {
         if (strcmp(filename, event_image_list_ptr->next->orig_filename) == 0) {
             if (mapped_name != NULL) {
-                if (append == 0)
-                    *mapped_name = lib_stralloc(event_image_list_ptr->next->mapped_filename);
-                else
+                if (append == 0) {
+                    if (event_image_list_ptr->next->mapped_filename != NULL) {
+                        *mapped_name = lib_stralloc(event_image_list_ptr->next->mapped_filename);
+                    } else {
+                        return 1;
+                    }
+                } else {
                     event_image_list_ptr->next->mapped_filename = lib_stralloc(*mapped_name);
+                }
             }
             return 0;
         }
-
         event_image_list_ptr = event_image_list_ptr->next;
     }
 
@@ -136,7 +140,7 @@ static int event_image_append(const char *filename,
     event_image_list_ptr->next = NULL;
     event_image_list_ptr->orig_filename = lib_stralloc(filename);
     event_image_list_ptr->mapped_filename = NULL;
-    if (mapped_name != NULL)
+    if (mapped_name != NULL && append)
         event_image_list_ptr->mapped_filename = lib_stralloc(*mapped_name);
 
     return 1;
@@ -148,38 +152,53 @@ void event_record_attach_in_list(event_list_state_t *list, unsigned int unit,
 {
     char *event_data;
     unsigned int size;
+    char *strdir, *strfile;
 
     list->current->type = EVENT_ATTACHIMAGE;
     list->current->clk = maincpu_clk;
     list->current->next
         = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
 
-    size = strlen(filename) + 3;
+    util_fname_split(filename, &strdir, &strfile);
+
+    if (event_image_include)
+        size = strlen(filename) + 3;
+    else
+        size = strlen(strfile) + sizeof(long) + 4;
 
     event_data = lib_malloc(size);
     event_data[0] = unit;
     event_data[1] = read_only;
-    strcpy(&event_data[2], filename);
 
-    if (event_image_append(filename, NULL, 0) == 1) {
-        FILE *fd;
-        size_t file_len = 0;
+    if (event_image_include) {
+        strcpy(&event_data[2], filename);
+        if (event_image_append(filename, NULL, 0) == 1) {
+            FILE *fd;
+            size_t file_len = 0;
         
-        fd = fopen(filename, MODE_READ);
+            fd = fopen(filename, MODE_READ);
 
-        if (fd != NULL) {
-            file_len = util_file_length(fd);
-            event_data = lib_realloc(event_data, size + file_len);
+            if (fd != NULL) {
+                file_len = util_file_length(fd);
+                event_data = lib_realloc(event_data, size + file_len);
 
-            if (fread(&event_data[size], file_len, 1, fd) != 1)
-                log_error(event_log, "Cannot load image file %s", filename);
+                if (fread(&event_data[size], file_len, 1, fd) != 1)
+                    log_error(event_log, "Cannot load image file %s", filename);
 
-            fclose(fd);
-        } else {
-            log_error(event_log, "Cannot open image file %s", filename);
+                fclose(fd);
+            } else {
+                log_error(event_log, "Cannot open image file %s", filename);
+            }
+            size += file_len;
         }
-        size += file_len;
+    } else {
+        strcpy(&event_data[2], "");
+        *(unsigned long *)(event_data + 3) = crc32_file(filename);
+        strcpy(&event_data[3 + sizeof(long)], strfile);
     }
+
+    lib_free(strdir);
+    lib_free(strfile);
 
     list->current->size = size;
     list->current->data = event_data;
@@ -201,48 +220,55 @@ static void event_playback_attach_image(void *data, unsigned int size)
     unsigned int unit, read_only;
     char *orig_filename, *filename = NULL;
     size_t file_len;
+    unsigned long crc_to_attach;
 
     unit = (unsigned int)((char*)data)[0];
     read_only = (unsigned int)((char*)data)[1];
     orig_filename = &((char*)data)[2];
-    file_len  = size - strlen(orig_filename) - 3;
 
-    if (file_len > 0) {
-        FILE *fd;
+    if (*orig_filename == 0) {
+        /* no image attached */
+        orig_filename = (char *) data + 3 + sizeof(long);
 
-        fd = archdep_mkstemp_fd(&filename, MODE_WRITE);
-
-        if (fd == NULL) {
-#ifdef HAS_TRANSLATION
-            ui_error(translate_text(IDGS_CANNOT_CREATE_IMAGE), filename);
-#else
-            ui_error(_("Cannot create image file!"));
-#endif
-            goto error;
-        }
-
-        if (fwrite((char*)data + strlen(orig_filename) + 3, file_len, 1, fd) != 1) {
-#ifdef HAS_TRANSLATION
-            ui_error(translate_text(IDGS_CANNOT_WRITE_IMAGE_FILE_S), filename);
-#else
-            ui_error(_("Cannot write image file %s"), filename);
-#endif
-            goto error;
-        }
-
-        fclose(fd);
-        event_image_append(orig_filename, &filename, 1);
-    } else {
         if (event_image_append(orig_filename, &filename, 0) != 0) {
-#ifdef HAS_TRANSLATION
-            ui_error(translate_text(IDGS_CANNOT_FIND_MAPPED_NAME_S), orig_filename);
-#else
-            ui_error(_("Cannot find mapped name for %s"), orig_filename);
-#endif
-            return;
+            crc_to_attach = *(unsigned long *)(((char *)data)+3);
+            do {
+                filename = ui_get_file("Please attach image %s (CRC32 checksum 0x%x)",
+                            (char *) data + 3 + sizeof(long), crc_to_attach);
+            } while (filename != NULL && crc_to_attach != crc32_file(filename));
+            if (filename == NULL) {
+                ui_error("Image wasn't attached. Playback will probably get out of sync.");
+                return;
+            }
+            event_image_append(orig_filename, &filename, 1);
+        }
+    } else {
+        file_len  = size - strlen(orig_filename) - 3;
+
+        if (file_len > 0) {
+            FILE *fd;
+
+            fd = archdep_mkstemp_fd(&filename, MODE_WRITE);
+    
+            if (fd == NULL) {
+                ui_error(translate_text(IDGS_CANNOT_CREATE_IMAGE), filename);
+                goto error;
+            }
+
+            if (fwrite((char*)data + strlen(orig_filename) + 3, file_len, 1, fd) != 1) {
+                ui_error(translate_text(IDGS_CANNOT_WRITE_IMAGE_FILE_S), filename);
+                goto error;
+            }
+
+            fclose(fd);
+            event_image_append(orig_filename, &filename, 1);
+        } else {
+            if (event_image_append(orig_filename, &filename, 0) != 0) {
+                ui_error(translate_text(IDGS_CANNOT_FIND_MAPPED_NAME_S), orig_filename);
+                return;
+            }
         }
     }
-
     /* now filename holds the name to attach    */
     /* FIXME: read_only isn't handled for tape  */
     if (unit == 1) {
@@ -614,11 +640,7 @@ static void event_record_start_trap(WORD addr, void *data)
       case EVENT_START_MODE_FILE_SAVE:
         if (machine_write_snapshot(event_snapshot_path(event_start_snapshot),
                                     1, 1, 0) < 0) {
-#ifdef HAS_TRANSLATION
             ui_error(translate_text(IDGS_CANT_CREATE_START_SNAP_S), 
-#else
-            ui_error(_("Could not create start snapshot file %s."), 
-#endif
                         event_snapshot_path(event_start_snapshot));
             ui_display_recording(0);
             return;
@@ -633,11 +655,7 @@ static void event_record_start_trap(WORD addr, void *data)
       case EVENT_START_MODE_FILE_LOAD:
         if (machine_read_snapshot(
                 event_snapshot_path(event_end_snapshot), 1) < 0) {
-#ifdef HAS_TRANSLATION
             ui_error(translate_text(IDGS_ERROR_READING_END_SNAP_S),
-#else
-            ui_error(_("Error reading end snapshot file %s."),
-#endif
                         event_snapshot_path(event_end_snapshot));
             return;
         }
@@ -701,11 +719,7 @@ static void event_record_stop_trap(WORD addr, void *data)
 {
     if (machine_write_snapshot(
             event_snapshot_path(event_end_snapshot), 1, 1, 1) < 0) {
-#ifdef HAS_TRANSLATION
         ui_error(translate_text(IDGS_CANT_CREATE_END_SNAP_S),
-#else
-        ui_error(_("Could not create end snapshot file %s."),
-#endif
                     event_snapshot_path(event_end_snapshot));
         return;
     }
@@ -769,11 +783,7 @@ static void event_playback_start_trap(WORD addr, void *data)
         event_snapshot_path(event_end_snapshot), &major, &minor, machine_name);
 
     if (s == NULL) {
-#ifdef HAS_TRANSLATION
         ui_error(translate_text(IDGS_CANT_OPEN_END_SNAP_S), 
-#else
-        ui_error(_("Could not open end snapshot file %s."), 
-#endif
                     event_snapshot_path(event_end_snapshot));
         ui_display_playback(0, NULL);
         return;
@@ -784,11 +794,7 @@ static void event_playback_start_trap(WORD addr, void *data)
 
     if (event_snapshot_read_module(s, 1) < 0) {
         snapshot_close(s);
-#ifdef HAS_TRANSLATION
         ui_error(translate_text(IDGS_CANT_FIND_SECTION_END_SNAP));
-#else
-        ui_error(_("Could not find event section in end snapshot file."));
-#endif
         ui_display_playback(0, NULL);
         return;
     }
@@ -808,11 +814,7 @@ static void event_playback_start_trap(WORD addr, void *data)
                     event_snapshot_path(event_start_snapshot), 0) < 0)
             {
                 char *st = lib_stralloc(event_snapshot_path((char *)(&data[1])));
-#ifdef HAS_TRANSLATION
                 ui_error(translate_text(IDGS_ERROR_READING_START_SNAP_TRIED),
-#else
-                ui_error(_("Error reading start snapshot file. Tried %s and %s"),
-#endif
                             st, event_snapshot_path(event_start_snapshot));
                 lib_free(st);
                 ui_display_playback(0, NULL);
@@ -838,11 +840,7 @@ static void event_playback_start_trap(WORD addr, void *data)
     } else {
         if (machine_read_snapshot(
                 event_snapshot_path(event_start_snapshot), 0) < 0) {
-#ifdef HAS_TRANSLATION
             ui_error(translate_text(IDGS_ERROR_READING_START_SNAP));
-#else
-            ui_error(_("Error reading start snapshot file."));
-#endif
             ui_display_playback(0, NULL);
             return;
         }
@@ -895,11 +893,7 @@ static void event_record_set_milestone_trap(WORD addr, void *data)
 {
     if (machine_write_snapshot(
         event_snapshot_path(event_end_snapshot), 1, 1, 1) < 0) {
-#ifdef HAS_TRANSLATION
             ui_error(translate_text(IDGS_CANT_CREATE_END_SNAP_S),
-#else
-            ui_error(_("Could not create end snapshot file %s."),
-#endif
                         event_snapshot_path(event_end_snapshot));
     } else {
         milestone_timestamp_alarm = next_timestamp_clk;
@@ -928,11 +922,7 @@ static void event_record_reset_milestone_trap(WORD addr, void *data)
 
     if (machine_read_snapshot(
             event_snapshot_path(event_end_snapshot), 1) < 0) {
-#ifdef HAS_TRANSLATION
         ui_error(translate_text(IDGS_ERROR_READING_END_SNAP_S),
-#else
-        ui_error(_("Error reading end snapshot file %s."),
-#endif
                     event_snapshot_path(event_end_snapshot));
         return;
     }
@@ -1173,6 +1163,12 @@ static int set_event_start_mode(int mode, void *param)
     return 0;
 }
 
+static int set_event_image_include(int enable, void *param)
+{
+    event_image_include = enable;
+    return 0;
+}
+
 static const resource_string_t resources_string[] = {
     { "EventSnapshotDir", 
       FSDEVICE_DEFAULT_DIR FSDEV_DIR_SEP_STR, RES_EVENT_NO, NULL,
@@ -1187,6 +1183,8 @@ static const resource_string_t resources_string[] = {
 static const resource_int_t resources_int[] = {
     { "EventStartMode", EVENT_START_MODE_FILE_SAVE, RES_EVENT_NO, NULL,
       &event_start_mode, set_event_start_mode, NULL },
+    { "EventImageInclude", 1, RES_EVENT_NO, NULL,
+      &event_image_include, set_event_image_include, NULL },
     { NULL }
 };
 
@@ -1215,19 +1213,14 @@ static int cmdline_help(const char *param, void *extra_param)
     return event_playback_start();
 }
 
-#ifdef HAS_TRANSLATION
 static const cmdline_option_t cmdline_options[] = {
-    { "-playback", CALL_FUNCTION, 0, cmdline_help, NULL, NULL, NULL,
-      0, IDCLS_PLAYBACK_RECORDED_EVENTS },
+    { "-playback", CALL_FUNCTION, 0,
+      cmdline_help, NULL, NULL, NULL,
+      USE_PARAM_STRING, USE_DESCRIPTION_ID,
+      IDCLS_UNUSED, IDCLS_PLAYBACK_RECORDED_EVENTS,
+      NULL, NULL },
     { NULL }
 };
-#else
-static const cmdline_option_t cmdline_options[] = {
-    { "-playback", CALL_FUNCTION, 0, cmdline_help, NULL, NULL, NULL,
-      NULL, N_("Playback recorded events") },
-    { NULL }
-};
-#endif
 
 int event_cmdline_options_init(void)
 {

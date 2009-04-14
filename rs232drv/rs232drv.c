@@ -32,22 +32,17 @@
 #include "resources.h"
 #include "rs232.h"
 #include "rs232drv.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "types.h"
 #include "util.h"
 
-
 #ifdef HAVE_RS232
 
-#define NUM_DEVICES 4
-
-/*static*/ char *devfile[NUM_DEVICES] = { NULL, NULL, NULL, NULL };
+char *rs232_devfile[RS232_NUM_DEVICES] = { NULL };
 
 static int set_devfile(const char *val, void *param)
 {
-    util_string_set(&devfile[(int)param], val);
+    util_string_set(&rs232_devfile[(int)param], val);
     return 0;
 }
 
@@ -55,15 +50,19 @@ static int set_devfile(const char *val, void *param)
 
 static const resource_string_t resources_string[] = {
     { "RsDevice1", ARCHDEP_RS232_DEV1, RES_EVENT_NO, NULL,
-      &devfile[0], set_devfile, (void *)0 },
+      &rs232_devfile[0], set_devfile, (void *)0 },
     { "RsDevice2", ARCHDEP_RS232_DEV2, RES_EVENT_NO, NULL,
-      &devfile[1], set_devfile, (void *)1 },
+      &rs232_devfile[1], set_devfile, (void *)1 },
     { "RsDevice3", ARCHDEP_RS232_DEV3, RES_EVENT_NO, NULL,
-      &devfile[2], set_devfile, (void *)2 },
+      &rs232_devfile[2], set_devfile, (void *)2 },
     { "RsDevice4", ARCHDEP_RS232_DEV4, RES_EVENT_NO, NULL,
-      &devfile[3], set_devfile, (void *)3 },
+      &rs232_devfile[3], set_devfile, (void *)3 },
     { NULL }
 };
+
+#if RS232_NUM_DEVICES != 4
+# error Please fix the count of resources_string[] and cmdline_options[]!
+#endif
 
 int rs232drv_resources_init(void)
 {
@@ -75,39 +74,36 @@ int rs232drv_resources_init(void)
 
 void rs232drv_resources_shutdown(void)
 {
-    lib_free(devfile[0]);
-    lib_free(devfile[1]);
-    lib_free(devfile[2]);
-    lib_free(devfile[3]);
+    int i;
+    for (i = 0; i < RS232_NUM_DEVICES; i++)
+        lib_free(rs232_devfile[i]);
 
     rs232_resources_shutdown();
 }
 
-#ifdef HAS_TRANSLATION
 static const cmdline_option_t cmdline_options[] = {
-    { "-rsdev1", SET_RESOURCE, 1, NULL, NULL, "RsDevice1", NULL,
-      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_1_NAME },
-    { "-rsdev2", SET_RESOURCE, 1, NULL, NULL, "RsDevice2", NULL,
-      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_2_NAME },
-    { "-rsdev3", SET_RESOURCE, 1, NULL, NULL, "RsDevice3", NULL,
-      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_3_NAME },
-    { "-rsdev4", SET_RESOURCE, 1, NULL, NULL, "RsDevice4", NULL,
-      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_4_NAME },
+    { "-rsdev1", SET_RESOURCE, 1,
+      NULL, NULL, "RsDevice1", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_1_NAME,
+      NULL, NULL },
+    { "-rsdev2", SET_RESOURCE, 1,
+      NULL, NULL, "RsDevice2", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_2_NAME,
+      NULL, NULL },
+    { "-rsdev3", SET_RESOURCE, 1,
+      NULL, NULL, "RsDevice3", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_3_NAME,
+      NULL, NULL },
+    { "-rsdev4", SET_RESOURCE, 1,
+      NULL, NULL, "RsDevice4", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_RS232_4_NAME,
+      NULL, NULL },
     { NULL }
 };
-#else
-static const cmdline_option_t cmdline_options[] = {
-    { "-rsdev1", SET_RESOURCE, 1, NULL, NULL, "RsDevice1", NULL,
-      N_("<name>"), N_("Specify name of first RS232 device") },
-    { "-rsdev2", SET_RESOURCE, 1, NULL, NULL, "RsDevice2", NULL,
-      N_("<name>"), N_("Specify name of second RS232 device") },
-    { "-rsdev3", SET_RESOURCE, 1, NULL, NULL, "RsDevice3", NULL,
-      N_("<name>"), N_("Specify name of third RS232 device") },
-    { "-rsdev4", SET_RESOURCE, 1, NULL, NULL, "RsDevice4", NULL,
-      N_("<name>"), N_("Specify name of fourth RS232 device") },
-    { NULL }
-};
-#endif
 
 int rs232drv_cmdline_options_init(void)
 {
@@ -147,6 +143,21 @@ int rs232drv_getc(int fd, BYTE *b)
     return rs232_getc(fd, b);
 }
 
+int rs232drv_set_status(int fd, enum rs232handshake_out status)
+{
+    return rs232_set_status(fd, status);
+}
+
+enum rs232handshake_in rs232drv_get_status(int fd)
+{
+    return rs232_get_status(fd);
+}
+
+void rs232drv_set_bps(int fd, unsigned int bps)
+{
+    rs232_set_bps(fd, bps);
+}
+
 #else
 
 void rs232drv_init(void)
@@ -178,6 +189,20 @@ int rs232drv_getc(int fd, BYTE *b)
     return -1;
 }
 
+int rs232drv_set_status(int fd, enum rs232handshake_out status)
+{
+    return -1;
+}
+
+enum rs232handshake_in rs232drv_get_status(int fd)
+{
+    return 0;
+}
+
+void rs232drv_set_bps(int fd, unsigned int bps)
+{
+}
+
 int rs232drv_resources_init(void)
 {
     return 0;
@@ -193,4 +218,3 @@ int rs232drv_cmdline_options_init(void)
 }
 
 #endif
-

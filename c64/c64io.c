@@ -28,6 +28,7 @@
 
 #include <string.h>
 
+#include "c64-midi.h"
 #include "c64-resources.h"
 #include "c64_256k.h"
 #include "c64acia.h"
@@ -35,19 +36,20 @@
 #include "c64io.h"
 #include "cartridge.h"
 #include "digimax.h"
+#include "dqbb.h"
 #include "emuid.h"
 #include "lib.h"
 #include "mmc64.h"
+#include "cart/retroreplay.h"
 #include "monitor.h"
 #include "reu.h"
 #include "georam.h"
+#include "isepic.h"
 #include "ramcart.h"
 #include "resources.h"
 #include "sid-resources.h"
 #include "sid.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "types.h"
 #include "ui.h"
 #include "util.h"
@@ -78,6 +80,7 @@ static void io_source_detach(int detach_id, char *resource_name)
         resources_set_int(resource_name, 0);
         break;
     }
+    ui_update_menus();
 }
 
 static io_source_t io_source_table[] = {
@@ -108,6 +111,8 @@ static io_source_t io_source_table[] = {
     {IO_SOURCE_DIGIMAX, "DIGIMAX", IO_DETACH_RESOURCE, "DIGIMAX"},
     {IO_SOURCE_ACTION_REPLAY4, "ACTION REPLAY 4", IO_DETACH_CART, NULL},
     {IO_SOURCE_STARDOS, "STARDOS", IO_DETACH_CART, NULL},
+    {IO_SOURCE_MIDI, "MIDI", IO_DETACH_RESOURCE, "MIDIEnable"},
+    {IO_SOURCE_ISEPIC, "ISEPIC", IO_DETACH_RESOURCE, "Isepic"},
     {-1,NULL,0,NULL}
 };
 
@@ -139,8 +144,8 @@ static int get_io_source_index(int id)
   return 0;
 }
 
-#define MAX_IO1_RETURNS 8
-#define MAX_IO2_RETURNS 10
+#define MAX_IO1_RETURNS 10
+#define MAX_IO2_RETURNS 12
 
 #if MAX_IO1_RETURNS>MAX_IO2_RETURNS
 static int io_source_return[MAX_IO1_RETURNS];
@@ -181,11 +186,7 @@ static void io_source_msg_detach(int addr)
         {
             if (i==io_source_start)
             {
-#ifdef HAS_TRANSLATION
                 old_msg=lib_stralloc(translate_text(IDGS_IO_READ_COLL_AT_X_FROM));
-#else
-                old_msg=lib_stralloc(_("I/O read collision at %X from "));
-#endif
                 new_msg=util_concat(old_msg,get_io_source_name(io_source_return[i]),NULL);
                 lib_free(old_msg);
             }
@@ -198,13 +199,8 @@ static void io_source_msg_detach(int addr)
             if (i==io_source_end)
             {
                 old_msg=new_msg;
-#ifdef HAS_TRANSLATION
                 new_msg=util_concat(old_msg,translate_text(IDGS_AND),get_io_source_name(io_source_return[i]),
                                     translate_text(IDGS_ALL_DEVICES_DETACHED),NULL);
-#else
-                new_msg=util_concat(old_msg,_(" and "),get_io_source_name(io_source_return[i]),
-                                    _(".\nAll the named devices will be detached."),NULL);
-#endif
                 lib_free(old_msg);
             }
         }
@@ -267,12 +263,24 @@ BYTE REGPARM1 c64io1_read(WORD addr)
         io_source_counter++;
     }
 
+    if (isepic_enabled) {
+        return_value = isepic_reg_read(addr);
+        io_source_check(io_source_counter);
+        io_source_counter++;
+    }
+
 #ifdef HAVE_TFE
     if (tfe_enabled)
     {
         if (mmc64_enabled && tfe_as_rr_net) {
             if (mmc64_hw_clockport==0xde02 && mmc64_clockport_enabled && 
                 addr>0xde01 && addr<0xde10) {
+                return_value = tfe_read((WORD)(addr & 0x0f));
+                io_source_check(io_source_counter);
+                io_source_counter++;
+            }
+        } else if (rr_active && tfe_as_rr_net) {
+            if (rr_clockport_enabled && addr>0xde01 && addr<0xde10) {
                 return_value = tfe_read((WORD)(addr & 0x0f));
                 io_source_check(io_source_counter);
                 io_source_counter++;
@@ -295,10 +303,21 @@ BYTE REGPARM1 c64io1_read(WORD addr)
     }
 
 #ifdef HAVE_RS232
-    if (acia_de_enabled)
+    if (acia_de_enabled && addr <= 0xde07)
     {
         return_value = acia1_read((WORD)(addr & 0x07));
         io_source_check(io_source_counter);
+        io_source_counter++;
+    }
+#endif
+#ifdef HAVE_MIDI
+    if (midi_enabled && c64_midi_base_de00())
+    {
+        if(midi_test_read((WORD)(addr & 0xff))) {
+            return_value = midi_read((WORD)(addr & 0xff));
+            io_source = IO_SOURCE_MIDI;
+            io_source_check(io_source_counter);
+        }
         io_source_counter++;
     }
 #endif
@@ -336,6 +355,9 @@ void REGPARM2 c64io1_store(WORD addr, BYTE value)
     if (ramcart_enabled) {
         ramcart_reg_store((WORD)(addr&1), value);
     }
+    if (isepic_enabled) {
+        isepic_reg_store(addr, value);
+    }
     if (mmc64_enabled && mmc64_hw_clockport==0xde02 && addr==0xde01) {
         mmc64_clockport_enable_store(value);
     }
@@ -344,6 +366,10 @@ void REGPARM2 c64io1_store(WORD addr, BYTE value)
         if (mmc64_enabled && tfe_as_rr_net) {
             if (mmc64_hw_clockport==0xde02 && mmc64_clockport_enabled && 
                 addr>0xde01 && addr<0xde10) {
+                tfe_store((WORD)(addr & 0x0f), value);
+            }
+        } else if (rr_active && tfe_as_rr_net) {
+            if (rr_clockport_enabled && addr>0xde01 && addr<0xde10) {
                 tfe_store((WORD)(addr & 0x0f), value);
             }
         } else {
@@ -361,6 +387,14 @@ void REGPARM2 c64io1_store(WORD addr, BYTE value)
         acia1_store((WORD)(addr & 0x07), value);
     }
 #endif
+#ifdef HAVE_MIDI
+    if (midi_enabled && c64_midi_base_de00()) {
+        midi_store((WORD)(addr & 0xff), value);
+    }
+#endif
+    if (dqbb_enabled) {
+        dqbb_reg_store(addr, value);
+    }
     return;
 }
 
@@ -396,6 +430,11 @@ BYTE REGPARM1 c64io2_read(WORD addr)
     }
     if (ramcart_enabled) {
         return_value = ramcart_window_read(addr);
+        io_source_check(io_source_counter);
+        io_source_counter++;
+    }
+    if (isepic_enabled) {
+        return_value = isepic_window_read(addr);
         io_source_check(io_source_counter);
         io_source_counter++;
     }
@@ -435,6 +474,18 @@ BYTE REGPARM1 c64io2_read(WORD addr)
         io_source_check(io_source_counter);
         io_source_counter++;
     }
+
+#ifdef HAVE_MIDI
+    if (midi_enabled && !c64_midi_base_de00())
+    {
+        if(midi_test_read((WORD)(addr & 0xff))) {
+            return_value = midi_read((WORD)(addr & 0xff));
+            io_source = IO_SOURCE_MIDI;
+            io_source_check(io_source_counter);
+        }
+        io_source_counter++;
+    }
+#endif
 
     if (returned == 0)
         return vicii_read_phi1();
@@ -476,6 +527,9 @@ void REGPARM2 c64io2_store(WORD addr, BYTE value)
     if (ramcart_enabled) {
         ramcart_window_store(addr, value);
     }
+    if (isepic_enabled) {
+        isepic_window_store(addr, value);
+    }
     if (mmc64_enabled && addr >= 0xdf10 && addr <= 0xdf13) {
         mmc64_io2_store(addr, value);
     }
@@ -492,6 +546,13 @@ void REGPARM2 c64io2_store(WORD addr, BYTE value)
     if (mem_cartridge_type != CARTRIDGE_NONE) {
         cartridge_store_io2(addr, value);
     }
+
+#ifdef HAVE_MIDI
+    if (midi_enabled && !c64_midi_base_de00()) {
+        midi_store((WORD)(addr & 0xff), value);
+    }
+#endif
+
     return;
 }
 

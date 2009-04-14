@@ -39,460 +39,433 @@
 #include "montypes.h"
 #include "mon_parse.h" /* FIXME ! */
 #include "mon_util.h"
+#include "translate.h"
 #include "uimon.h"
 #include "util.h"
 
+#define GET_PARAM(c) ((c->use_param_names_id == USE_PARAM_ID) ? translate_text(c->param_names_id) : _(c->param_names))
+#define GET_DESCRIPTION(c) ((c->use_description_id == USE_DESCRIPTION_ID) ? translate_text(c->description_id) : _(c->description))
 
 typedef struct mon_cmds_s {
    const char *str;
    const char *abbrev;
+   int use_param_names_id;
+   int use_description_id;
+   int param_names_id;
+   int description_id;
    const char *param_names;
    const char *description;
 } mon_cmds_t;
 
 static const mon_cmds_t mon_cmd_array[] = {
-   { "", "", "", "Available commands are:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_AVAILABLE_COMMANDS_ARE,
+     "", NULL },
 
-   { "", "", "", "Machine state commands:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MACHINE_STATE_COMMANDS,
+     "", NULL },
 
-   { "bank",            "",
-     "[<memspace>] [bankname]",
-     "If bankname is not given, print the possible banks for the memspace.\n"
-     "If bankname is given set the current bank in the memspace to the given\n"
-     "bank." },
+   { "bank", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE_R_BANKNAME, IDGS_MON_BANK_DESCRIPTION,
+     NULL, NULL },
 
-   { "backtrace",       "bt",
-     NULL,
-     "Print JSR call chain (most recent call first). Stack offset\n"
-     "relative to SP+1 is printed in parentheses. This is a best guess\n"
-     "only." },
+   { "backtrace", "bt",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_BACKTRACE_DESCRIPTION,
+     NULL, NULL },
 
-   { "cpu",             "",
-     "<type>",
-     "Specify the type of CPU currently used (6502/z80)." },
+   { "cpu", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDCLS_P_TYPE, IDGS_MON_CPU_DESCRIPTION,
+     NULL, NULL },
 
-   { "cpuhistory",       "chis",
-     "[<count>]",
-     "Show <count> last executed commands." },
+   { "cpuhistory", "chis",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_COUNT, IDGS_MON_CPUHISTORY_DESCRIPTION,
+     NULL, NULL },
 
    { "dump",            "",
-     "\"<filename>\"",
-     "Write a snapshot of the machine into the file specified.\n"
-     "This snapshot is compatible with a snapshot written out by the UI.\n"
-     "Note: No ROM images are included into the dump." },
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME, IDGS_MON_DUMP_DESCRIPTION,
+     NULL, NULL },
 
-/*
-   { "down",            "",
-     NULL,
-     "*** unimplemented ***" },
-*/
+   { "goto", "g",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS, IDGS_MON_GOTO_DESCRIPTION,
+     NULL, NULL },
 
-   { "goto",            "g",
-     "<address>",
-     "Change the PC to ADDRESS and continue execution" },
+   { "io", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_IO_DESCRIPTION,
+     NULL, NULL },
 
-   { "io",              "",
-     NULL,
-     "Print out the I/O area of the emulated machine." },
+   { "next", "n",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_NEXT_DESCRIPTION,
+     NULL, NULL },
 
-   { "next",            "n",
-     NULL,
-     "Advance to the next instruction.  Subroutines are treated as\n"
-     "a single instruction." },
+   { "registers", "r",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_REG_NAME_P_NUMBER, IDGS_MON_REGISTERS_DESCRIPTION,
+     NULL, NULL },
 
-   { "registers",       "r",
-     "[<reg_name> = <number> [, <reg_name> = <number>]*]",
-     "Assign respective registers.  With no parameters, display register\n"
-     "values." },
+   { "reset", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_TYPE, IDGS_MON_RESET_DESCRIPTION,
+     NULL, NULL },
 
-   { "reset",           "",
-     "[<type>]",
-     "Reset the machine or drive. Type: 0 = soft, 1 = hard, 8-11 = drive." },
+   { "return", "ret",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_RETURN_DESCRIPTION,
+     NULL, NULL },
 
-   { "return",          "ret",
-     NULL,
-     "Continues execution and returns to the monitor just before the next\n"
-     "RTS or RTI is executed." },
+   { "screen", "sc",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_SCREEN_DESCRIPTION,
+     NULL, NULL },
 
-   { "screen",         "sc",
-     NULL,
-     "Displays the contents of the screen." },
+   { "step", "z",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_COUNT, IDGS_MON_STEP_DESCRIPTION,
+     NULL, NULL },
 
-   { "step",            "z",
-     "[<count>]",
-     "Single-step through instructions.  COUNT allows stepping\n"
-     "more than a single instruction at a time." },
+   { "undump", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME, IDGS_MON_UNDUMP_DESCRIPTION,
+     NULL, NULL },
 
-   { "undump",          "",
-     "\"<filename>\"",
-     "Read a snapshot of the machine from the file specified." },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_SYMBOL_TABLE_COMMANDS,
+     "", NULL },
 
-/*
-   { "up",              "",
-     NULL,
-     "*** unimplemented ***" },
-*/
-   { "", "", "", "Symbol table commands:" },
+   { "add_label", "al",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE_P_ADDRESS_P_LABEL, IDGS_MON_ADD_LABEL_DESCRIPTION,
+     NULL, NULL },
 
-   { "add_label",       "al",
-     "[<memspace>] <address> <label>",
-     "<memspace> is one of: C: 8: 9: 10: 11:\n"
-     "<address>  is the address which should get the label.\n"
-     "<label>    is the name of the label; it must start with a dot (\".\").\n\n"
-     "Map a given address to a label.  This label can be used when entering\n"
-     "assembly code and is shown during disassembly.  Additionally, it can\n"
-     "be used whenever an address must be specified." },
+   { "delete_label", "dl",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE_P_LABEL, IDGS_MON_DELETE_LABEL_DESCRIPTION,
+     NULL, NULL },
 
-   { "delete_label",    "dl",
-     "[<memspace>] <label>",
-     "<memspace> is one of: C: 8: 9: 10: 11:\n"
-     "<label>    is the name of the label; it must start with a dot (\".\").\n\n"
-     "Delete a previously defined label." },
+   { "load_labels", "ll",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE_QP_FILENAME, IDGS_MON_LOAD_LABELS_DESCRIPTION,
+     NULL, NULL },
 
-   { "load_labels",     "ll",
-     "[<memspace>] \"<filename>\"",
-     "Load a file containing a mapping of labels to addresses.  If no memory\n"
-     "space is specified, the default readspace is used.\n\n" 
-     "The format of the file is the one written out by the `save_labels' command;\n" 
-     "it consists of some `add_label' commands, written one after the other." },
+   { "save_labels", "sl",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE_QP_FILENAME, IDGS_MON_SAVE_LABELS_DESCRIPTION,
+     NULL, NULL },
 
-   { "save_labels",     "sl",
-     "[<memspace>] \"<filename>\"",
-     "Save labels to a file.  If no memory space is specified, all of the\n"
-     "labels are saved." },
+   { "show_labels", "shl",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MEMSPACE, IDGS_MON_SHOW_LABELS_DESCRIPTION,
+     NULL, NULL },
 
-   { "show_labels",     "shl",
-     "[<memspace>]",
-     "Display current label mappings.  If no memory space is specified, show\n"
-     "all labels." },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_ASSEMBLER_AND_MEMORY_COMMANDS,
+     "", NULL },
 
-   { "", "", "", "Assembler and memory commands:" },
+   { ">", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_ADDRESS_P_DATA_LIST, IDGS_MON_WRITE_DESCRIPTION,
+     NULL, NULL },
 
-   { ">",               "",
-     "[<address>] <data_list>",
-     "Write the specified data at `address'." },
+   { "a", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_RP_INSTRUCTION, IDGS_MON_ASSEMBLE_DESCRIPTION,
+     NULL, NULL },
 
-   { "a",               "",
-     "<address> [ <instruction> [: <instruction>]* ]",
-     "Assemble instructions to the specified address.  If only one\n"
-     "instruction is specified, enter assembly mode (enter an empty line to\n"
-     "exit assembly mode)." },
+   { "compare", "c",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_RANGE_P_ADDRESS, IDGS_MON_COMPARE_DESCRIPTION,
+     NULL, NULL },
 
-   { "compare",         "c",
-     "<address_range> <address>",
-     "Compare memory from the source specified by the address range to the\n"
-     "destination specified by the address.  The regions may overlap.  Any\n"
-     "values that miscompare are displayed using the default displaytype." },
+   { "delete", "del",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM, IDGS_MON_DELETE_DESCRIPTION,
+     NULL, NULL },
 
-   { "delete",          "del",
-     "<checknum>",
-     "Delete checkpoint `checknum'." },
+   { "disass", "d",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_ADDRESS_RP_ADDRESS, IDGS_MON_DISASS_DESCRIPTION,
+     NULL, NULL },
 
-   { "disass",          "d",
-     "[<address> [<address>]]",
-     "Disassemble instructions.  If two addresses are specified, they are\n"
-     "used as a start and end address.  If only one is specified, it is\n"
-     "treated as the start address and a default number of instructions are\n"
-     "disassembled.  If no addresses are specified, a default number of\n"
-     "instructions are disassembled from the dot address." },
+   { "fill", "f",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_RANGE_P_DATA_LIST, IDGS_MON_FILL_DESCRIPTION,
+     NULL, NULL },
 
-   { "fill",            "f",
-     "<address_range> <data_list>",
-     "Fill memory in the specified address range with the data in\n"
-     "<data_list>.  If the size of the address range is greater than the size\n"
-     "of the data_list, the data_list is repeated." },
+   { "hunt", "h",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_RANGE_P_DATA_LIST, IDGS_MON_HUNT_DESCRIPTION,
+     NULL, NULL },
 
-   { "hunt",            "h",
-     "<address_range> <data_list>",
-     "Hunt memory in the specified address range for the data in\n"
-     "<data_list>.  If the data is found, the starting address of the match\n"
-     "is displayed.  The entire range is searched for all possible matches." },
+   { "i", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_OPT_RANGE, IDGS_MON_I_DESCRIPTION,
+     NULL, NULL },
 
-   { "i",               "",
-     "<address_opt_range>",
-     "Display memory contents as PETSCII text." },
+   { "ii", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_OPT_RANGE, IDGS_MON_II_DESCRIPTION,
+     NULL, NULL },
 
-   { "ii",              "",
-     "<address_opt_range>",
-     "Display memory contents as screen code text." },
+   { "mem", "m",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_DATA_TYPE_RP_ADDRESS_OPT_RANGE, IDGS_MON_MEM_DESCRIPTION,
+     NULL, NULL },
 
-   { "mem",             "m",
-     "[<data_type>] [<address_opt_range>]",
-     "Display the contents of memory.  If no datatype is given, the default\n"
-     "is used.  If only one address is specified, the length of data\n"
-     "displayed is based on the datatype.  If no addresses are given, the\n"
-     "'dot' address is used." },
+   { "memchar", "mc",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_DATA_TYPE_RP_ADDRESS_OPT_RANGE, IDGS_MON_MEMCHAR_DESCRIPTION,
+     NULL, NULL },
 
-   { "memchar",         "mc",
-     "[<data_type>] [<address_opt_range>]",
-     "Display the contents of memory as character data.  If only one address\n"
-     "is specified, only one character is displayed.  If no addresses are\n"
-     "given, the ``dot'' address is used." },
+   { "memmapsave", "mmsave",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_P_FORMAT, IDGS_MON_MEMMAPSAVE_DESCRIPTION,
+     NULL, NULL },
 
-   { "memmapsave",       "mmsave",
-     "\"<filename>\" <format>",
-     "Save the memmap as a picture. Format is:\n"
-     "0 = BMP, 1 = PCX, 2 = PNG, 3 = GIF, 4 = IFF." },
+   { "memmapshow", "mmsh",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_MASK_RP_ADDRESS_OPT_RANGE, IDGS_MON_MEMMAPSHOW_DESCRIPTION,
+     NULL, NULL },
 
-   { "memmapshow",       "mmsh",
-     "[<mask>] [<address_opt_range>]",
-     "Show the memmap. The mask can be specified to show only those\n"
-     "locations with accesses of certain type(s). The mask is a number\n"
-     "with the bits \"ioRWXrwx\", where RWX are for ROM and rwx for RAM.\n"
-     "Optionally, an address range can be specified." },
-
-   { "memmapzap",        "mmzap",
-     NULL,
-     "Clear the memmap." },
+   { "memmapzap", "mmzap",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_MEMMAPZAP_DESCRIPTION,
+     NULL, NULL },
 
    { "memsprite",       "ms",
-     "[<data_type>] [<address_opt_range>]",
-     "Display the contents of memory as sprite data.  If only one address is\n"
-     "specified, only one sprite is displayed.  If no addresses are given,\n"
-     "the ``dot'' address is used." },
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_DATA_TYPE_RP_ADDRESS_OPT_RANGE, IDGS_MON_MEMSPRITE_DESCRIPTION,
+     NULL, NULL },
 
-   { "move",            "t",
-     "<address_range> <address>",
-     "Move memory from the source specified by the address range to\n"
-     "the destination specified by the address.  The regions may overlap." },
+   { "move", "t",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_ADDRESS_RANGE_P_ADDRESS, IDGS_MON_MOVE_DESCRIPTION,
+     NULL, NULL },
 
-   { "", "", "", "Checkpoint commands:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_CHECKPOINT_COMMANDS,
+     "", NULL },
 
-   { "break",           "",
-     "[<address> [if <cond_expr>] ]",
-     "If no address is given, the currently valid watchpoints are printed.\n"
-     "If an address is given, a breakpoint is set for that address and the\n"
-     "breakpoint number is printed.  A conditional expression can also be\n"
-     "specified for the breakpoint.  For more information on conditions, see\n"
-     "the CONDITION command." },
+   { "break", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_ADDRESS_RP_COND_EXPR, IDGS_MON_BREAK_DESCRIPTION,
+     NULL, NULL },
 
-   { "command",         "",
-     "<checknum> \"<command>\"",
-     "Specify `command' as the command to execute when checkpoint `checknum'\n"
-     "is hit.  Note that the `x' command is not yet supported as a\n"
-     "command argument." },
+   { "command", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM_QP_COMMAND, IDGS_MON_COMMAND_DESCRIPTION,
+     NULL, NULL },
 
-   { "condition",       "cond",
-     "<checknum> if <cond_expr>",
-     "Each time the specified checkpoint is examined, the condition is\n"
-     "evaluated.  If it evalutes to true, the checkpoint is activated.\n"
-     "Otherwise, it is ignored.  If registers are specified in the expression,\n"
-     "the values used are those at the time the checkpoint is examined, not\n"
-     "when the condition is set.\n"
-     "The condition can make use of registers (.A, .X, .Y, .PC, .SP) and\n"
-     "compare them (==, !=, <, >, <=, >=) again other registers or constants.\n"
-     "Registers can be the registers of other devices; this is denoted by\n"
-     "a memspace prefix (i.e., c:, 8:, 9:, 10:, 11:\n"
-     "Examples: .A == 0, .X == .Y, 8:.X == .X\n" },
+   { "condition", "cond",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM_IF_P_COND_EXPR, IDGS_MON_CONDITION_DESCRIPTION,
+     NULL, NULL },
 
-   { "disable",         "",
-     "<checknum>",
-     "Disable checkpoint `checknum'." },
+   { "disable", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM, IDGS_MON_DISABLE_DESCRIPTION,
+     NULL, NULL },
 
-   { "enable",          "",
-     "<checknum>",
-     "Enable checkpoint `checknum'." },
+   { "enable", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM, IDGS_MON_ENABLE_DESCRIPTION,
+     NULL, NULL },
 
-   { "ignore",          "",
-     "<checknum> [<count>]",
-     "Ignore a checkpoint a given number of crossings.  If no count is given,\n"
-     "the default value is 1." },
+   { "ignore", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_CHECKNUM_RP_COUNT, IDGS_MON_IGNORE_DESCRIPTION,
+     NULL, NULL },
 
-   { "until",           "un",
-     "[<address>]",
-     "If no address is given, the currently valid breakpoints are printed.\n"
-     "If an address is given, a temporary breakpoint is set for that address\n"
-     "and the breakpoint number is printed.  Control is returned to the\n"
-    "emulator by this command.  The breakpoint is deleted once it is hit." },
+   { "until", "un",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_ADDRESS, IDGS_MON_UNTIL_DESCRIPTION,
+     NULL, NULL },
 
-   { "watch",           "w",
-     "[loadstore] [address [address]]",
-     "Set a watchpoint.  If a single address is specified, set a watchpoint\n"
-     "for that address.  If two addresses are specified, set a watchpoint\n"
-     "for the memory locations between the two addresses.\n"
-     "`loadstore' is either `load' or `store' to specify on which operation\n"
-     "the monitor breaks. If not specified, the monitor breaks on both\n"
-     "operations." },
+   { "watch", "w",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_R_LOADSTORE_R_ADDRESS_R_ADDRESS, IDGS_MON_WATCH_DESCRIPTION,
+     NULL, NULL },
 
-   { "trace",           "tr",
-     "[address [address]]",
-     "Set a tracepoint.  If a single address is specified, set a tracepoint\n"
-     "for that address.  If two addresses are specified, set a tracepoint\n"
-     "for the memory locations between the two addresses." },
+   { "trace", "tr",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_R_ADDRESS_R_ADDRESS, IDGS_MON_TRACE_DESCRIPTION,
+     NULL, NULL },
 
-   { "", "", "", "Monitor state commands:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MONITOR_STATE_COMMANDS,
+     "", NULL },
 
-   { "device",          "dev",
-     "[c:|8:|9:|10:|11:]",
-     "Set the default memory device to either the computer `c:' or the\n"
-     "specified disk drive (`8:', `9:')." },
+   { "device", "dev",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_DEVICE_DESCRIPTION,
+     "[c:|8:|9:|10:|11:]", NULL },
 
-   { "exit",            "x",
-     NULL,
-     "Leave the monitor and return to execution." },
+   { "exit", "x",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_EXIT_DESCRIPTION,
+     NULL, NULL },
 
-   { "quit",            "",
-     NULL,
+   { "quit", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
 #ifdef OS2
-     "Leave the monitor and return to execution." },
+     IDGS_UNUSED, IDGS_MON_EXIT_DESCRIPTION,
 #else
-     "Exit the emulator immediately."},
+     IDGS_UNUSED, IDGS_MON_QUIT_DESCRIPTION,
 #endif
+     NULL, NULL },
 
-   { "radix",           "rad",
-     "[H|D|O|B]",
-     "Set the default radix to hex, decimal, octal, or binary.  With no\n"
-     "argument, the current radix is printed." },
+   { "radix", "rad",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_RADIX_DESCRIPTION,
+     "[H|D|O|B]", NULL },
 
-   { "sidefx",          "sfx",
-     "[on|off|toggle]",
-     "Control how monitor generated reads affect memory locations that have\n"
-     "read side-effects.  If the argument is 'on' then reads may cause\n"
-     "side-effects.  If the argument is 'off' then reads don't cause\n"
-     "side-effects.  If the argument is 'toggle' then the current mode is\n"
-     "switched.  No argument displays the current state." },
+   { "sidefx", "sfx",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_R_ON_R_OFF_R_TOGGLE, IDGS_MON_SIDEFX_DESCRIPTION,
+     NULL, NULL },
 
-   { "", "", "", "Disk commands:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_DISK_COMMANDS,
+     "", NULL },
 
-   { "@",               "",
-     "<disk command>",
-     "Perform a disk command on the currently attached disk image on drive 8.\n"
-     "The specified disk command is sent to the drive's channel #15." },
+   { "@", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_DISK_COMMAND, IDGS_MON_AT_DESCRIPTION,
+     NULL, NULL },
 
-   { "attach",          "",
-     "<filename> <device>",
-     "Attach file to device. (device 32 = cart)" },
+   { "attach", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_FILENAME_P_DEVICE, IDGS_MON_ATTACH_DESCRIPTION,
+     NULL, NULL },
 
-   { "bload",           "bl",
-     "\"<filename>\" <device> <address>",
-     "Load the specified file into memory at the specified address.\n"
-     "If device is 0, the file is read from the file system." },
+   { "bload", "bl",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_P_DEVICE_P_ADDRESS, IDGS_MON_BLOAD_DESCRIPTION,
+     NULL, NULL },
 
-   { "block_read",      "br",
-     "<track> <sector> [<address>]",
-     "Read the block at the specified track and sector.  If an address is\n"
-     "specified, the data is loaded into memory.  If no address is given, the\n"
-     "data is displayed using the default datatype." },
+   { "block_read", "br",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_TRACK_P_SECTOR_RP_ADDRESS, IDGS_MON_BLOCK_READ_DESCRIPTION,
+     NULL, NULL },
 
-   { "bsave",           "bs",
-     "\"<filename>\" <device> <address1> <address2>",
-     "Save the memory from address1 to address2 to the specified file.\n"
-     "If device is 0, the file is written to the file system." },
+   { "bsave", "bs",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_P_DEVICE_P_ADDRESS1_P_ADDRESS2, IDGS_MON_BSAVE_DESCRIPTION,
+     NULL, NULL },
 
-   { "block_write",     "bw",
-     "<track> <sector> <address>",
-     "Write a block of data at `address' on the specified track and sector\n"
-     "of disk in drive 8." },
+   { "block_write", "bw",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_TRACK_P_SECTOR_P_ADDRESS, IDGS_MON_BLOCK_WRITE_DESCRIPTION,
+     NULL, NULL },
 
-   { "cd",              "",
-     "<directory>",
-     "Change the working directory." },
+   { "cd", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_DIRECTORY, IDGS_MON_CD_DESCRIPTION,
+     NULL, NULL },
 
-   { "detach",          "",
-     "<device>",
-     "Detach file from device. (device 32 = cart)" },
+   { "detach", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDCLS_P_DEVICE, IDGS_MON_DETACH_DESCRIPTION,
+     NULL, NULL },
 
-   { "dir",              "ls",
-     "[<directory>]",
-     "Display the directory contents." },
+   { "dir", "ls",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_DIRECTORY, IDGS_MON_DIR_DESCRIPTION,
+     NULL, NULL },
 
-   { "load",            "l",
-     "\"<filename>\" <device> [<address>]",
-     "Load the specified file into memory at the specified address. Set BASIC\n"
-     "pointers appropriately if loaded into computer memory (not all emulators).\n"
-     "Use (otherwise ignored) two-byte load address from file if no address\n"
-     "specified.\n"
-     "If device is 0, the file is read from the file system." },
+   { "load", "l",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_P_DEVICE_RP_ADDRESS, IDGS_MON_LOAD_DESCRIPTION,
+     NULL, NULL },
 
-   { "pwd",           "",
-     NULL,
-     "Show current working directory." },
+   { "pwd", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_PWD_DESCRIPTION,
+     NULL, NULL },
 
-   { "save",            "s",
-     "\"<filename>\" <device> <address1> <address2>",
-     "Save the memory from address1 to address2 to the specified file.\n"
-     "Write two-byte load address.\n"
-     "If device is 0, the file is written to the file system." },
+   { "save", "s",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_P_DEVICE_P_ADDRESS1_P_ADDRESS2, IDGS_MON_SAVE_DESCRIPTION,
+     NULL, NULL },
 
-   { "", "", "", "Other commands:" },
+   { "", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_OTHER_COMMANDS,
+     "", NULL },
 
-   { "~",               "",
-     "<number>",
-     "Display the specified number in decimal, hex, octal and binary." },
+   { "~", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDCLS_P_NUMBER, IDGS_MON_DISPLAY_NUMBER_DESCRIPTION,
+     NULL, NULL },
 
-   { "cartfreeze",      "",
-     NULL,
-     "Use cartridge freeze." },
+   { "cartfreeze", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_CARTFREEZE_DESCRIPTION,
+     NULL, NULL },
 
-   { "help",            "?",
-     "[<command>]",
-     "If no argument is given, prints out a list of all available commands\n" 
-     "If an argument is given, prints out specific help for that command." },
+   { "help", "?",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_RP_COMMAND, IDGS_MON_HELP_DESCRIPTION,
+     NULL, NULL },
 
-   { "keybuf",          "",
-     "\"<string>\"",
-     "Put the specified string into the keyboard buffer." },
+   { "keybuf", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_STRING, IDGS_MON_KEYBUF_DESCRIPTION,
+     NULL, NULL },
 
-   { "playback",        "pb",
-     "\"<filename>\"",
-     "Monitor commands from the specified file are read and executed.  This\n"
-     "command stops at the end of file or when a STOP command is read." },
+   { "playback", "pb",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME, IDGS_MON_PLAYBACK_DESCRIPTION,
+     NULL, NULL },
 
-   { "print",           "p",
-     "<expression>",
-     "Evaluate the specified expression and output the result." },
+   { "print", "p",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_EXPRESSION, IDGS_MON_PRINT_DESCRIPTION,
+     NULL, NULL },
 
-   { "record",          "rec",
-     "\"<filename>\"",
-     "After this command, all commands entered are written to the specified\n"
-     "file until the STOP command is entered." },
+   { "record", "rec",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME, IDGS_MON_RECORD_DESCRIPTION,
+     NULL, NULL },
 
-   { "resourceget",     "resget",
-     "\"<resource>\"",
-     "Displays the value on the resource." },
+   { "resourceget", "resget",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_RESOURCE, IDGS_MON_RESOURCEGET_DESCRIPTION,
+     NULL, NULL },
 
-   { "resourceset",     "resset",
-     "\"<resource>\" \"<value>\"",
-     "Sets the value of the resource." },
+   { "resourceset", "resset",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_RESOURCE_QP_VALUE, IDGS_MON_RESOURCESET_DESCRIPTION,
+     NULL, NULL },
 
-   { "stop",            "",
-     NULL,
-     "Stop recording commands.  See `record'." },
+   { "stop", "",
+     USE_PARAM_STRING, USE_DESCRIPTION_ID,
+     IDGS_UNUSED, IDGS_MON_STOP_DESCRIPTION,
+     NULL, NULL },
 
-   { "screenshot",       "scrsh",
-     "\"<filename>\" [<format>]",
-     "Take a screenshot. Format is:\n"
-     "default = BMP, 1 = PCX, 2 = PNG, 3 = GIF, 4 = IFF." },
+   { "screenshot", "scrsh",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_QP_FILENAME_RP_FORMAT, IDGS_MON_SCREENSHOT_DESCRIPTION,
+     NULL, NULL },
 
-   { "tapectrl",       "",
-     "<command>",
-     "Control the datasette. Valid commands:\n"
-     "0 = stop, 1 = start, 2 = forward, 3 = rewind, 4 = record,\n"
-     "5 = reset, 6 = reset counter." },
-
-/*
-   { "]",               "",
-     NULL,
-     "*** unimplemented ***" },
-*/
-
-/*
-   { "brmon",           "",
-     NULL,
-     "*** unimplemented ***" },
-*/
-
-/*
-   { "system",          "sys",
-     NULL,
-     "*** unimplemented ***" },
-*/
-
-/*
-   { "verify",          "v",
-     NULL,
-     "*** unimplemented ***" },
-*/
+   { "tapectrl", "",
+     USE_PARAM_ID, USE_DESCRIPTION_ID,
+     IDGS_P_COMMAND, IDGS_MON_TAPECTRL_DESCRIPTION,
+     NULL, NULL },
 
    { NULL }
 
@@ -547,7 +520,7 @@ void mon_command_print_help(const char *cmd)
                     mon_out("\n");
                     column = 0;
                 }
-                mon_out("\n%s\n", c->description);
+                mon_out("\n%s\n", GET_DESCRIPTION(c));
                 continue;
             }
 
@@ -575,21 +548,20 @@ void mon_command_print_help(const char *cmd)
         cmd_num = mon_command_lookup_index(cmd);
 
         if (cmd_num == -1)
-            mon_out("Command `%s' unknown.\n", cmd);
-        else if (mon_cmd_array[cmd_num].description == NULL)
-            mon_out("No help available for `%s'\n", cmd);
+            mon_out(translate_text(IDGS_COMMAND_S_UNKNOWN), cmd);
+        else if (mon_cmd_array[cmd_num].description == NULL && mon_cmd_array[cmd_num].description_id == IDGS_UNUSED)
+            mon_out(translate_text(IDGS_NO_HELP_AVAILABLE_FOR_S), cmd);
         else {
             const mon_cmds_t *c;
 
             c = &mon_cmd_array[cmd_num];
 
-            mon_out("\nSyntax: %s %s\n",
+            mon_out(translate_text(IDGS_SYNTAX_S_S),
                       c->str,
-                      c->param_names != NULL ? c->param_names : "");
+                      GET_PARAM(c) != NULL ? GET_PARAM(c) : "");
             if (!util_check_null_string(c->abbrev))
-                mon_out("Abbreviation: %s\n", c->abbrev);
-            mon_out("\n%s\n\n", c->description);
+                mon_out(translate_text(IDGS_ABBREVIATION_S), c->abbrev);
+            mon_out("\n%s\n\n", GET_DESCRIPTION(c));
         }
     }
 }
-

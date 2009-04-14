@@ -7,14 +7,13 @@ PSP_FW_VERSION=200
 export PSP_FW_VERSION
 
 PSP_APP_NAME=VICE PSP: C64
-PSP_APP_VER=2.0.1
+PSP_APP_VER=2.1.1
 
 TARGET=vicepsp
 EXTRA_TARGETS=EBOOT.PBP
 PSP_EBOOT_TITLE=$(PSP_APP_NAME) $(PSP_APP_VER)
 
-BUILD_EMUL= \
-           c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
+BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            c64/c64memsnapshot.o c64/c64sound.o c64/psid.o \
            c64/c64acia1.o c64/c64fastiec.o c64/c64parallel.o \
            c64/c64tpi.o c64/ramcart.o c64/c64bus.o c64/c64iec.o \
@@ -38,7 +37,8 @@ BUILD_EMUL= \
            c64/cart/zaxxon.o c64/cart/delaep256.o \
            c64/cart/magicformel.o c64/cart/delaep64.o \
            c64/cart/mikroass.o c64/cart/stardos.o c64/cart/actionreplay4.o \
-           vicii/vicii-badline.o vicii/vicii.o \
+           c64/isepic.o c64/dqbb.o c64/psid.o \
+           vicii/vicii-badline.o vicii/vicii.o vicii/vicii-stubs.o \
            vicii/vicii-cmdline-options.o vicii/vicii-color.o \
            vicii/vicii-draw.o vicii/vicii-fetch.o vicii/vicii-irq.o \
            vicii/vicii-mem.o vicii/vicii-phi1.o vicii/vicii-resources.o \
@@ -141,7 +141,8 @@ BUILD_EMUL= \
            serial/serial-realdevice.o serial/serial-trap.o \
            sounddrv/soundiff.o sounddrv/soundaiff.o sounddrv/soundvoc.o \
            sounddrv/soundwav.o sounddrv/sounddump.o sounddrv/soundspeed.o \
-           sounddrv/soundfs.o sounddrv/sounddummy.o 
+           sounddrv/soundfs.o sounddrv/sounddummy.o \
+           translate.o crc32.o 
 BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
            arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o \
            arch/psp/blockdev.o arch/psp/c64ui.o arch/psp/console.o \
@@ -149,12 +150,12 @@ BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
            arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
 OBJS=$(BUILD_EMUL) $(BUILD_PORT)
 
-DEFINES=-DVERSION=\"2.0\" -DSOUND_BUFFER_SIZE=768 -DPSP_DEBUG
+DEFINES=-DVERSION=\"2.1\" -DSOUND_BUFFER_SIZE=768 -DPSP_DEBUG
 BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAME)\""
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS=$(CFLAGS)
-INCDIR=$(PSPAPP) sid drive vicii tape c64 vdc raster crtc vdrive
+INCDIR=$(PSPAPP) sid drive vicii tape c64 c64dtv vdc raster crtc vdrive
 LIBDIR=$(PSPLIB)
 LIBS=-lpsplib -lpng -lpspgu -lpsppower \
      -lz -lm -lc -lpspaudio -lpsprtc -lpspwlan -lpspnet_adhoc \

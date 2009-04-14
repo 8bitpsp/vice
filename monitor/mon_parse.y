@@ -109,7 +109,7 @@ extern int cur_len, last_len;
 #define ERR_EXPECT_ADDRESS 15
 
 #define BAD_ADDR (new_addr(e_invalid_space, 0))
-#define CHECK_ADDR(x) ((x) == LO16(x))
+#define CHECK_ADDR(x) ((x) == addr_mask(x))
 
 #define YYDEBUG 1
 
@@ -256,14 +256,12 @@ register_mod: CMD_REGISTERS end_cmd
 symbol_table_rules: CMD_LOAD_LABELS memspace opt_sep filename end_cmd
                     {
                         /* What about the memspace? */
-                        playback = TRUE; playback_name = $4;
-                        /*mon_load_symbols($2, $3);*/
+                        mon_playback_init($4);
                     }
                   | CMD_LOAD_LABELS filename end_cmd
                     {
                         /* What about the memspace? */
-                        playback = TRUE; playback_name = $2;
-                        /*mon_load_symbols($2, $3);*/
+                        mon_playback_init($2);
                     }
                   | CMD_SAVE_LABELS memspace opt_sep filename end_cmd
                     { mon_save_symbols($2, $4); }
@@ -428,10 +426,7 @@ monitor_state_rules: CMD_SIDEFX TOGGLE end_cmd
                      }
 
                    | CMD_DEVICE memspace end_cmd
-                     {
-                         mon_out("Setting default device to `%s'\n",
-                         _mon_space_strings[(int) $2]); default_memspace = $2;
-                     }
+                     { monitor_change_device($2); }
                    | CMD_QUIT end_cmd
                      { mon_quit(); YYACCEPT; }
                    | CMD_EXIT end_cmd
@@ -512,7 +507,7 @@ cmd_file_rules: CMD_RECORD filename end_cmd
               | CMD_STOP end_cmd
                 { mon_end_recording(); }
               | CMD_PLAYBACK filename end_cmd
-                { playback=TRUE; playback_name = $2; }
+                { mon_playback_init($2); }
               ;
 
 data_entry_rules: CMD_ENTER_DATA address data_list end_cmd

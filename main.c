@@ -82,7 +82,8 @@ int main_program(int argc, char **argv)
     int i;
     char *program_name;
 
-    /* Check for -console and -vsid before initializing the user interface.
+    /* Check for -config, -console and -vsid before initializing the user interface.
+       -config  => use specified configuration file
        -console => no user interface
        -vsid    => user interface in separate process */
     for (i = 0; i < argc; i++) {
@@ -93,6 +94,10 @@ int main_program(int argc, char **argv)
 #endif
         if (strcmp(argv[i], "-vsid") == 0) {
             vsid_mode = 1;
+        } else if (strcmp(argv[i], "-config") == 0) {
+            if ((i+1) < argc) {
+                vice_config_file = lib_stralloc(argv[++i]);
+            }
         }
     }
 
@@ -191,7 +196,7 @@ int main_program(int argc, char **argv)
     log_message(LOG_DEFAULT, "Current VICE team members:");
     log_message(LOG_DEFAULT, "A. Boose, D. Lem, T. Biczo, A. Dehmel, T. Bretz, A. Matthies,");
     log_message(LOG_DEFAULT, "M. Pottendorfer, M. Brenner, S. Trikaliotis, M. van den Heuvel,");
-    log_message(LOG_DEFAULT, "C. Vogelgsang, Fabrizio Gennari.");
+    log_message(LOG_DEFAULT, "C. Vogelgsang, F. Gennari, M. Kiesel, H. Nuotio, D. Kahlin.");
     log_message(LOG_DEFAULT, " ");
     log_message(LOG_DEFAULT, "This is free software with ABSOLUTELY NO WARRANTY.");
     log_message(LOG_DEFAULT, "See the \"About VICE\" command for more info.");

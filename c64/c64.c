@@ -33,6 +33,7 @@
 
 #include "autostart.h"
 #include "c64-cmdline-options.h"
+#include "c64-midi.h"
 #include "c64-resources.h"
 #include "c64-snapshot.h"
 #include "c64.h"
@@ -55,12 +56,14 @@
 #include "datasette.h"
 #include "debug.h"
 #include "digimax.h"
+#include "dqbb.h"
 #include "drive-cmdline-options.h"
 #include "drive-resources.h"
 #include "drive.h"
 #include "drivecpu.h"
 #include "georam.h"
 #include "imagecontents.h"
+#include "isepic.h"
 #include "kbdbuf.h"
 #include "keyboard.h"
 #include "log.h"
@@ -251,6 +254,8 @@ int machine_resources_init(void)
         || reu_resources_init() < 0
         || georam_resources_init() < 0
         || ramcart_resources_init() < 0
+        || isepic_resources_init() < 0
+        || dqbb_resources_init() < 0
         || plus60k_resources_init() < 0
         || plus256k_resources_init() < 0
         || c64_256k_resources_init() < 0
@@ -263,7 +268,6 @@ int machine_resources_init(void)
         || sound_resources_init() < 0
         || sid_resources_init() < 0
         || acia1_resources_init() < 0
-        || acia1_mode_resources_init() < 0
         || rs232drv_resources_init() < 0
         || rsuser_resources_init() < 0
         || serial_resources_init() < 0
@@ -277,6 +281,9 @@ int machine_resources_init(void)
         || drive_resources_init() < 0
         || datasette_resources_init() < 0
         || cartridge_resources_init() < 0
+#ifdef HAVE_MIDI
+        || c64_midi_resources_init() < 0
+#endif
         )
         return -1;
 
@@ -298,11 +305,15 @@ void machine_resources_shutdown(void)
     plus256k_resources_shutdown();
     c64_256k_resources_shutdown();
     mmc64_resources_shutdown();
+    dqbb_resources_shutdown();
     sound_resources_shutdown();
     rs232drv_resources_shutdown();
     printer_resources_shutdown();
     drive_resources_shutdown();
     cartridge_resources_shutdown();
+#ifdef HAVE_MIDI
+    midi_resources_shutdown();
+#endif
 }
 
 /* C64-specific command-line option initialization.  */
@@ -325,6 +336,8 @@ int machine_cmdline_options_init(void)
         || reu_cmdline_options_init() < 0
         || georam_cmdline_options_init() < 0
         || ramcart_cmdline_options_init() < 0
+        || isepic_cmdline_options_init() < 0
+        || dqbb_cmdline_options_init() < 0
         || plus60k_cmdline_options_init() < 0
         || plus256k_cmdline_options_init() < 0
         || c64_256k_cmdline_options_init() < 0
@@ -350,6 +363,9 @@ int machine_cmdline_options_init(void)
         || drive_cmdline_options_init() < 0
         || datasette_cmdline_options_init() < 0
         || cartridge_cmdline_options_init() < 0
+#ifdef HAVE_MIDI
+        || c64_midi_cmdline_options_init() < 0
+#endif
         )
         return -1;
 
@@ -512,9 +528,22 @@ int machine_specific_init(void)
         c64fastiec_init();
 
         cartridge_init();
+#ifdef HAVE_MIDI
+        midi_init();
+#endif
     }
 
     machine_drive_stub();
+#if defined (USE_XF86_EXTENSIONS) && \
+    (defined(USE_XF86_VIDMODE_EXT) || defined (HAVE_XRANDR))
+    {
+	/* set fullscreen if user used `-fullscreen' on cmdline */
+	int fs;
+	resources_get_int("UseFullscreen", &fs);
+	if (fs)
+	    resources_set_int("VICIIFullscreen", 1);
+    }
+#endif
 
     return 0;
 }
@@ -559,6 +588,10 @@ void machine_specific_reset(void)
     plus256k_reset();
     c64_256k_reset();
     mmc64_reset();
+#ifdef HAVE_MIDI
+    midi_reset();
+#endif
+    dqbb_reset();
 }
 
 void machine_specific_powerup(void)
@@ -584,6 +617,7 @@ void machine_specific_shutdown(void)
     reu_shutdown();
     georam_shutdown();
     ramcart_shutdown();
+    dqbb_shutdown();
     plus60k_shutdown();
     plus256k_shutdown();
     c64_256k_shutdown();

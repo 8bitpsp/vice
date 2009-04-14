@@ -35,17 +35,16 @@
 #include "cmdline.h"
 #include "lib.h"
 #include "log.h"
+#include "machine.h"
 #include "machine-bus.h"
 #include "maincpu.h"
 #include "mem.h"
 #include "mos6510.h"
+#include "mos6510dtv.h"
 #include "resources.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "traps.h"
 #include "types.h"
-
 
 typedef struct traplist_s {
     struct traplist_s *next;
@@ -106,27 +105,19 @@ int traps_resources_init(void)
 
 /* Trap-related command-line options.  */
 
-#ifdef HAS_TRANSLATION
 static const cmdline_option_t cmdline_options[] = {
-    { "-virtualdev", SET_RESOURCE, 0, NULL, NULL, "VirtualDevices",
-        (resource_value_t)1,
-      0, IDCLS_ENABLE_TRAPS_FAST_EMULATION },
-    { "+virtualdev", SET_RESOURCE, 0, NULL, NULL, "VirtualDevices",
-        (resource_value_t)0,
-      0, IDCLS_DISABLE_TRAPS_FAST_EMULATION },
+    { "-virtualdev", SET_RESOURCE, 0,
+      NULL, NULL, "VirtualDevices", (resource_value_t)1,
+      USE_PARAM_STRING, USE_DESCRIPTION_ID,
+      IDCLS_UNUSED, IDCLS_ENABLE_TRAPS_FAST_EMULATION,
+      NULL, NULL },
+    { "+virtualdev", SET_RESOURCE, 0,
+      NULL, NULL, "VirtualDevices", (resource_value_t)0,
+      USE_PARAM_STRING, USE_DESCRIPTION_ID,
+      IDCLS_UNUSED, IDCLS_DISABLE_TRAPS_FAST_EMULATION,
+      NULL, NULL },
     { NULL }
 };
-#else
-static const cmdline_option_t cmdline_options[] = {
-    { "-virtualdev", SET_RESOURCE, 0, NULL, NULL, "VirtualDevices",
-        (resource_value_t)1,
-      NULL, N_("Enable general mechanisms for fast disk/tape emulation") },
-    { "+virtualdev", SET_RESOURCE, 0, NULL, NULL, "VirtualDevices",
-        (resource_value_t)0,
-      NULL, N_("Disable general mechanisms for fast disk/tape emulation") },
-    { NULL }
-};
-#endif
 
 int traps_cmdline_options_init(void)
 {
@@ -230,8 +221,14 @@ int traps_remove(const trap_t *trap)
 DWORD traps_handler(void)
 {
     traplist_t *p = traplist;
-    unsigned int pc = MOS6510_REGS_GET_PC(&maincpu_regs);
+    unsigned int pc;
     int result;
+
+    if (machine_class == VICE_MACHINE_C64DTV) {
+        pc = MOS6510DTV_REGS_GET_PC(&maincpu_regs);
+    } else {
+        pc = MOS6510_REGS_GET_PC(&maincpu_regs);
+    }
 
     while (p) {
         if (p->trap->address == pc) {
@@ -245,7 +242,12 @@ DWORD traps_handler(void)
             } 
             /* XXX ALERT!  `p' might not be valid anymore here, because
                `p->trap->func()' might have removed all the traps.  */
-            MOS6510_REGS_SET_PC(&maincpu_regs, resume_address);
+            if (machine_class == VICE_MACHINE_C64DTV) {
+                MOS6510DTV_REGS_SET_PC(&maincpu_regs, resume_address);
+
+            } else {
+                MOS6510_REGS_SET_PC(&maincpu_regs, resume_address);
+            }
             return 0;
         }
         p = p->next;

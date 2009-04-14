@@ -39,10 +39,6 @@
 #include "util.h"
 #include "log.h"
 
-#ifdef WIN32
-#include "ui.h"
-#endif
-
 video_resources_t video_resources =
 {
     1000, /* color_saturation */
@@ -324,8 +320,7 @@ static int set_fullscreen_device(const char *val, void *param)
 }
 
 static const char *vname_chip_fullscreen[] = {
-    "Fullscreen", "FullscreenStatusbar", "FullscreenDoubleSize", 
-    "FullscreenDoubleScan", "FullscreenDevice", NULL
+    "Fullscreen", "FullscreenStatusbar", "FullscreenDevice", NULL
 };
 
 static resource_string_t resources_chip_fullscreen_string[] =
@@ -510,20 +505,8 @@ int video_resources_chip_init(const char *chipname,
             = &((*canvas)->videoconfig->fullscreen_statusbar_enabled);
         resources_chip_fullscreen_int[1].param = (void *)*canvas;
 
-        resources_chip_fullscreen_int[2].name
-            = util_concat(chipname, vname_chip_fullscreen[2], NULL);
-        resources_chip_fullscreen_int[2].value_ptr
-            = &((*canvas)->videoconfig->fullscreen_double_size_enabled);
-        resources_chip_fullscreen_int[2].param = (void *)*canvas;
-
-        resources_chip_fullscreen_int[3].name
-            = util_concat(chipname, vname_chip_fullscreen[3], NULL);
-        resources_chip_fullscreen_int[3].value_ptr
-            = &((*canvas)->videoconfig->fullscreen_double_scan_enabled);
-        resources_chip_fullscreen_int[3].param = (void *)*canvas;
-
         resources_chip_fullscreen_string[0].name
-            = util_concat(chipname, vname_chip_fullscreen[4], NULL);
+            = util_concat(chipname, vname_chip_fullscreen[2], NULL);
         resources_chip_fullscreen_string[0].factory_value
             = video_chip_cap->fullscreen.device_name[0];
         resources_chip_fullscreen_string[0].value_ptr
@@ -538,8 +521,6 @@ int video_resources_chip_init(const char *chipname,
 
         lib_free((char *)(resources_chip_fullscreen_int[0].name));
         lib_free((char *)(resources_chip_fullscreen_int[1].name));
-        lib_free((char *)(resources_chip_fullscreen_int[2].name));
-        lib_free((char *)(resources_chip_fullscreen_int[3].name));
         lib_free((char *)(resources_chip_fullscreen_string[0].name));
 
         for (i = 0; i < video_chip_cap->fullscreen.device_num; i++) {
@@ -613,35 +594,6 @@ void video_resources_chip_shutdown(struct video_canvas_s *canvas)
     lib_free(canvas->videoconfig->external_palette_name);
 }
 
-#ifdef WIN32
-extern struct video_canvas_s *video_current_canvas;
-
-void video_resources_check_win32_newpal(void)
-{
-    int pal_enabled = 0;
-    int pal_mode = 0;
-
-    resources_get_int("PALEmulation", &pal_enabled);
-
-    if (pal_enabled)
-        resources_get_int("PALMode", &pal_mode);
-
-    if (video_current_canvas==NULL)
-      return;
-
-    if (video_current_canvas->videoconfig==NULL)
-      return;
-
-    if (pal_enabled != 0 && pal_mode == 2 &&
-        video_current_canvas->videoconfig->fullscreen_enabled == 0 &&
-        video_current_canvas->videoconfig->doublescan != 0 &&
-        video_current_canvas->videoconfig->double_size_enabled != 0)
-    {
-        ui_message("This combination has a performance problem\nplease switch to old PAL emulation");
-    }
-}
-#endif
-
 static void video_resources_update_ui(video_canvas_t *canvas)
 {
     int pal_enabled = 0;
@@ -668,7 +620,4 @@ static void video_resources_update_ui(video_canvas_t *canvas)
 /*
     ui_enable_chip resources(ui_doublescan_enabled, ui_scale2x_enabled);
 */
-#ifdef WIN32
-    video_resources_check_win32_newpal();
-#endif
 }

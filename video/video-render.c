@@ -53,7 +53,7 @@ static void(*render_2x2_func)(video_render_config_t *, const BYTE *, BYTE *,
 
 static void(*render_pal_func)(video_render_config_t *, BYTE *, BYTE *,
                               int, int, int, int,
-                              int, int, int, int, int);
+                              int, int, int, int, int, viewport_t *);
 
 
 /* this function is the interface to the outer world */
@@ -77,6 +77,7 @@ void video_render_initconfig(video_render_config_t *config)
 void video_render_setphysicalcolor(video_render_config_t *config, int index,
                                    DWORD color, int depth)
 {
+    /* duplicated colours are used by the double size 8/16 bpp renderers. */
     switch (depth) {
       case 8:
         color &= 0x000000FF;
@@ -86,18 +87,13 @@ void video_render_setphysicalcolor(video_render_config_t *config, int index,
         color &= 0x0000FFFF;
         color = color | (color << 16);
         break;
-      case 24:
-        color &= 0x00FFFFFF;
-        break;
-      case 32:
-        break;
     }
     config->color_tables.physical_colors[index] = color;
 }
 
 void video_render_main(video_render_config_t *config, BYTE *src, BYTE *trg,
                        int width, int height, int xs, int ys, int xt, int yt,
-                       int pitchs, int pitcht, int depth)
+                       int pitchs, int pitcht, int depth, viewport_t *viewport)
 {
     const video_render_color_tables_t *colortab;
     int rendermode;
@@ -105,6 +101,7 @@ void video_render_main(video_render_config_t *config, BYTE *src, BYTE *trg,
 #if 0
     log_debug("w:%i h:%i xs:%i ys:%i xt:%i yt:%i ps:%i pt:%i d%i",
               width, height, xs, ys, xt, yt, pitchs, pitcht, depth);
+
 #endif
 
     if (width <= 0)
@@ -120,7 +117,7 @@ void video_render_main(video_render_config_t *config, BYTE *src, BYTE *trg,
       case VIDEO_RENDER_PAL_1X1:
       case VIDEO_RENDER_PAL_2X2:
         (*render_pal_func)(config, src, trg, width, height, xs, ys, xt, yt,
-                           pitchs, pitcht, depth);
+                           pitchs, pitcht, depth, viewport);
         return;
 
       case VIDEO_RENDER_RGB_1X1:
@@ -180,7 +177,7 @@ void video_render_2x2func_set(void(*func)(video_render_config_t *,
 
 void video_render_palfunc_set(void(*func)(video_render_config_t *,
                               BYTE *, BYTE *, int, int, int, int,
-                              int, int, int, int, int))
+                              int, int, int, int, int, viewport_t *))
 {
     render_pal_func = func;
 }

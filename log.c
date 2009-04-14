@@ -36,9 +36,7 @@
 #include "lib.h"
 #include "log.h"
 #include "resources.h"
-#ifdef HAS_TRANSLATION
 #include "translate.h"
-#endif
 #include "util.h"
 
 
@@ -71,7 +69,9 @@ static void log_file_open(void)
 
 static int set_log_file_name(const char *val, void *param)
 {
-    util_string_set(&log_file_name, val);
+    if (util_string_set(&log_file_name, val) < 0) {
+        return 0;
+    }
 
     if (log_file) {
         fclose(log_file);
@@ -98,19 +98,14 @@ void log_resources_shutdown(void)
     lib_free(log_file_name);
 }
 
-#ifdef HAS_TRANSLATION
 static const cmdline_option_t cmdline_options[] = {
-    { "-logfile", SET_RESOURCE, 1, NULL, NULL,
-      "LogFileName", NULL, IDCLS_P_NAME, IDCLS_SPECIFY_LOG_FILE_NAME },
+    { "-logfile", SET_RESOURCE, 1,
+      NULL, NULL, "LogFileName", NULL,
+      USE_PARAM_ID, USE_DESCRIPTION_ID,
+      IDCLS_P_NAME, IDCLS_SPECIFY_LOG_FILE_NAME,
+      NULL, NULL },
     { NULL }
 };
-#else
-static const cmdline_option_t cmdline_options[] = {
-    { "-logfile", SET_RESOURCE, 1, NULL, NULL,
-      "LogFileName", NULL, N_("<name>"), N_("Specify log file name") },
-    { NULL }
-};
-#endif
 
 int log_cmdline_options_init(void)
 {
