@@ -154,10 +154,6 @@ void ui_dispatch_events()
 {
 }
 
-void archdep_ui_init()
-{
-}
-
 signed long kbd_arch_keyname_to_keynum(char *keyname) {
 	return (signed long)atoi(keyname);
 }

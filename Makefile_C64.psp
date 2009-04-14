@@ -38,102 +38,94 @@ BUILD_EMUL= \
            c64/cart/zaxxon.o c64/cart/delaep256.o \
            c64/cart/magicformel.o c64/cart/delaep64.o \
            c64/cart/mikroass.o c64/cart/stardos.o c64/cart/actionreplay4.o \
-\
            vicii/vicii-badline.o vicii/vicii.o \
            vicii/vicii-cmdline-options.o vicii/vicii-color.o \
            vicii/vicii-draw.o vicii/vicii-fetch.o vicii/vicii-irq.o \
            vicii/vicii-mem.o vicii/vicii-phi1.o vicii/vicii-resources.o \
            vicii/vicii-snapshot.o vicii/vicii-sprites.o vicii/vicii-timing.o \
-\
            core/ciacore.o core/riotcore.o core/viacore.o \
            core/ciatimer.o core/tpicore.o \
-\
            diskimage/diskimage.o diskimage/fsimage-create.o \
            diskimage/rawimage.o diskimage/fsimage.o \
            diskimage/fsimage-gcr.o diskimage/realimage.o \
            diskimage/fsimage-check.o diskimage/fsimage-probe.o \
-\
            fileio/cbmfile.o fileio/fileio.o fileio/p00.o \
-\
            fsdevice/fsdevice.o fsdevice/fsdevice-open.o \
            fsdevice/fsdevice-close.o fsdevice/fsdevice-read.o \
            fsdevice/fsdevice-cmdline-options.o \
            fsdevice/fsdevice-resources.o fsdevice/fsdevice-flush.o \
            fsdevice/fsdevice-write.o \
-\
            imagecontents/diskcontents-block.o imagecontents/diskcontents.o \
            imagecontents/diskcontents-iec.o imagecontents/imagecontents.o \
            imagecontents/tapecontents.o \
-\
            monitor/asm6502.o monitor/asmz80.o monitor/mon_assemble6502.o \
            monitor/mon_assemblez80.o monitor/mon_breakpoint.o \
            monitor/mon_command.o monitor/mon_disassemble.o monitor/mon_drive.o \
            monitor/mon_file.o monitor/monitor.o monitor/mon_lex.o \
            monitor/mon_memory.o monitor/mon_parse.o monitor/mon_register6502.o \
            monitor/mon_registerz80.o monitor/mon_ui.o monitor/mon_util.o \
-\
            parallel/parallel.o parallel/parallel-trap.o \
-\
-           printerdrv/driver-select.o printerdrv/drv-ascii.o printerdrv/drv-mps803.o \
-           printerdrv/drv-nl10.o printerdrv/interface-serial.o \
+           printerdrv/driver-select.o printerdrv/drv-ascii.o \
+           printerdrv/drv-mps803.o printerdrv/drv-nl10.o \
+           printerdrv/interface-serial.o \
            printerdrv/interface-userport.o printerdrv/output-graphics.o \
-           printerdrv/output-select.o printerdrv/output-text.o printerdrv/printer.o \
-           printerdrv/printer-serial.o printerdrv/printer-userport.o \
-\
+           printerdrv/output-select.o printerdrv/output-text.o \
+           printerdrv/printer.o printerdrv/printer-serial.o \
+           printerdrv/printer-userport.o \
            raster/raster.o raster/raster-cache.o raster/raster-canvas.o \
-           raster/raster-changes.o raster/raster-cmdline-options.o raster/raster-line.o \
-           raster/raster-line-changes.o raster/raster-line-changes-sprite.o \
-           raster/raster-modes.o raster/raster-resources.o raster/raster-sprite.o \
+           raster/raster-changes.o raster/raster-cmdline-options.o \
+           raster/raster-line.o raster/raster-line-changes.o \
+           raster/raster-line-changes-sprite.o raster/raster-modes.o \
+           raster/raster-resources.o raster/raster-sprite.o \
            raster/raster-sprite-cache.o raster/raster-sprite-status.o \
-\
            rs232drv/rs232drv.o rs232drv/rsuser.o \
-\
-           sid/fastsid.o sid/sid.o sid/sid-cmdline-options.o sid/sid-resources.o \
-           sid/sid-snapshot.o sid/resid.o \
-\
+           sid/fastsid.o sid/sid.o sid/sid-cmdline-options.o \
+           sid/sid-resources.o sid/sid-snapshot.o sid/resid.o \
            tape/t64.o tape/tap.o tape/tape.o tape/tapeimage.o \
            tape/tape-internal.o tape/tape-snapshot.o \
-\
            vdc/vdc.o vdc/vdc-cmdline-options.o vdc/vdc-draw.o vdc/vdc-mem.o \
            vdc/vdc-resources.o vdc/vdc-snapshot.o \
-\
            vdrive/vdrive-bam.o vdrive/vdrive.o vdrive/vdrive-command.o \
            vdrive/vdrive-dir.o vdrive/vdrive-iec.o vdrive/vdrive-internal.o \
            vdrive/vdrive-rel.o vdrive/vdrive-snapshot.o \
-\
            video/render1x1.o video/render1x1pal.o video/render1x2.o \
            video/render2x2.o video/render2x2pal.o video/renderscale2x.o \
-           video/renderyuv.o video/video-canvas.o video/video-cmdline-options.o \
-           video/video-color.o video/video-render-1x2.o video/video-render-2x2.o \
-           video/video-render.o video/video-render-pal.o video/video-resources.o \
-           video/video-resources-pal.o video/video-viewport.o \
-\
+           video/renderyuv.o video/video-canvas.o \
+           video/video-cmdline-options.o video/video-color.o \
+           video/video-render-1x2.o video/video-render-2x2.o \
+           video/video-render.o video/video-render-pal.o \
+           video/video-resources.o video/video-resources-pal.o \
+           video/video-viewport.o \
            drive/drive.o \
            drive/drive-check.o drive/drive-cmdline-options.o drive/drivecpu.o \
            drive/driveimage.o drive/drivemem.o drive/drive-overflow.o \
            drive/drive-resources.o drive/driverom.o drive/drive-snapshot.o \
            drive/drivesync.o drive/drive-writeprotect.o drive/rotation.o \
-           drive/iec128dcr/iec128dcr.o drive/iec128dcr/iec128dcr-cmdline-options.o \
-           drive/iec128dcr/iec128dcr-resources.o drive/iec128dcr/iec128dcrrom.o \
+           drive/iec128dcr/iec128dcr.o \
+           drive/iec128dcr/iec128dcr-cmdline-options.o \
+           drive/iec128dcr/iec128dcr-resources.o \
+           drive/iec128dcr/iec128dcrrom.o \
            drive/iec/cia1571d.o drive/iec/cia1581d.o drive/iec/glue1571.o \
-           drive/iec/iec.o drive/iec/iec-cmdline-options.o drive/iec/iec-resources.o \
-           drive/iec/iecrom.o drive/iecieee/iecieee.o drive/iecieee/via2d.o \
-           drive/iec/memiec.o drive/iec/via1d1541.o drive/iec/wd1770.o drive/ieee/fdc.o \
-           drive/ieee/ieee.o drive/ieee/ieee-cmdline-options.o drive/ieee/ieee-resources.o \
-           drive/ieee/ieeerom.o drive/ieee/memieee.o drive/ieee/riot1d.o drive/ieee/riot2d.o \
+           drive/iec/iec.o drive/iec/iec-cmdline-options.o \
+           drive/iec/iec-resources.o drive/iec/iecrom.o \
+           drive/iecieee/iecieee.o drive/iecieee/via2d.o drive/iec/memiec.o \
+           drive/iec/via1d1541.o drive/iec/wd1770.o drive/ieee/fdc.o \
+           drive/ieee/ieee.o drive/ieee/ieee-cmdline-options.o \
+           drive/ieee/ieee-resources.o drive/ieee/ieeerom.o \
+           drive/ieee/memieee.o drive/ieee/riot1d.o drive/ieee/riot2d.o \
            drive/ieee/via1d2031.o drive/iec/plus4exp/iec-plus4exp.o \
-           drive/iec/plus4exp/plus4exp-resources.o drive/iec/c64exp/iec-c64exp.o \
-           drive/iec/c64exp/mc6821.o drive/iec/c64exp/c64exp-resources.o \
-           drive/iec/c64exp/c64exp-cmdline-options.o drive/iec/c64exp/profdos.o \
+           drive/iec/plus4exp/plus4exp-resources.o \
+           drive/iec/c64exp/iec-c64exp.o drive/iec/c64exp/mc6821.o \
+           drive/iec/c64exp/c64exp-resources.o \
+           drive/iec/c64exp/c64exp-cmdline-options.o \
+           drive/iec/c64exp/profdos.o \
            drive/iec/plus4exp/plus4exp-cmdline-options.o \
-\
            resid/voice.o resid/wave8580__ST.o resid/extfilt.o resid/pot.o \
-           resid/version.o resid/wave6581__ST.o resid/sid.o resid/wave8580_P_T.o \
-           resid/wave8580_PST.o resid/envelope.o resid/wave6581_PS_.o resid/wave.o \
-           resid/wave6581_P_T.o resid/filter.o resid/wave6581_PST.o resid/wave8580_PS_.o \
-\
+           resid/version.o resid/wave6581__ST.o resid/sid.o \
+           resid/wave8580_P_T.o resid/wave8580_PST.o resid/envelope.o \
+           resid/wave6581_PS_.o resid/wave.o resid/wave6581_P_T.o \
+           resid/filter.o resid/wave6581_PST.o resid/wave8580_PS_.o \
            iecbus/iecbus.o \
-\
            lib.o util.o resources.o ioutil.o palette.o snapshot.o interrupt.o \
            log.o alarm.o zfile.o joystick.o sound.o event.o keyboard.o dma.o \
            machine.o vsync.o sysfile.o gcr.o network.o cmdline.o romset.o \
@@ -141,24 +133,23 @@ BUILD_EMUL= \
            ram.o main.o cbmdos.o emuid.o rawfile.o kbdbuf.o screenshot.o \
            machine-bus.o debug.o fliplist.o maincpu.o zipcode.o findpath.o \
            cbmimage.o initcmdline.o init.o \
-\
-           gfxoutputdrv/gfxoutput.o gfxoutputdrv/bmpdrv.o gfxoutputdrv/iffdrv.o \
-           gfxoutputdrv/pcxdrv.o gfxoutputdrv/ppmdrv.o \
-\
+           gfxoutputdrv/gfxoutput.o gfxoutputdrv/bmpdrv.o \
+           gfxoutputdrv/iffdrv.o gfxoutputdrv/pcxdrv.o gfxoutputdrv/ppmdrv.o \
            serial/fsdrive.o serial/serial.o serial/serial-device.o \
-           serial/serial-iec-bus.o serial/serial-iec.o serial/serial-iec-device.o \
-           serial/serial-iec-lib.o serial/serial-realdevice.o serial/serial-trap.o \
-\
-           sounddrv/soundiff.o sounddrv/soundaiff.o sounddrv/soundvoc.o sounddrv/soundwav.o \
-           sounddrv/sounddump.o sounddrv/soundspeed.o sounddrv/soundfs.o
-
-BUILD_PORT=sounddrv/sounddummy.o arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
-           arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o arch/psp/blockdev.o \
-           arch/psp/c64ui.o arch/psp/console.o arch/psp/uicmdline.o arch/psp/uimon.o \
-           arch/psp/signals.o arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
+           serial/serial-iec-bus.o serial/serial-iec.o \
+           serial/serial-iec-device.o serial/serial-iec-lib.o \
+           serial/serial-realdevice.o serial/serial-trap.o \
+           sounddrv/soundiff.o sounddrv/soundaiff.o sounddrv/soundvoc.o \
+           sounddrv/soundwav.o sounddrv/sounddump.o sounddrv/soundspeed.o \
+           sounddrv/soundfs.o sounddrv/sounddummy.o 
+BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o \
+           arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o \
+           arch/psp/blockdev.o arch/psp/c64ui.o arch/psp/console.o \
+           arch/psp/uicmdline.o arch/psp/uimon.o arch/psp/signals.o \
+           arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
 OBJS=$(BUILD_EMUL) $(BUILD_PORT)
 
-DEFINES=-DVERSION=\"2.0\" -DSOUND_BUFFER_SIZE=768
+DEFINES=-DVERSION=\"2.0\" -DSOUND_BUFFER_SIZE=768 -DPSP_DEBUG
 BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAME)\""
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti

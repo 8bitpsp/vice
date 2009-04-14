@@ -4,6 +4,9 @@
 
 #include <pspkernel.h>
 
+#include "main.h"
+#include "machine.h"
+
 #include "lib/pl_snd.h"
 #include "lib/video.h"
 #include "lib/pl_psp.h"
@@ -26,11 +29,11 @@ int main(int argc, char *argv[])
   pspVideoInit();
 
   /* Initialize callbacks */
-  pl_psp_register_callback(PSP_EXIT_CALLBACK,
-                           ExitCallback,
-                           NULL);
+  pl_psp_register_callback(PSP_EXIT_CALLBACK, ExitCallback, NULL);
   pl_psp_start_callback_thread();
-pl_psp_set_clock_freq(333);
+
+pl_psp_set_clock_freq(333); /* TODO */
+
   main_program(argc, argv);
 
 /* TODO
@@ -40,8 +43,10 @@ pl_psp_set_clock_freq(333);
     TrashMenu();
   }
 */
-//  main_exit();
-pl_psp_set_clock_freq(222);
+
+pl_psp_set_clock_freq(222); /* TODO */
+
+  main_exit();
 
   /* Release PSP resources */
   pl_snd_shutdown();
@@ -51,7 +56,7 @@ pl_psp_set_clock_freq(222);
   return(0);
 }
 
-void main_exit(void)
+void main_exit()
 {
     machine_shutdown();
 }

@@ -65,13 +65,16 @@ static char *boot_path = NULL;
 /* alternate storage of preferences */
 const char *archdep_pref_path = NULL; /* NULL -> use home_path + ".vice" */
 
-FILE *TODO = NULL;
+static FILE *log_file = NULL;
 
 int archdep_init(int *argc, char **argv)
 {
     argv0 = lib_stralloc(argv[0]);
 
-    archdep_ui_init(*argc, argv);
+#ifdef PSP_DEBUG
+    log_file = fopen("log.txt", "w");
+#endif
+
     return 0;
 }
 
@@ -233,16 +236,7 @@ char *archdep_default_save_resource_file_name(void)
 
 FILE *archdep_open_default_log_file(void)
 {
-if (!TODO)
-{
-TODO=fopen("log.txt","w");
-}
-else
-{
-fflush(TODO);
-}
-return TODO;
-    return stdout;
+    return (log_file) ? log_file : NULL;
 }
 
 int archdep_num_text_lines(void)
@@ -535,6 +529,11 @@ int archdep_file_is_chardev(const char *name)
 
 void archdep_shutdown(void)
 {
+  log_message(LOG_DEFAULT, "\nExiting...");
+
+#ifdef PSP_DEBUG
+    if (log_file) fclose(log_file);
+#endif
     lib_free(argv0);
     lib_free(boot_path);
 }

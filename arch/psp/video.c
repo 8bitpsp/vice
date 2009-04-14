@@ -30,7 +30,7 @@ int video_init_cmdline_options(void)
     return cmdline_register_options(cmdline_options);
 }
 
-void fullscreen_capability()//cap_fullscreen_t *cap_fullscreen)
+void fullscreen_capability()
 {
 }
 

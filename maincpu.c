@@ -468,8 +468,6 @@ void maincpu_mainloop(void)
             debug.maincpu_traceflg = 1;
 #endif
     }
-extern FILE*TODO;
-fclose(TODO);
 }
 
 /* ------------------------------------------------------------------------- */
