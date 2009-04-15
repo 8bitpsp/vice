@@ -2,6 +2,7 @@
  * archdep.h - Miscellaneous system-specific stuff.
  *
  * Written by
+ *  Akop Karapetyan <dev@psp.akop.org>
  *  Ettore Perazzoli <ettore@comm2000.it>
  *  Andreas Boose <viceteam@t-online.de>
  *
@@ -103,6 +104,7 @@
 /* No key symcode.  */
 #define ARCHDEP_KEYBOARD_SYM_NONE 0
 
+extern int sound_init_psp_device();
 extern const char *archdep_home_path(void);
 
 /* set this path to customize the preference storage */ 
