@@ -32,8 +32,6 @@ int main(int argc, char *argv[])
   pl_psp_register_callback(PSP_EXIT_CALLBACK, ExitCallback, NULL);
   pl_psp_start_callback_thread();
 
-pl_psp_set_clock_freq(333); /* TODO */
-
   main_program(argc, argv);
 
 /* TODO
@@ -43,8 +41,6 @@ pl_psp_set_clock_freq(333); /* TODO */
     TrashMenu();
   }
 */
-
-pl_psp_set_clock_freq(222); /* TODO */
 
   main_exit();
 

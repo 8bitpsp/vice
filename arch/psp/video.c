@@ -7,6 +7,9 @@
 #include "keyboard.h"
 #include "lib.h"
 #include "log.h"
+#include "ui.h"
+#include "vsync.h"
+#include "raster.h"
 
 #include "lib/video.h"
 #include "lib/ctrl.h"
@@ -19,6 +22,15 @@
 PspImage *Screen = NULL;
 static float last_framerate = 0; /* TODO: reinitialize this */
 static float last_percent = 0;   /* when reentering menu */
+static int screen_x;
+static int screen_y;
+static int screen_w;
+static int screen_h;
+static int clear_screen;
+static int line_height;
+static int psp_first_time = 1;
+
+static void video_psp_display_menu();
 
 /* Video-related command-line options.  */
 static const cmdline_option_t cmdline_options[] = {
@@ -55,7 +67,7 @@ video_canvas_t *video_canvas_create(video_canvas_t *canvas,
 
 void video_canvas_destroy(struct video_canvas_s *canvas)
 {
-  if (Screen) pspImageDestroy(Screen);
+  if (Screen) { pspImageDestroy(Screen); Screen = NULL; }
   lib_free(canvas->video_draw_buffer_callback);
 }
 
@@ -111,9 +123,9 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
 {
   if (!Screen)
   {
-    log_message(LOG_DEFAULT, "\nAllocating framebuffer");
+    if (!(Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED)))
+      return -1;
 
-    Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED);
     Screen->Viewport.Y = 16; /* TODO: determine these values properly */
     Screen->Viewport.Height = 272;
     Screen->Viewport.Width = 384;
@@ -128,12 +140,6 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
 static void video_frame_buffer_free(video_canvas_t *canvas, 
                                     BYTE *draw_buffer)
 {
-  if (Screen)
-  {
-    log_message(LOG_DEFAULT, "\nFreeing framebuffer");
-    pspImageDestroy(Screen);
-    Screen = NULL;
-  }
 }
 
 static void video_frame_buffer_clear(video_canvas_t *canvas, 
@@ -160,9 +166,40 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
   return 0;
 }
 
-void psp_display_menu();
-static int deleteMe=0;
-#include "autostart.h"
+static void video_psp_display_menu()
+{ 
+  vsync_suspend_speed_eval();
+  psp_display_menu();
+  vsync_sync_reset();
+  /* TODO: force repaint */
+
+  /* Set up viewing ratios */
+  float ratio;
+  switch (psp_options.display_mode)
+  {
+  default:
+  case DISPLAY_MODE_UNSCALED:
+    screen_w = Screen->Viewport.Width;
+    screen_h = Screen->Viewport.Height;
+    break;
+  case DISPLAY_MODE_FIT_HEIGHT:
+    ratio = (float)PL_GFX_SCREEN_HEIGHT / (float)Screen->Viewport.Height;
+    screen_w = (float)Screen->Viewport.Width * ratio - 2;
+    screen_h = PL_GFX_SCREEN_HEIGHT;
+    break;
+  case DISPLAY_MODE_FILL_SCREEN:
+    screen_w = PL_GFX_SCREEN_WIDTH - 3;
+    screen_h = PL_GFX_SCREEN_HEIGHT;
+    break;
+  }
+
+  screen_x = (PL_GFX_SCREEN_WIDTH / 2) - (screen_w / 2);
+  screen_y = (PL_GFX_SCREEN_HEIGHT / 2) - (screen_h / 2);
+
+  line_height = pspFontGetLineHeight(&PspStockFont);
+  clear_screen = 1;
+}
+
 void video_canvas_refresh(struct video_canvas_s *canvas,
                                  unsigned int xs, unsigned int ys,
                                  unsigned int xi, unsigned int yi,
@@ -171,19 +208,31 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
 	if (canvas->width == 0)
     return;
 
+  if (psp_first_time)
+  {
+    video_psp_display_menu();
+    psp_first_time = 0;
+  }
+
   /* Update the display */
   pspVideoBegin();
 
+  /* Clear the buffer first, if necessary */
+  if (clear_screen >= 0)
   {
-    int height = pspFontGetLineHeight(&PspStockFont);
-    pspVideoFillRect(0, 0, SCR_WIDTH, height, PSP_COLOR_BLACK);
+    clear_screen--;
+    pspVideoClearScreen();
+  }
+  else
+  {
+    if (psp_options.show_fps)
+      pspVideoFillRect(0, 0, SCR_WIDTH, line_height, PSP_COLOR_BLACK);
   }
 
   /* Draw the screen */
-  pl_gfx_put_image(Screen, 0, 0, 
-                   Screen->Viewport.Width,
-                   Screen->Viewport.Height);
+  pl_gfx_put_image(Screen, screen_x, screen_y, screen_w, screen_h); 
 
+  if (psp_options.show_fps)
   {
     static char fps_display[64];
     sprintf(fps_display, " %3.02f (%.02f%%)", last_framerate, last_percent);
@@ -199,14 +248,9 @@ SceCtrlData pad;
 pspCtrlPollControls(&pad);
 if (pad.Buttons&PSP_CTRL_CROSS)
 keyboard_set_keyarr(7,4,1);
-else if ((pad.Buttons&PSP_CTRL_CIRCLE) && !deleteMe)
-{
-autostart_autodetect("giana sisters.d64", NULL, 0, AUTOSTART_MODE_RUN);
-deleteMe=1;
-}
 else if (pad.Buttons&PSP_CTRL_TRIANGLE)
 {
-  psp_display_menu();
+  video_psp_display_menu();
 }
 
   /* Swap buffers */

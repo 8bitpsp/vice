@@ -26,6 +26,7 @@
 
 #include "autostart.h"
 #include "vice.h"
+#include "machine.h"
 #include "ui.h"
 
 #include <stdio.h>
@@ -73,6 +74,8 @@ static const char *QuickloadFilter[] =
 static const char *TabLabel[] = 
 {
   "Game",
+  "Options",
+  "System",
 /*
   "Save/Load",
   "Controls",
@@ -517,7 +520,7 @@ static int OnMenuOk(const void *uimenu, const void* sel_item)
       if (pspUiConfirm("Reset the system?"))
       {
         psp_exit_menu = 1;
-        // TODO 
+        machine_trigger_reset(MACHINE_RESET_MODE_SOFT);
         return 1;
       }
       break;
