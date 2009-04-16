@@ -23,6 +23,7 @@ typedef struct psp_options
   int animate_menu;
   int toggle_vk;
   int clock_freq;
+  int autoload_slot;
 } psp_options_t;
 
 extern psp_options_t psp_options;

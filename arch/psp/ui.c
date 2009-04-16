@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pspkernel.h>
 
 #include "lib/video.h"
 #include "lib/ui.h"
@@ -44,12 +45,12 @@
 #include "lib/pl_gfx.h"
 
 #define TAB_QUICKLOAD 0
-#define TAB_OPTIONS   1
-#define TAB_SYSTEM    2
-#define TAB_MAX       TAB_SYSTEM
-#define TAB_ABOUT     3
-/*
 #define TAB_STATE     1
+#define TAB_OPTIONS   2
+#define TAB_SYSTEM    3
+#define TAB_MAX       TAB_SYSTEM
+#define TAB_ABOUT     4
+/*
 #define TAB_CONTROLS  2
 #define TAB_OPTIONS   3
 #define TAB_SYSTEM    4
@@ -68,6 +69,12 @@
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
 
+static const char 
+  PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete\t\026"PSP_CHAR_START"\020 Export",
+  EmptySlotText[]   = "\026\244\020 Save\t\026"PSP_CHAR_START"\020 Export",
+  ControlHelpText[] = "\026\250\020 Change mapping\t\026\001\020 Save to \271\t"
+                      "\026\244\020 Set as default\t\026\243\020 Load defaults";
+
 static const char *QuickloadFilter[] =
       { "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
         "PRG", "P00", "ZIP", '\0' };
@@ -76,8 +83,8 @@ static const char *QuickloadFilter[] =
 static const char *TabLabel[] = 
 {
   "Game",
-/*
   "Save/Load",
+/*
   "Controls",
 */
   "Options",
@@ -156,6 +163,11 @@ static void OnSystemRender(const void *uiobject, const void *item_obj);
 
 static int OnQuickloadOk(const void *browser, const void *path);
 
+static int OnSaveStateOk(const void *gallery, const void *item);
+static int OnSaveStateButtonPress(const PspUiGallery *gallery,
+                                  pl_menu_item *sel,
+                                  u32 button_mask);
+
 PspUiSplash SplashScreen = 
 {
   OnSplashRender,
@@ -197,6 +209,14 @@ PspUiMenu
     OnMenuButtonPress,     /* OnButtonPress() */
     OnMenuItemChanged,     /* OnItemChanged() */
   };
+PspUiGallery SaveStateGallery = 
+{
+  OnGenericRender,             /* OnRender() */
+  OnSaveStateOk,               /* OnOk() */
+  OnGenericCancel,             /* OnCancel() */
+  OnSaveStateButtonPress,      /* OnButtonPress() */
+  NULL                         /* Userdata */
+};
 
 pl_file_path psp_current_game = {'\0'},
              psp_game_path = {'\0'},
@@ -212,11 +232,18 @@ psp_options_t psp_options;
 
 static int psp_tab_index;
 static PspImage *psp_menu_bg;
+static PspImage *psp_blank_ss_icon;
 static int psp_exit_menu;
 extern PspImage *Screen;
 
 static void psp_load_options();
 static int  psp_save_options();
+
+static PspImage* psp_load_state_icon(const char *path);
+static int psp_load_state(const char *path);
+static PspImage* psp_save_state(const char *path, PspImage *icon);
+
+static void psp_display_state_tab();
 
 int ui_init(int *argc, char **argv)
 {
@@ -228,6 +255,19 @@ int ui_init(int *argc, char **argv)
   /* Initialize menus */
   pl_menu_create(&OptionUiMenu.Menu, OptionMenuDef);
   pl_menu_create(&SystemUiMenu.Menu, SystemMenuDef);
+
+  /* Init NoSaveState icon image */
+  psp_blank_ss_icon = pspImageCreate(192, 136, PSP_IMAGE_16BPP);
+  pspImageClear(psp_blank_ss_icon, RGB(0x3e,0x31,0xa2));
+
+  /* Initialize state menu */
+  int i;
+  pl_menu_item *item;
+  for (i = 0; i < 10; i++)
+  {
+    item = pl_menu_append_item(&SaveStateGallery.Menu, i, NULL);
+    pl_menu_set_item_help_text(item, EmptySlotText);
+  }
 
   /* Load the background image */
   psp_menu_bg = pspImageLoadPng("background.png");
@@ -281,6 +321,7 @@ void ui_shutdown()
 
   pl_menu_destroy(&OptionUiMenu.Menu);
   pl_menu_destroy(&SystemUiMenu.Menu);
+  pl_menu_destroy(&SaveStateGallery.Menu);
 
   psp_save_options();
 }
@@ -288,6 +329,72 @@ void ui_shutdown()
 /**************************/
 /* Helper functions       */
 /**************************/
+/* Load state icon */
+static PspImage* psp_load_state_icon(const char *path)
+{
+  FILE *f = fopen(path, "r");
+  if (!f) return NULL;
+
+  /* Load image */
+  PspImage *image = pspImageLoadPngFd(f);
+  fclose(f);
+
+  return image;
+}
+
+/* Load state */
+static int psp_load_state(const char *path)
+{
+return 0; // TODO
+  /* Open file for reading */
+  FILE *f = fopen(path, "r");
+  if (!f) return 0;
+
+  /* Load image into temporary object */
+  PspImage *image = pspImageLoadPngFd(f);
+  pspImageDestroy(image);
+
+  /* Load the state data */
+  int error;// = !snapshot_read_file(path, f);
+  fclose(f);
+
+  return error;
+}
+
+/* Save state */
+static PspImage* psp_save_state(const char *path, PspImage *icon)
+{
+return 0; /*TODO */
+  /* Open file for writing */
+  FILE *f;
+  if (!(f = fopen(path, "w")))
+    return NULL;
+
+  /* Create thumbnail */
+  PspImage *thumb;
+  thumb = (icon->Viewport.Width <= 256)
+    ? pspImageCreateCopy(icon) : pspImageCreateThumbnail(icon);
+  if (!thumb) { fclose(f); return NULL; }
+
+  /* Write the thumbnail */
+  if (!pspImageSavePngFd(f, thumb))
+  {
+    pspImageDestroy(thumb);
+    fclose(f);
+    return NULL;
+  }
+
+  /* Write the state */
+//  if (snapshot_write_file(path, f))
+  {
+    pspImageDestroy(thumb);
+    thumb = NULL;
+  }
+
+  fclose(f);
+  return thumb;
+}
+
 static void psp_load_options()
 {
   pl_file_path path;
@@ -297,6 +404,7 @@ static void psp_load_options()
   pl_ini_file file;
   pl_ini_load(&file, path);
 
+  psp_options.autoload_slot = pl_ini_get_int(&file, "System", "Autoload Slot", 9);
   psp_options.display_mode = pl_ini_get_int(&file, "Video", "Display Mode", 
                                             DISPLAY_MODE_UNSCALED);
   psp_options.clock_freq = pl_ini_get_int(&file, "Video", "PSP Clock Frequency", 222);
@@ -318,6 +426,7 @@ static int psp_save_options()
   /* Initialize INI structure */
   pl_ini_file file;
   pl_ini_create(&file);
+  pl_ini_set_int(&file, "System", "Autoload Slot", psp_options.autoload_slot);
   pl_ini_set_int(&file, "Video", "Display Mode", psp_options.display_mode);
   pl_ini_set_int(&file, "Video", "PSP Clock Frequency", psp_options.clock_freq);
   pl_ini_set_int(&file, "Video", "Show FPS", psp_options.show_fps);
@@ -379,11 +488,9 @@ void psp_display_menu()
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;
-#if 0
     case TAB_STATE:
       psp_display_state_tab();
       break;
-#endif
     case TAB_SYSTEM:
       pspUiOpenMenu(&SystemUiMenu, NULL);
       break;
@@ -403,6 +510,76 @@ void psp_display_menu()
     if (psp_options.animate_menu)
       pspUiFadeout();
   }
+}
+
+static void psp_display_state_tab()
+{
+  pl_menu_item *item, *sel = NULL;
+  SceIoStat stat;
+  ScePspDateTime latest;
+  char caption[32];
+  const char *config_name = (GAME_LOADED)
+    ? pl_file_get_filename(psp_current_game) : "BASIC";
+  char *path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
+  char *game_name = strdup(config_name);
+  char *dot = strrchr(game_name, '.');
+  if (dot) *dot='\0';
+
+  memset(&latest,0,sizeof(latest));
+
+  /* Initialize icons */
+  for (item = SaveStateGallery.Menu.items; item; item = item->next)
+  {
+    sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name, item->id);
+
+    if (pl_file_exists(path))
+    {
+      if (sceIoGetstat(path, &stat) < 0)
+        sprintf(caption, "ERROR");
+      else
+      {
+        /* Determine the latest save state */
+        if (pl_util_date_compare(&latest, &stat.st_mtime) < 0)
+        {
+          sel = item;
+          latest = stat.st_mtime;
+        }
+
+        sprintf(caption, "%02i/%02i/%02i %02i:%02i%s", 
+          stat.st_mtime.month,
+          stat.st_mtime.day,
+          stat.st_mtime.year - (stat.st_mtime.year / 100) * 100,
+          stat.st_mtime.hour,
+          stat.st_mtime.minute,
+          ((int)item->id == psp_options.autoload_slot) ? "*" : "");
+      }
+
+      pl_menu_set_item_caption(item, caption);
+      item->param = psp_load_state_icon(path);
+      pl_menu_set_item_help_text(item, PresentSlotText);
+    }
+    else
+    {
+      pl_menu_set_item_caption(item, ((int)item->id == psp_options.autoload_slot)
+          ? "Autoload" : "Empty");
+      item->param = psp_blank_ss_icon;
+      pl_menu_set_item_help_text(item, EmptySlotText);
+    }
+  }
+
+  free(path);
+
+  /* Highlight the latest save state if none are selected */
+  if (SaveStateGallery.Menu.selected == NULL)
+    SaveStateGallery.Menu.selected = sel;
+
+  pspUiOpenGallery(&SaveStateGallery, game_name);
+  free(game_name);
+
+  /* Destroy any icons */
+  for (item = SaveStateGallery.Menu.items; item; item = item->next)
+    if (item->param != NULL && item->param != psp_blank_ss_icon)
+      pspImageDestroy((PspImage*)item->param);
 }
 
 /**************************/
@@ -657,9 +834,138 @@ static int OnQuickloadOk(const void *browser, const void *path)
                          &current_map));
 #endif
 
+  /* Autoload saved state */
+  if (psp_options.autoload_slot >= 0)
+  {
+    const char *config_name = (GAME_LOADED)
+                              ? pl_file_get_filename(psp_current_game) : "BASIC";
+    pl_file_path state_file;
+    snprintf(state_file, sizeof(state_file) - 1, 
+             "%s%s_%02i.sta", psp_save_state_path, config_name, 
+             psp_options.autoload_slot);
+
+    /* Attempt loading saved state (don't care if fails) */
+    psp_load_state(state_file);
+  }
+
   /* Reset selected state */
-  //TODO: SaveStateGallery.Menu.selected = NULL;
+  SaveStateGallery.Menu.selected = NULL;
 
   return 1;
+}
+
+static int OnSaveStateOk(const void *gallery, const void *item)
+{
+  char *path;
+  const char *config_name = (GAME_LOADED) 
+    ? pl_file_get_filename(psp_current_game) : "BASIC";
+
+  path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
+  sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name,
+    ((const pl_menu_item*)item)->id);
+
+  if (pl_file_exists(path) && pspUiConfirm("Load state?"))
+  {
+    if (psp_load_state(path))
+    {
+      psp_exit_menu = 1;
+      pl_menu_find_item_by_id(&((PspUiGallery*)gallery)->Menu,
+        ((pl_menu_item*)item)->id);
+      free(path);
+
+      return 1;
+    }
+
+    pspUiAlert("ERROR: State failed to load\nSee documentation for possible reasons");
+  }
+
+  free(path);
+  return 0;
+}
+
+static int OnSaveStateButtonPress(const PspUiGallery *gallery, 
+                                  pl_menu_item *sel,
+                                  u32 button_mask)
+{
+  if (button_mask & PSP_CTRL_SQUARE 
+    || button_mask & PSP_CTRL_TRIANGLE
+    || button_mask & PSP_CTRL_START)
+  {
+    char *path;
+    char caption[32];
+    const char *config_name = (GAME_LOADED) 
+      ? pl_file_get_filename(psp_current_game) : "BASIC";
+    pl_menu_item *item = pl_menu_find_item_by_id(&gallery->Menu, sel->id);
+
+    path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
+    sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name, item->id);
+
+    do /* not a real loop; flow control construct */
+    {
+      if (button_mask & PSP_CTRL_SQUARE)
+      {
+        if (pl_file_exists(path) && !pspUiConfirm("Overwrite existing state?"))
+          break;
+
+        pspUiFlashMessage("Saving, please wait ...");
+
+        PspImage *icon;
+        if (!(icon = psp_save_state(path, Screen)))
+        {
+          pspUiAlert("ERROR: State not saved");
+          break;
+        }
+
+        SceIoStat stat;
+
+        /* Trash the old icon (if any) */
+        if (item->param && item->param != psp_blank_ss_icon)
+          pspImageDestroy((PspImage*)item->param);
+
+        /* Update icon, help text */
+        item->param = icon;
+        pl_menu_set_item_help_text(item, PresentSlotText);
+
+        /* Get file modification time/date */
+        if (sceIoGetstat(path, &stat) < 0)
+          sprintf(caption, "ERROR");
+        else
+          sprintf(caption, "%02i/%02i/%02i %02i:%02i", 
+            stat.st_mtime.month,
+            stat.st_mtime.day,
+            stat.st_mtime.year - (stat.st_mtime.year / 100) * 100,
+            stat.st_mtime.hour,
+            stat.st_mtime.minute);
+
+        pl_menu_set_item_caption(item, caption);
+      }
+      else if (button_mask & PSP_CTRL_TRIANGLE)
+      {
+        if (!pl_file_exists(path) || !pspUiConfirm("Delete state?"))
+          break;
+
+        if (!pl_file_rm(path))
+        {
+          pspUiAlert("ERROR: State not deleted");
+          break;
+        }
+
+        /* Trash the old icon (if any) */
+        if (item->param && item->param != psp_blank_ss_icon)
+          pspImageDestroy((PspImage*)item->param);
+
+        /* Update icon, caption */
+        item->param = psp_blank_ss_icon;
+        pl_menu_set_item_help_text(item, EmptySlotText);
+        pl_menu_set_item_caption(item, ((int)item->id == psp_options.autoload_slot)
+            ? "Autoload" : "Empty");
+      }
+    } while (0);
+
+    if (path) free(path);
+    return 0;
+  }
+
+  return OnGenericButtonPress(NULL, NULL, button_mask);
 }
 
