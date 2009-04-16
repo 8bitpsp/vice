@@ -69,20 +69,19 @@
 #define SYSTEM_RESET        0x12
 
 static const char *QuickloadFilter[] =
-      { "D64", "ZIP", '\0' }; /* TODO: add all */
+      { "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
+        "PRG", "P00", "ZIP", '\0' };
 
 /* Tab labels */
 static const char *TabLabel[] = 
 {
   "Game",
-  "Options",
-  "System",
 /*
   "Save/Load",
   "Controls",
+*/
   "Options",
   "System",
-*/
   "About"
 };
 
