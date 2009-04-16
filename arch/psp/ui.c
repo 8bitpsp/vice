@@ -41,6 +41,7 @@
 #include "lib/pl_psp.h"
 #include "lib/pl_ini.h"
 #include "lib/pl_util.h"
+#include "lib/pl_gfx.h"
 
 #define TAB_QUICKLOAD 0
 #define TAB_OPTIONS   1
@@ -250,7 +251,7 @@ int ui_init(int *argc, char **argv)
   UiMetric.ScrollbarWidth = 10;
   UiMetric.TextColor = PSP_COLOR_GRAY;
   UiMetric.SelectedColor = COLOR(0xf7,0xc2,0x50,0xFF);
-  UiMetric.SelectedBgColor = COLOR(0x46,0x98,0xce,0x99);
+  UiMetric.SelectedBgColor = COLOR(0xff,0xff,0xff,0x99);
   UiMetric.StatusBarColor = PSP_COLOR_WHITE;
   UiMetric.BrowserFileColor = PSP_COLOR_GRAY;
   UiMetric.BrowserDirectoryColor = PSP_COLOR_YELLOW;
@@ -259,13 +260,13 @@ int ui_init(int *argc, char **argv)
   UiMetric.MenuItemMargin = 20;
   UiMetric.MenuSelOptionBg = PSP_COLOR_BLACK;
   UiMetric.MenuOptionBoxColor = PSP_COLOR_GRAY;
-  UiMetric.MenuOptionBoxBg = COLOR(0x46,0x98,0xce,0xCC);
+  UiMetric.MenuOptionBoxBg = COLOR(0x3e,0x31,0xa2,0xCC);
   UiMetric.MenuDecorColor = UiMetric.SelectedColor;
-  UiMetric.DialogFogColor = COLOR(0x59,0x91,0x38,0xBB);
+  UiMetric.DialogFogColor = COLOR(0x3e,0x31,0xa2,0x66);
   UiMetric.TitlePadding = 4;
   UiMetric.TitleColor = PSP_COLOR_WHITE;
   UiMetric.MenuFps = 30;
-  UiMetric.TabBgColor = COLOR(0xa4,0xa4,0xa4,0xff);
+  UiMetric.TabBgColor = PSP_COLOR_WHITE;
   UiMetric.Animate = psp_options.animate_menu;
   UiMetric.BrowserScreenshotPath = psp_screenshot_path;
   UiMetric.BrowserScreenshotDelay = 30;
@@ -627,11 +628,11 @@ static void OnSystemRender(const void *uiobject, const void *item_obj)
   w = Screen->Viewport.Width >> 1;
   h = Screen->Viewport.Height >> 1;
   x = UiMetric.Right - w - UiMetric.ScrollbarWidth;
-  y = SCR_HEIGHT - h - 56;
+  y = SCR_HEIGHT - h - 80;
 
   /* Draw a small representation of the screen */
   pspVideoShadowRect(x, y, x + w - 1, y + h - 1, PSP_COLOR_BLACK, 3);
-  pspVideoPutImage(Screen, x, y, w, h);
+  pl_gfx_put_image(Screen, x, y, w, h);
   pspVideoDrawRect(x, y, x + w - 1, y + h - 1, PSP_COLOR_GRAY);
 
   OnGenericRender(uiobject, item_obj);

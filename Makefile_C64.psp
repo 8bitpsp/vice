@@ -12,6 +12,7 @@ PSP_APP_VER=2.1.1
 TARGET=vicepsp
 EXTRA_TARGETS=EBOOT.PBP
 PSP_EBOOT_TITLE=$(PSP_APP_NAME) $(PSP_APP_VER)
+PSP_EBOOT_ICON=$(PSPAPP)/data/xmb-icon-c64.png
 
 BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            c64/c64memsnapshot.o c64/c64sound.o c64/psid.o \
