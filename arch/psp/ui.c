@@ -67,7 +67,7 @@
 static const char 
   PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete\t\026"PSP_CHAR_START"\020 Export",
   EmptySlotText[]   = "\026\244\020 Save\t\026"PSP_CHAR_START"\020 Export",
-  ControlHelpText[] = "\026\250\020 Change mapping\t\026\001\020 Save to \271\t"
+  ControlHelpText[] = "\026\250\020 Change mapping\t"
                       "\026\244\020 Set as default\t\026\243\020 Load defaults";
 
 static const char *QuickloadFilter[] =
@@ -126,9 +126,44 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
   PL_MENU_OPTION("None", 0)
   /* Special */
   PL_MENU_OPTION("Special: Open Menu",     (SPC|SPC_MENU))
+  /* Function keys */
+  PL_MENU_OPTION("Joystick Up",    JOY|0x01)
+  PL_MENU_OPTION("Joystick Down",  JOY|0x02)
+  PL_MENU_OPTION("Joystick Left",  JOY|0x04)
+  PL_MENU_OPTION("Joystick Right", JOY|0x08)
+  PL_MENU_OPTION("Joystick Fire",  JOY|0x10)
   /* Cursor */
   PL_MENU_OPTION("Up/Down",    CK(0,7,8))
   PL_MENU_OPTION("Left/Right", CK(0,2,8))
+  /* Function keys */
+  PL_MENU_OPTION("F1/F2", CK(0,4,8))
+  PL_MENU_OPTION("F3/F4", CK(0,5,8))
+  PL_MENU_OPTION("F5/F6", CK(0,6,8))
+  PL_MENU_OPTION("F7/F8", CK(0,3,8))
+  /* Etc.. */
+  PL_MENU_OPTION("BS/Del",       CK(0,0,8))
+  PL_MENU_OPTION("Tab/Ctrl",     CK(7,2,8))
+  PL_MENU_OPTION("Return",       CK(0,1,8))
+  PL_MENU_OPTION("L. Ctrl/CBM",  CK(7,5,8))
+  PL_MENU_OPTION("L. Shift",     CK(1,7,2))
+  PL_MENU_OPTION("R. Shift",     CK(6,4,4))
+  PL_MENU_OPTION("Space",        CK(7,4,8))
+  PL_MENU_OPTION("CAPS Lock/Run/Stop", CK(7,7,8))
+  PL_MENU_OPTION("Home/CLR/Home",CK(6,3,8))
+  PL_MENU_OPTION("Ins/#",        CK(6,0,8))
+  PL_MENU_OPTION("Del/Up Arrow", CK(6,6,8))
+  /* Symbols */
+  PL_MENU_OPTION("-", CK(5,0,8))
+  PL_MENU_OPTION("=", CK(5,3,8))
+  PL_MENU_OPTION("[", CK(5,6,8))
+  PL_MENU_OPTION("]", CK(6,1,8))
+  PL_MENU_OPTION(";", CK(5,5,8))
+  PL_MENU_OPTION("'", CK(6,2,8))
+  PL_MENU_OPTION("`", CK(7,1,8))
+  PL_MENU_OPTION("\\", CK(6,5,8))
+  PL_MENU_OPTION(",", CK(5,7,8))
+  PL_MENU_OPTION(".", CK(5,4,8))
+  PL_MENU_OPTION("/", CK(6,7,8))
   /* Digits */
   PL_MENU_OPTION("1", CK(7,0,8))
   PL_MENU_OPTION("2", CK(7,3,8))
@@ -168,39 +203,7 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
   PL_MENU_OPTION("Y", CK(3,1,8))
   PL_MENU_OPTION("Z", CK(1,4,8))
 PL_MENU_OPTIONS_END
-/*
-12 5 0 8        --        Minus -> Plus         --
-13 5 3 8        --        Equal -> Minus        --
-14 0 0 8        --    Backspace -> Del          --
-15 7 2 8        --          TAB -> Ctrl         --
-26 5 6 8        --            [ -> @            --
-27 6 1 8        --            ] -> *            --
-28 0 1 8        --       Return -> Return       --
-29 7 5 8        --    Left Ctrl -> CBM          --
-39 5 5 8        --            ; -> :            --
-40 6 2 8        --            ' -> ;            --
-41 7 1 8        --            ` -> Left Arrow   --
-42 1 7 2        --   Left Shift -> Left Shift   --
-43 6 5 8        --            \ -> =            --
-51 5 7 8        --            , -> ,            --
-52 5 4 8        --            . -> .            --
-53 6 7 8        --            / -> /            --
-54 6 4 4        --  Right Shift -> Right Shift  --
-55 6 1 8        --       Grey * -> *            --
-57 7 4 8        --        Space -> Space        --
-58 7 7 8        --    Caps Lock -> Run/Stop     --
-59 0 4 8        --           F1 -> F1           --
-60 0 4 1        --           F2 -> F2           --
-61 0 5 8        --           F3 -> F3           --
-62 0 5 1        --           F4 -> F4           --
-63 0 6 8        --           F5 -> F5           --
-64 0 6 1        --           F6 -> F6           --
-65 0 3 8        --           F7 -> F7           --
-66 0 3 1        --           F8 -> F8           --
-89 6 3 8        --         Home -> CLR/HOME     --
-97 6 0 8        --          Ins -> Pound        --
-98 6 6 8        --          Del -> Up Arrow     --
-*/
+
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
   PL_MENU_HEADER("Options")
   PL_MENU_ITEM("Reset",SYSTEM_RESET,NULL,
@@ -264,22 +267,22 @@ PL_MENU_ITEMS_END
 static psp_ctrl_map_t default_map =
 {
   {
-    0,    /* Analog Up    */
-    0,  /* Analog Down  */
-    0,  /* Analog Left  */
-    0, /* Analog Right */
-    0,    /* D-pad Up     */
-    0,  /* D-pad Down   */
-    0,  /* D-pad Left   */
-    0, /* D-pad Right  */
-    0,      /* Square       */
-    0, /* Cross        */
-    0,   /* Circle       */
-    0,                     /* Triangle     */
-    0,                     /* L Trigger    */
-    0,          /* R Trigger    */
-    0,       /* Select       */
-    0,       /* Start        */
+    JOY|0x01,  /* Analog Up    */
+    JOY|0x02,  /* Analog Down  */
+    JOY|0x04,  /* Analog Left  */
+    JOY|0x08,  /* Analog Right */
+    JOY|0x01,  /* D-pad Up     */
+    JOY|0x02,  /* D-pad Down   */
+    JOY|0x04,  /* D-pad Left   */
+    JOY|0x08,  /* D-pad Right  */
+    0,         /* Square       */
+    JOY|0x10,  /* Cross        */
+    CK(7,4,8), /* Circle       */
+    0,         /* Triangle     */
+    0,         /* L Trigger    */
+    0,         /* R Trigger    */
+    0,         /* Select       */
+    CK(7,7,8), /* Start        */
     SPC|SPC_MENU,          /* L+R Triggers */
     0,                     /* Start+Select */
     0,                     /* L + Select   */
@@ -383,6 +386,7 @@ psp_options_t psp_options;
 #define SET_AS_CURRENT_GAME(filename) \
   strncpy(psp_current_game, filename, sizeof(psp_current_game) - 1)
 
+static int psp_controls_changed;
 static int psp_tab_index;
 static PspImage *psp_menu_bg;
 static PspImage *psp_blank_ss_icon;
@@ -509,8 +513,18 @@ static void psp_display_control_tab()
   for (item = ControlUiMenu.Menu.items, i = 0; item; item = item->next, i++)
     pl_menu_select_option_by_value(item, (void*)current_map.button_map[i]);
 
+  psp_controls_changed = 0;
+
   pspUiOpenMenu(&ControlUiMenu, game_name);
   free(game_name);
+
+  /* Save to MS, if configuration changed */
+  if (psp_controls_changed)
+  {
+    pspUiFlashMessage("Saving configuration, please wait...");
+    if (!psp_save_controls(config_name, &current_map))
+      pspUiAlert("ERROR: Changes not saved");
+  }
 }
 
 static void psp_init_controls(psp_ctrl_map_t *config)
@@ -914,38 +928,25 @@ static const char* OnSplashGetStatusBarText(const struct PspUiSplash *splash)
 
 static int OnMenuOk(const void *uimenu, const void* sel_item)
 {
-  if (uimenu == &ControlUiMenu)
+  switch (((const pl_menu_item*)sel_item)->id)
   {
-    /* Save to MS */
-    if (psp_save_controls((GAME_LOADED)
-                          ? pl_file_get_filename(psp_current_game) : "BASIC", 
-                          &current_map))
-      pspUiAlert("Changes saved");
-    else
-      pspUiAlert("ERROR: Changes not saved");
-  }
-  else
-  {
-    switch (((const pl_menu_item*)sel_item)->id)
+  case SYSTEM_RESET:
+    if (pspUiConfirm("Reset the system?"))
     {
-    case SYSTEM_RESET:
-      if (pspUiConfirm("Reset the system?"))
-      {
-        psp_exit_menu = 1;
-        machine_trigger_reset(MACHINE_RESET_MODE_SOFT);
-        return 1;
-      }
-      break;
-    case SYSTEM_SCRNSHOT:
-      /* Save screenshot */
-      if (!pl_util_save_image_seq(psp_screenshot_path, (GAME_LOADED)
-                                  ? pl_file_get_filename(psp_current_game) : "BASIC",
-                                  Screen))
-        pspUiAlert("ERROR: Screenshot not saved");
-      else
-        pspUiAlert("Screenshot saved successfully");
-      break;
+      psp_exit_menu = 1;
+      machine_trigger_reset(MACHINE_RESET_MODE_SOFT);
+      return 1;
     }
+    break;
+  case SYSTEM_SCRNSHOT:
+    /* Save screenshot */
+    if (!pl_util_save_image_seq(psp_screenshot_path, (GAME_LOADED)
+                                ? pl_file_get_filename(psp_current_game) : "BASIC",
+                                Screen))
+      pspUiAlert("ERROR: Screenshot not saved");
+    else
+      pspUiAlert("Screenshot saved successfully");
+    break;
   }
 
   return 0;
@@ -997,6 +998,7 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
   if (uimenu == &ControlUiMenu)
   {
     current_map.button_map[item->id] = (unsigned int)option->value;
+    psp_controls_changed = 1;
   }
   else
   {

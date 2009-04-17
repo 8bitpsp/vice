@@ -31,6 +31,41 @@ static int line_height;
 static int psp_first_time = 1;
 
 static void video_psp_display_menu();
+static void video_psp_refresh_screen();
+
+typedef struct psp_ctrl_mask_to_index_map
+{
+  uint64_t mask;
+  uint8_t  index;
+} psp_ctrl_mask_to_index_map_t;
+
+static const psp_ctrl_mask_to_index_map_t physical_to_emulated_button_map[] =
+{
+  /* These are shift-based (e.g. L/R are not unset when a button pressed) */
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_SELECT,   18 },
+  { PSP_CTRL_RTRIGGER | PSP_CTRL_SELECT,   19 },
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_SQUARE,   20 },
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_CROSS,    21 },
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_CIRCLE,   22 },
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_TRIANGLE, 23 },
+  { PSP_CTRL_RTRIGGER | PSP_CTRL_SQUARE,   24 },
+  { PSP_CTRL_RTRIGGER | PSP_CTRL_CROSS,    25 },
+  { PSP_CTRL_RTRIGGER | PSP_CTRL_CIRCLE,   26 },
+  { PSP_CTRL_RTRIGGER | PSP_CTRL_TRIANGLE, 27 },
+
+  /* These are normal */
+  { PSP_CTRL_LTRIGGER | PSP_CTRL_RTRIGGER, 16 },
+  { PSP_CTRL_START    | PSP_CTRL_SELECT,   17 },
+  { PSP_CTRL_ANALUP,   0 }, { PSP_CTRL_ANALDOWN,  1 },
+  { PSP_CTRL_ANALLEFT, 2 }, { PSP_CTRL_ANALRIGHT, 3 },
+  { PSP_CTRL_UP,   4 }, { PSP_CTRL_DOWN,  5 },
+  { PSP_CTRL_LEFT, 6 }, { PSP_CTRL_RIGHT, 7 },
+  { PSP_CTRL_SQUARE, 8 },  { PSP_CTRL_CROSS,     9 },
+  { PSP_CTRL_CIRCLE, 10 }, { PSP_CTRL_TRIANGLE, 11 },
+  { PSP_CTRL_LTRIGGER, 12 }, { PSP_CTRL_RTRIGGER, 13 },
+  { PSP_CTRL_SELECT, 14 }, { PSP_CTRL_START, 15 },
+  { 0, -1 }
+};
 
 void video_canvas_resize(struct video_canvas_s *canvas,
                                 unsigned int width, unsigned int height)
@@ -138,7 +173,6 @@ static void video_psp_display_menu()
 { 
   vsync_suspend_speed_eval();
   psp_display_menu();
-  /* TODO: force repaint */
   vsync_sync_reset();
 
   last_framerate = 0;
@@ -169,6 +203,100 @@ static void video_psp_display_menu()
 
   line_height = pspFontGetLineHeight(&PspStockFont);
   clear_screen = 1;
+
+  video_psp_refresh_screen();
+}
+
+void input_poll()
+{
+  int joy_port = 2;
+
+  /* Reset joystick */
+  joystick_value[joy_port] = 0;
+
+  /* Parse input */
+  static SceCtrlData pad;
+  if (pspCtrlPollControls(&pad))
+  {
+#if 0
+    if (keyboard_visible)
+      pl_vk_navigate(&vk_spectrum, &pad);
+#endif
+    const psp_ctrl_mask_to_index_map_t *current_mapping = physical_to_emulated_button_map;
+    for (; current_mapping->mask; current_mapping++)
+    {
+      u32 code = current_map.button_map[current_mapping->index];
+      u8  on = (pad.Buttons & current_mapping->mask) == current_mapping->mask;
+if (1)
+//      if (!keyboard_visible)
+      {
+        if (on)
+        {
+          if (current_mapping->index < MAP_SHIFT_START_POS)
+            /* If a button set is pressed, unset it, so it */
+            /* doesn't trigger any other combination presses. */
+            pad.Buttons &= ~current_mapping->mask;
+          else
+            /* Shift mode: Don't unset the L/R; just the rest */
+            pad.Buttons &= ~(current_mapping->mask &
+                             ~(PSP_CTRL_LTRIGGER|PSP_CTRL_RTRIGGER));
+        }
+
+        if (code & KBD)
+        {
+          keyboard_set_keyarr(CKROW(code),CKCOL(code),on);
+          continue;
+        }
+        else if ((code & JOY) && on)
+        {
+          joystick_value[joy_port] |= CODE_MASK(code);
+          continue;
+        }
+      }
+
+      if (code & SPC)
+      {
+        switch (CODE_MASK(code))
+        {
+        case SPC_MENU:
+          if (on) { video_psp_display_menu(); return; }
+          break;
+#if 0
+        case SPC_KYBD:
+          if (psp_options.toggle_vk)
+          {
+            if (show_kybd_held != on && on)
+            {
+              keyboard_visible = !keyboard_visible;
+              keyboard_release_all();
+
+              if (keyboard_visible) 
+                pl_vk_reinit(&vk_spectrum);
+              else clear_screen = 1;
+            }
+          }
+          else
+          {
+            if (show_kybd_held != on)
+            {
+              keyboard_visible = on;
+              if (on) 
+                pl_vk_reinit(&vk_spectrum);
+              else
+              {
+                clear_screen = 1;
+                keyboard_release_all();
+              }
+            }
+          }
+
+          show_kybd_held = on;
+          break;
+#endif
+        }
+      }
+    }
+  }
 }
 
 void video_canvas_refresh(struct video_canvas_s *canvas,
@@ -185,6 +313,11 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
     psp_first_time = 0;
   }
 
+  video_psp_refresh_screen();
+}
+
+void video_psp_refresh_screen()
+{
   /* Update the display */
   pspVideoBegin();
 
@@ -214,15 +347,6 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
   }
 
   pspVideoEnd();
-
-SceCtrlData pad;
-pspCtrlPollControls(&pad);
-if (pad.Buttons&PSP_CTRL_CROSS)
-keyboard_set_keyarr(7,4,1);
-else if (pad.Buttons&PSP_CTRL_TRIANGLE)
-{
-  video_psp_display_menu();
-}
 
   /* Swap buffers */
   pspVideoSwapBuffers();

@@ -36,13 +36,16 @@ typedef struct psp_options
 
 #define SPC 0x1000000
 #define KBD 0x2000000
+#define JOY 0x4000000
 
 #define SPC_MENU 0x00001
 #define CK(x,y,z) (KBD|(((x&0xff) << 8)|(y&0xff)))
 #define CKROW(ck) ((ck&0xff00)>>8)
 #define CKCOL(ck) (ck&0xff)
+#define CODE_MASK(ck) (ck&0xffffff)
 
 extern psp_options_t psp_options;
+extern psp_ctrl_map_t current_map;
 
 extern int ui_vblank_sync_enabled();
 extern void psp_display_menu();

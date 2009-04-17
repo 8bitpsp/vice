@@ -30,6 +30,7 @@
 #include "kbdbuf.h"
 #include "ui.h"
 #include "vsyncapi.h"
+#include "videoarch.h"
 
 #include <time.h>
 #include <psptypes.h>
@@ -76,6 +77,7 @@ void vsyncarch_sleep(signed long delay)
 
 void vsyncarch_presync(void)
 {
+    input_poll();
     kbdbuf_flush();
 }
 
