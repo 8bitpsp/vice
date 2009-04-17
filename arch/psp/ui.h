@@ -15,6 +15,14 @@
 #define DISPLAY_MODE_FIT_HEIGHT  1
 #define DISPLAY_MODE_FILL_SCREEN 2
 
+#define MAP_BUTTONS         28
+#define MAP_SHIFT_START_POS 18 /* Shift buttons start here */
+
+typedef struct psp_ctrl_map
+{
+  unsigned int button_map[MAP_BUTTONS];
+} psp_ctrl_map_t;
+
 typedef struct psp_options
 {
   int display_mode;
@@ -25,6 +33,14 @@ typedef struct psp_options
   int clock_freq;
   int autoload_slot;
 } psp_options_t;
+
+#define SPC 0x1000000
+#define KBD 0x2000000
+
+#define SPC_MENU 0x00001
+#define CK(x,y,z) (KBD|(((x&0xff) << 8)|(y&0xff)))
+#define CKROW(ck) ((ck&0xff00)>>8)
+#define CKCOL(ck) (ck&0xff)
 
 extern psp_options_t psp_options;
 

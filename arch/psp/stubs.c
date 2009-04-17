@@ -128,6 +128,11 @@ void ui_resources_shutdown()
 {
 }
 
+int video_init_cmdline_options(void)
+{
+    return cmdline_register_options(cmdline_options);
+}
+
 int ui_cmdline_options_init(void)
 {
   return cmdline_register_options(cmdline_options);
@@ -177,3 +182,8 @@ void ui_error(const char *format,...)
   fclose(error_log);
 #endif
 }
+
+void fullscreen_capability()
+{
+}
+

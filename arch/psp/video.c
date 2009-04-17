@@ -20,8 +20,8 @@
 #include <string.h>
 
 PspImage *Screen = NULL;
-static float last_framerate = 0; /* TODO: reinitialize this */
-static float last_percent = 0;   /* when reentering menu */
+static float last_framerate = 0;
+static float last_percent = 0;
 static int screen_x;
 static int screen_y;
 static int screen_w;
@@ -31,20 +31,6 @@ static int line_height;
 static int psp_first_time = 1;
 
 static void video_psp_display_menu();
-
-/* Video-related command-line options.  */
-static const cmdline_option_t cmdline_options[] = {
-    { NULL }
-};
-
-int video_init_cmdline_options(void)
-{
-    return cmdline_register_options(cmdline_options);
-}
-
-void fullscreen_capability()
-{
-}
 
 void video_canvas_resize(struct video_canvas_s *canvas,
                                 unsigned int width, unsigned int height)
@@ -69,24 +55,6 @@ void video_canvas_destroy(struct video_canvas_s *canvas)
 {
   if (Screen) { pspImageDestroy(Screen); Screen = NULL; }
   lib_free(canvas->video_draw_buffer_callback);
-}
-
-int video_init()
-{
-  return 0;
-}
-
-void video_shutdown()
-{
-}
-
-int video_arch_resources_init()
-{
-    return 0;
-}
-
-void video_arch_resources_shutdown()
-{
 }
 
 static int video_frame_buffer_alloc(video_canvas_t *canvas, 
@@ -170,8 +138,11 @@ static void video_psp_display_menu()
 { 
   vsync_suspend_speed_eval();
   psp_display_menu();
-  vsync_sync_reset();
   /* TODO: force repaint */
+  vsync_sync_reset();
+
+  last_framerate = 0;
+  last_percent = 0;
 
   /* Set up viewing ratios */
   float ratio;
@@ -261,4 +232,22 @@ void ui_display_speed(float percent, float framerate, int warp_flag)
 {
   last_framerate = framerate;
   last_percent = percent;
+}
+
+int video_init()
+{
+  return 0;
+}
+
+void video_shutdown()
+{
+}
+
+int video_arch_resources_init()
+{
+    return 0;
+}
+
+void video_arch_resources_shutdown()
+{
 }
