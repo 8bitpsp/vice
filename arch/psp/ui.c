@@ -43,6 +43,7 @@
 #include "lib/pl_ini.h"
 #include "lib/pl_util.h"
 #include "lib/pl_gfx.h"
+#include "libmz/unzip.h"
 
 #define TAB_QUICKLOAD 0
 #define TAB_STATE     1
@@ -71,8 +72,8 @@ static const char
                       "\026\244\020 Set as default\t\026\243\020 Load defaults";
 
 static const char *QuickloadFilter[] =
-      { "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
-        "PRG", "P00", "ZIP", '\0' };
+      { "ZIP", "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
+        "PRG", "P00", '\0' };
 
 /* Tab labels */
 static const char *TabLabel[] = 
@@ -378,7 +379,8 @@ pl_file_path psp_current_game = {'\0'},
              psp_game_path = {'\0'},
              psp_save_state_path,
              psp_screenshot_path,
-             psp_config_path;
+             psp_config_path,
+             psp_tmp_file = {'\0'};
 psp_options_t psp_options;
 
 #define CURRENT_GAME (psp_current_game)
@@ -491,6 +493,10 @@ void ui_shutdown()
   pl_menu_destroy(&OptionUiMenu.Menu);
   pl_menu_destroy(&SystemUiMenu.Menu);
   pl_menu_destroy(&SaveStateGallery.Menu);
+
+  /* Remove temp. file (if any) */
+  if (*psp_tmp_file && pl_file_exists(psp_tmp_file))
+    pl_file_rm(psp_tmp_file);
 
   psp_save_options();
 }
@@ -696,7 +702,115 @@ static int psp_save_options()
 
 static int psp_load_game(const char *path)
 {
-  return !autostart_autodetect(path, NULL, 0, AUTOSTART_MODE_RUN);
+  const char *game_path = path;
+  void *file_buffer = NULL;
+  int file_size = 0;
+
+  if (pl_file_is_of_type(path, "ZIP"))
+  {
+    pspUiFlashMessage("Loading compressed file, please wait...");
+
+    char archived_file[512];
+    unzFile zipfile = NULL;
+    unz_global_info gi;
+    unz_file_info fi;
+
+    /* Open archive for reading */
+    if (!(zipfile = unzOpen(path)))
+      return 0;
+
+    /* Get global ZIP file information */
+    if (unzGetGlobalInfo(zipfile, &gi) != UNZ_OK)
+    {
+      unzClose(zipfile);
+      return 0;
+    }
+
+    const char *extension;
+    int i, j;
+
+    for (i = 0; i < (int)gi.number_entry; i++)
+    {
+      /* Get name of the archived file */
+      if (unzGetCurrentFileInfo(zipfile, &fi, archived_file, 
+          sizeof(archived_file), NULL, 0, NULL, 0) != UNZ_OK)
+      {
+        unzClose(zipfile);
+        return 0;
+      }
+
+      extension = pl_file_get_extension(archived_file);
+      for (j = 1; QuickloadFilter[j]; j++)
+      {
+        if (strcasecmp(QuickloadFilter[j], extension) == 0)
+        {
+          file_size = fi.uncompressed_size;
+
+          /* Open archived file for reading */
+          if(unzOpenCurrentFile(zipfile) != UNZ_OK)
+          {
+            unzClose(zipfile); 
+            return 0;
+          }
+
+          if (!(file_buffer = malloc(file_size)))
+          {
+            unzCloseCurrentFile(zipfile);
+            unzClose(zipfile); 
+            return 0;
+          }
+
+          unzReadCurrentFile(zipfile, file_buffer, file_size);
+          unzCloseCurrentFile(zipfile);
+
+          goto close_archive;
+        }
+      }
+
+      /* Go to the next file in the archive */
+      if (i + 1 < (int)gi.number_entry)
+      {
+        if (unzGoToNextFile(zipfile) != UNZ_OK)
+        {
+          unzClose(zipfile);
+          return 0;
+        }
+      }
+    }
+
+    /* No eligible files */
+    return 0;
+
+close_archive:
+    unzClose(zipfile);
+
+    /* Remove temp. file (if any) */
+    if (*psp_tmp_file && pl_file_exists(psp_tmp_file))
+      pl_file_rm(psp_tmp_file);
+
+    /* Define temp filename */
+    sprintf(psp_tmp_file, "%st%04i_%s", 
+      pl_psp_get_app_directory(), rand() % 10000, archived_file);
+
+    /* Write file to stick */
+    FILE *file = fopen(psp_tmp_file, "w");
+    if (!file)
+    {
+      *psp_tmp_file = '\0';
+      return 0;
+    }
+    if (fwrite(file_buffer, 1, file_size, file) < file_size)
+    {
+      fclose(file);
+      *psp_tmp_file = '\0';
+      return 0;
+    }
+    fclose(file);
+
+    game_path = psp_tmp_file;
+  }
+
+  return !autostart_autodetect(game_path, NULL, 0, AUTOSTART_MODE_RUN);
 }
 
 void psp_display_menu()

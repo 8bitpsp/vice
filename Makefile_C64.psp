@@ -2,6 +2,7 @@ PSPSDK=$(shell psp-config --pspsdk-path)
 
 PSPAPP=arch/psp
 PSPLIB=$(PSPAPP)/lib
+MZLIB=$(PSPAPP)/libmz
 
 PSP_FW_VERSION=200
 export PSP_FW_VERSION
@@ -157,8 +158,8 @@ CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS=$(CFLAGS)
 INCDIR=$(PSPAPP) sid drive vicii tape c64 c64dtv vdc raster crtc vdrive
-LIBDIR=$(PSPLIB)
-LIBS=-lpsplib -lpng -lpspgu -lpsppower \
+LIBDIR=$(PSPLIB) $(MZLIB)
+LIBS=-lminizip -lpsplib -lpng -lpspgu -lpsppower \
      -lz -lm -lc -lpspaudio -lpsprtc -lpspwlan -lpspnet_adhoc \
      -lpspnet_adhocctl -lpspnet_adhocmatching -lstdc++
 
@@ -169,5 +170,7 @@ include $(PSPSDK)/lib/build.mak
 
 build_libs:
 	cd $(PSPLIB) ; $(MAKE)
+	cd $(MZLIB) ; $(MAKE) -f Makefile.psp
 clean_libs:
 	cd $(PSPLIB) ; $(MAKE) clean
+	cd $(MZLIB) ; $(MAKE) -f Makefile.psp clean
