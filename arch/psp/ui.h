@@ -39,6 +39,8 @@ typedef struct psp_options
 #define JOY 0x4000000
 
 #define SPC_MENU 0x00001
+#define SPC_KYBD 0x00002
+
 #define CK(x,y,z) (KBD|(((x&0xff) << 8)|(y&0xff)))
 #define CKROW(ck) ((ck&0xff00)>>8)
 #define CKCOL(ck) (ck&0xff)

@@ -127,6 +127,7 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
   PL_MENU_OPTION("None", 0)
   /* Special */
   PL_MENU_OPTION("Special: Open Menu",     (SPC|SPC_MENU))
+  PL_MENU_OPTION("Special: Show keyboard", (SPC|SPC_KYBD))
   /* Function keys */
   PL_MENU_OPTION("Joystick Up",    JOY|0x01)
   PL_MENU_OPTION("Joystick Down",  JOY|0x02)

@@ -14,6 +14,7 @@
 #include "lib/video.h"
 #include "lib/ctrl.h"
 #include "lib/pl_gfx.h"
+#include "lib/pl_vk.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -30,8 +31,13 @@ static int clear_screen;
 static int line_height;
 static int psp_first_time = 1;
 
+static int show_kybd_held;
+static int keyboard_visible;
+static pl_vk_layout psp_keyboard;
+
 static void video_psp_display_menu();
 static void video_psp_refresh_screen();
+static inline void psp_keyboard_toggle(unsigned int code, int on);
 
 typedef struct psp_ctrl_mask_to_index_map
 {
@@ -203,7 +209,10 @@ static void video_psp_display_menu()
 
   line_height = pspFontGetLineHeight(&PspStockFont);
   clear_screen = 1;
+  show_kybd_held = 0;
+  keyboard_visible = 0;
 
+  keyboard_clear_keymatrix();
   video_psp_refresh_screen();
 }
 
@@ -218,17 +227,15 @@ void input_poll()
   static SceCtrlData pad;
   if (pspCtrlPollControls(&pad))
   {
-#if 0
     if (keyboard_visible)
-      pl_vk_navigate(&vk_spectrum, &pad);
-#endif
+      pl_vk_navigate(&psp_keyboard, &pad);
+
     const psp_ctrl_mask_to_index_map_t *current_mapping = physical_to_emulated_button_map;
     for (; current_mapping->mask; current_mapping++)
     {
       u32 code = current_map.button_map[current_mapping->index];
       u8  on = (pad.Buttons & current_mapping->mask) == current_mapping->mask;
-if (1)
-//      if (!keyboard_visible)
+      if (!keyboard_visible)
       {
         if (on)
         {
@@ -244,7 +251,7 @@ if (1)
 
         if (code & KBD)
         {
-          keyboard_set_keyarr(CKROW(code),CKCOL(code),on);
+          psp_keyboard_toggle(code, on);
           continue;
         }
         else if ((code & JOY) && on)
@@ -261,17 +268,16 @@ if (1)
         case SPC_MENU:
           if (on) { video_psp_display_menu(); return; }
           break;
-#if 0
         case SPC_KYBD:
           if (psp_options.toggle_vk)
           {
             if (show_kybd_held != on && on)
             {
               keyboard_visible = !keyboard_visible;
-              keyboard_release_all();
+              keyboard_clear_keymatrix();
 
               if (keyboard_visible) 
-                pl_vk_reinit(&vk_spectrum);
+                pl_vk_reinit(&psp_keyboard);
               else clear_screen = 1;
             }
           }
@@ -281,18 +287,17 @@ if (1)
             {
               keyboard_visible = on;
               if (on) 
-                pl_vk_reinit(&vk_spectrum);
+                pl_vk_reinit(&psp_keyboard);
               else
               {
                 clear_screen = 1;
-                keyboard_release_all();
+                keyboard_clear_keymatrix();
               }
             }
           }
 
           show_kybd_held = on;
           break;
-#endif
         }
       }
     }
@@ -304,7 +309,7 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
                                  unsigned int xi, unsigned int yi,
                                  unsigned int w, unsigned int h)
 {
-	if (canvas->width == 0)
+  if (canvas->width == 0)
     return;
 
   if (psp_first_time)
@@ -335,6 +340,10 @@ void video_psp_refresh_screen()
 
   /* Draw the screen */
   pl_gfx_put_image(Screen, screen_x, screen_y, screen_w, screen_h); 
+
+  /* Draw keyboard */
+  if (keyboard_visible)
+    pl_vk_render(&psp_keyboard);
 
   if (psp_options.show_fps)
   {
@@ -369,9 +378,18 @@ void video_shutdown()
 
 int video_arch_resources_init()
 {
-    return 0;
+  if (!pl_vk_load(&psp_keyboard, "c64.l2", "c64keys.png", NULL, psp_keyboard_toggle))
+    return 1;
+  return 0;
 }
 
 void video_arch_resources_shutdown()
 {
+  /* Destroy keyboard */
+  pl_vk_destroy(&psp_keyboard);
+}
+
+static inline void psp_keyboard_toggle(unsigned int code, int on)
+{
+  keyboard_set_keyarr(CKROW(code),CKCOL(code), on);
 }
