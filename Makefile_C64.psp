@@ -161,7 +161,7 @@ INCDIR=$(PSPAPP) sid drive vicii tape c64 c64dtv vdc raster crtc vdrive
 LIBDIR=$(PSPLIB) $(MZLIB)
 LIBS=-lminizip -lpsplib -lpng -lpspgu -lpsppower \
      -lz -lm -lc -lpspaudio -lpsprtc -lpspwlan -lpspnet_adhoc \
-     -lpspnet_adhocctl -lpspnet_adhocmatching -lstdc++
+     -lpspnet_adhocctl -lpspnet_adhocmatching
 
 all: build_libs
 clean: clean_libs
