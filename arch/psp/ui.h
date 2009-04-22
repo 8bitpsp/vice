@@ -34,17 +34,17 @@ typedef struct psp_options
   int autoload_slot;
 } psp_options_t;
 
-#define SPC 0x1000000
-#define KBD 0x2000000
-#define JOY 0x4000000
+#define SPC 0x100
+#define KBD 0x200
+#define JOY 0x400
 
-#define SPC_MENU 0x00001
-#define SPC_KYBD 0x00002
+#define SPC_MENU 0x01
+#define SPC_KYBD 0x02
 
-#define CK(x,y,z) (KBD|(((x&0xff) << 8)|(y&0xff)))
-#define CKROW(ck) ((ck&0xff00)>>8)
-#define CKCOL(ck) (ck&0xff)
-#define CODE_MASK(ck) (ck&0xffffff)
+#define CK(x,y,z) (KBD|(((x&0xf) << 4)|(y&0xf)))
+#define CKROW(ck) ((ck&0xf0)>>4)
+#define CKCOL(ck) (ck&0xf)
+#define CODE_MASK(ck) (ck&0xff)
 
 extern psp_options_t psp_options;
 extern psp_ctrl_map_t current_map;

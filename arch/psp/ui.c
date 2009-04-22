@@ -137,35 +137,35 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
   /* Cursor */
   PL_MENU_OPTION("Up/Down",    CK(0,7,8))
   PL_MENU_OPTION("Left/Right", CK(0,2,8))
+  PL_MENU_OPTION("Space",        CK(7,4,8))
   /* Function keys */
   PL_MENU_OPTION("F1/F2", CK(0,4,8))
   PL_MENU_OPTION("F3/F4", CK(0,5,8))
   PL_MENU_OPTION("F5/F6", CK(0,6,8))
   PL_MENU_OPTION("F7/F8", CK(0,3,8))
   /* Etc.. */
-  PL_MENU_OPTION("BS/Del",       CK(0,0,8))
-  PL_MENU_OPTION("Tab/Ctrl",     CK(7,2,8))
+  PL_MENU_OPTION("Clr/Home",     CK(6,3,8))
+  PL_MENU_OPTION("Ins/Del",      CK(0,0,8))
+  PL_MENU_OPTION("Ctrl",         CK(7,2,8))
+  PL_MENU_OPTION("Restore",      CK(0xf,0xf,8))
+  PL_MENU_OPTION("Run/Stop",     CK(7,7,8))
   PL_MENU_OPTION("Return",       CK(0,1,8))
-  PL_MENU_OPTION("L. Ctrl/CBM",  CK(7,5,8))
+  PL_MENU_OPTION("C= (CBM)",     CK(7,5,2))
   PL_MENU_OPTION("L. Shift",     CK(1,7,2))
   PL_MENU_OPTION("R. Shift",     CK(6,4,4))
-  PL_MENU_OPTION("Space",        CK(7,4,8))
-  PL_MENU_OPTION("CAPS Lock/Run/Stop", CK(7,7,8))
-  PL_MENU_OPTION("Home/CLR/Home",CK(6,3,8))
-  PL_MENU_OPTION("Ins/#",        CK(6,0,8))
-  PL_MENU_OPTION("Del/Up Arrow", CK(6,6,8))
   /* Symbols */
-  PL_MENU_OPTION("-", CK(5,0,8))
-  PL_MENU_OPTION("=", CK(5,3,8))
-  PL_MENU_OPTION("[", CK(5,6,8))
-  PL_MENU_OPTION("]", CK(6,1,8))
-  PL_MENU_OPTION(";", CK(5,5,8))
-  PL_MENU_OPTION("'", CK(6,2,8))
-  PL_MENU_OPTION("`", CK(7,1,8))
-  PL_MENU_OPTION("\\", CK(6,5,8))
-  PL_MENU_OPTION(",", CK(5,7,8))
-  PL_MENU_OPTION(".", CK(5,4,8))
-  PL_MENU_OPTION("/", CK(6,7,8))
+  PL_MENU_OPTION("+", CK(5,0,8))
+  PL_MENU_OPTION("-", CK(5,3,8))
+  PL_MENU_OPTION("Pound sterling", CK(6,0,8))
+  PL_MENU_OPTION("@", CK(5,6,8))
+  PL_MENU_OPTION("*", CK(6,1,8))
+  PL_MENU_OPTION("^", CK(6,6,8))
+  PL_MENU_OPTION("[", CK(5,5,8))
+  PL_MENU_OPTION("]", CK(6,2,8))
+  PL_MENU_OPTION("=", CK(6,5,8))
+  PL_MENU_OPTION("<", CK(5,7,8))
+  PL_MENU_OPTION(">", CK(5,4,8))
+  PL_MENU_OPTION("?", CK(6,7,8))
   /* Digits */
   PL_MENU_OPTION("1", CK(7,0,8))
   PL_MENU_OPTION("2", CK(7,3,8))
@@ -282,7 +282,7 @@ static psp_ctrl_map_t default_map =
     CK(7,4,8), /* Circle       */
     0,         /* Triangle     */
     0,         /* L Trigger    */
-    0,         /* R Trigger    */
+    SPC|SPC_KYBD,          /* R Trigger    */
     0,         /* Select       */
     CK(7,7,8), /* Start        */
     SPC|SPC_MENU,          /* L+R Triggers */

@@ -114,7 +114,7 @@ int pl_vk_load(pl_vk_layout *layout,
 
   /* Determine button count */
   while ((fscanf(file, "0x%x\t%hi\t%hi\t%hi\t%hi\n",
-                &code, &x, &y, &w, &h) == 5) && code)
+                &code, &x, &y, &w, &h) == 5) && code+x+y+w+h)
     layout->key_count++;
 
   /* Rewind to start */
@@ -471,8 +471,8 @@ void pl_vk_render(const pl_vk_layout *layout)
       for (j = 0; j < sticky->index_count; j++)
       {
         button = &(layout->keys[sticky->key_index[j]]);
-        pspVideoFillRect(off_x + button->x + 1,
-                         off_y + button->y + 1,
+        pspVideoFillRect(off_x + button->x,
+                         off_y + button->y,
                          off_x + button->x + button->w,
                          off_y + button->y + button->h,
                          PL_VK_STUCK_COLOR);
@@ -482,8 +482,8 @@ void pl_vk_render(const pl_vk_layout *layout)
 
   /* Highlight selected button */
   button = &(layout->keys[layout->selected]);
-  pspVideoFillRect(off_x + button->x + 1,
-                   off_y + button->y + 1,
+  pspVideoFillRect(off_x + button->x,
+                   off_y + button->y,
                    off_x + button->x + button->w,
                    off_y + button->y + button->h,
                    PL_VK_SELECTED_COLOR);
@@ -534,8 +534,8 @@ static void render_to_display_list(pl_vk_layout *layout)
   for (i = 0, button = layout->keys; i < layout->key_count; i++, button++)
     pspVideoFillRect(off_x + button->x, 
                      off_y + button->y,
-                     off_x + button->x + button->w + 1,
-                     off_y + button->y + button->h + 1,
+                     off_x + button->x + button->w,
+                     off_y + button->y + button->h,
                      PL_VK_BUTTON_BG);
 
   sceGuFinish();

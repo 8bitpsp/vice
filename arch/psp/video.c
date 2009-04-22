@@ -391,5 +391,10 @@ void video_arch_resources_shutdown()
 
 static inline void psp_keyboard_toggle(unsigned int code, int on)
 {
+  if (CODE_MASK(code) == 0xff) 
+  {
+    keyboard_set_keyarr(-3, 0, on); /* TODO: better */
+    return;
+  }
   keyboard_set_keyarr(CKROW(code),CKCOL(code), on);
 }
