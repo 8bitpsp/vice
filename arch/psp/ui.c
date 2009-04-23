@@ -28,6 +28,7 @@
 #include "vice.h"
 #include "machine.h"
 #include "ui.h"
+#include "attach.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -64,6 +65,10 @@
 
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
+#define SYSTEM_DRIVE8       0x18
+
+#define GET_DRIVE(code) ((code)&0x0F)
+#define GET_DRIVE_ID(code) (((code)&0x0F)|0x10)
 
 static const char 
   PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete\t\026"PSP_CHAR_START"\020 Export",
@@ -71,9 +76,12 @@ static const char
   ControlHelpText[] = "\026\250\020 Change mapping\t"
                       "\026\244\020 Set as default\t\026\243\020 Load defaults";
 
-static const char *QuickloadFilter[] =
-      { "ZIP", "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
-        "PRG", "P00", '\0' };
+static const char 
+  *QuickloadFilter[] =
+     { "ZIP", "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
+       "PRG", "P00", '\0' },
+  *DiskFilter[] =
+     { "ZIP", "D64", "D71", "D80", "D81", "D82", '\0' };
 
 /* Tab labels */
 static const char *TabLabel[] = 
@@ -207,6 +215,9 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
 PL_MENU_OPTIONS_END
 
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
+  PL_MENU_HEADER("Drives")
+  PL_MENU_ITEM("Drive 8",SYSTEM_DRIVE8,NULL,
+               "\026\001\020 Browse\t\026\243\020 Eject")
   PL_MENU_HEADER("Options")
   PL_MENU_ITEM("Reset",SYSTEM_RESET,NULL,
                "\026\001\020 Reset system")
@@ -320,6 +331,7 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu, pl_menu_item* item,
 static void OnSystemRender(const void *uiobject, const void *item_obj);
 
 static int OnQuickloadOk(const void *browser, const void *path);
+static int OnFileOk(const void *browser, const void *path);
 
 static int OnSaveStateOk(const void *gallery, const void *item);
 static int OnSaveStateButtonPress(const PspUiGallery *gallery,
@@ -333,7 +345,8 @@ PspUiSplash SplashScreen =
   OnSplashButtonPress,
   OnSplashGetStatusBarText
 };
-PspUiFileBrowser QuickloadBrowser = 
+PspUiFileBrowser
+  QuickloadBrowser = 
 {
   OnGenericRender,
   OnQuickloadOk,
@@ -341,7 +354,17 @@ PspUiFileBrowser QuickloadBrowser =
   OnGenericButtonPress,
   QuickloadFilter,
   0
+},
+  FileBrowser = 
+{
+  OnGenericRender,
+  OnFileOk,
+  NULL,
+  NULL,
+  NULL,
+  NULL
 };
+
 PspUiMenu
   OptionUiMenu =
   {
@@ -410,6 +433,8 @@ static PspImage* psp_save_state(const char *path, PspImage *icon);
 
 static void psp_display_state_tab();
 static void psp_display_control_tab();
+static void psp_display_system_tab();
+static void psp_refresh_devices();
 
 int ui_init(int *argc, char **argv)
 {
@@ -505,6 +530,26 @@ void ui_shutdown()
 /**************************/
 /* Helper functions       */
 /**************************/
+
+static void psp_refresh_devices()
+{
+  int i;
+  pl_menu_item *item;
+  const char *name;
+
+  for (i = 8; i <= 8; i++)
+  {
+    name = file_system_get_disk_name(i);
+    item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, GET_DRIVE_ID(i));
+    pl_menu_append_option(item, (name) ? name : "[EMPTY]", NULL, 1);
+  }
+}
+
+static void psp_display_system_tab()
+{
+  psp_refresh_devices();
+  pspUiOpenMenu(&SystemUiMenu, NULL);
+}
 
 static void psp_display_control_tab()
 {
@@ -701,7 +746,7 @@ static int psp_save_options()
   return status;
 }
 
-static int psp_load_game(const char *path)
+static const char *prepare_file(const char *path)
 {
   const char *game_path = path;
   void *file_buffer = NULL;
@@ -718,13 +763,13 @@ static int psp_load_game(const char *path)
 
     /* Open archive for reading */
     if (!(zipfile = unzOpen(path)))
-      return 0;
+      return NULL;
 
     /* Get global ZIP file information */
     if (unzGetGlobalInfo(zipfile, &gi) != UNZ_OK)
     {
       unzClose(zipfile);
-      return 0;
+      return NULL;
     }
 
     const char *extension;
@@ -737,7 +782,7 @@ static int psp_load_game(const char *path)
           sizeof(archived_file), NULL, 0, NULL, 0) != UNZ_OK)
       {
         unzClose(zipfile);
-        return 0;
+        return NULL;
       }
 
       extension = pl_file_get_extension(archived_file);
@@ -751,14 +796,14 @@ static int psp_load_game(const char *path)
           if(unzOpenCurrentFile(zipfile) != UNZ_OK)
           {
             unzClose(zipfile); 
-            return 0;
+            return NULL;
           }
 
           if (!(file_buffer = malloc(file_size)))
           {
             unzCloseCurrentFile(zipfile);
             unzClose(zipfile); 
-            return 0;
+            return NULL;
           }
 
           unzReadCurrentFile(zipfile, file_buffer, file_size);
@@ -774,13 +819,13 @@ static int psp_load_game(const char *path)
         if (unzGoToNextFile(zipfile) != UNZ_OK)
         {
           unzClose(zipfile);
-          return 0;
+          return NULL;
         }
       }
     }
 
     /* No eligible files */
-    return 0;
+    return NULL;
 
 close_archive:
     unzClose(zipfile);
@@ -798,19 +843,25 @@ close_archive:
     if (!file)
     {
       *psp_tmp_file = '\0';
-      return 0;
+      return NULL;
     }
     if (fwrite(file_buffer, 1, file_size, file) < file_size)
     {
       fclose(file);
       *psp_tmp_file = '\0';
-      return 0;
+      return NULL;
     }
     fclose(file);
 
     game_path = psp_tmp_file;
   }
 
+  return game_path;
+}
+
+static int psp_load_game(const char *path)
+{
+  const char *game_path = prepare_file(path);
   return !autostart_autodetect(game_path, NULL, 0, AUTOSTART_MODE_RUN);
 }
 
@@ -858,7 +909,7 @@ void psp_display_menu()
       psp_display_state_tab();
       break;
     case TAB_SYSTEM:
-      pspUiOpenMenu(&SystemUiMenu, NULL);
+      psp_display_system_tab();
       break;
     case TAB_ABOUT:
       pspUiSplashScreen(&SplashScreen);
@@ -1045,6 +1096,11 @@ static int OnMenuOk(const void *uimenu, const void* sel_item)
 {
   switch (((const pl_menu_item*)sel_item)->id)
   {
+  case SYSTEM_DRIVE8:
+    FileBrowser.Userdata = (void*)GET_DRIVE(((const pl_menu_item*)sel_item)->id);
+    FileBrowser.Filter = DiskFilter;
+    pspUiOpenBrowser(&FileBrowser, (*psp_game_path) ? psp_game_path : NULL);
+    break;
   case SYSTEM_RESET:
     if (pspUiConfirm("Reset the system?"))
     {
@@ -1100,6 +1156,20 @@ static int OnMenuButtonPress(const struct PspUiMenu *uimenu,
         pl_menu_select_option_by_value(item, (void*)default_map.button_map[i]);
 
       return 0;
+    }
+  }
+  else
+  {
+    int id = ((const pl_menu_item*)sel_item)->id;
+    if (button_mask & PSP_CTRL_TRIANGLE)
+    {
+      switch (id)
+      {
+      case SYSTEM_DRIVE8:
+        file_system_detach_disk(GET_DRIVE(id));
+        psp_refresh_devices();
+        break;
+      }
     }
   }
 
@@ -1160,6 +1230,39 @@ static void OnSystemRender(const void *uiobject, const void *item_obj)
   pspVideoDrawRect(x, y, x + w - 1, y + h - 1, PSP_COLOR_GRAY);
 
   OnGenericRender(uiobject, item_obj);
+}
+
+static int OnFileOk(const void *browser, const void *path)
+{
+  int drive_num = (int)((const PspUiFileBrowser*)browser)->Userdata;
+  const char *game_path;
+  if (!(game_path = prepare_file(path)))
+  {
+    pspUiAlert("Error loading file");
+    return 0;
+  }
+
+  if (file_system_attach_disk(drive_num, game_path) < 0)
+  {
+    pspUiAlert("Error loading file");
+    return 0;
+  }
+
+  if (drive_num == 8)
+  {
+    SET_AS_CURRENT_GAME(path);
+    pl_file_get_parent_directory(path,
+                                 psp_game_path,
+                                 sizeof(psp_game_path));
+    if (!psp_load_controls((GAME_LOADED)
+                             ? pl_file_get_filename(psp_current_game) : "BASIC",
+                           &current_map));
+
+    /* Reset selected state */
+    SaveStateGallery.Menu.selected = NULL;
+  }
+
+  return 1;
 }
 
 static int OnQuickloadOk(const void *browser, const void *path)
