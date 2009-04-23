@@ -29,6 +29,7 @@
 #include "machine.h"
 #include "ui.h"
 #include "attach.h"
+#include "cartridge.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -78,10 +79,17 @@ static const char
 
 static const char 
   *QuickloadFilter[] =
-     { "ZIP", "D64", "D71", "D80", "D81", "D82", "G64", "G41", "X64", "T64", "TAP", 
-       "PRG", "P00", '\0' },
+     { "ZIP",
+       "D64","D71","D80","D81","D82","G64","G41","X64",
+       "T64","TAP",
+       "PRG","P00",
+       "CRT",'\0' },
   *DiskFilter[] =
-     { "ZIP", "D64", "D71", "D80", "D81", "D82", '\0' };
+     { "ZIP", 
+       "D64","D71","D80","D81","D82","G64","G41","X64",'\0' },
+  *TapeFilter[] =
+     { "ZIP", 
+       "T64","TAP",'\0' };
 
 /* Tab labels */
 static const char *TabLabel[] = 
@@ -862,6 +870,11 @@ close_archive:
 static int psp_load_game(const char *path)
 {
   const char *game_path = prepare_file(path);
+
+  if (pl_file_is_of_type(game_path, "CRT"))
+    return !cartridge_attach_image(CARTRIDGE_CRT, game_path);
+
+  cartridge_detach_image();
   return !autostart_autodetect(game_path, NULL, 0, AUTOSTART_MODE_RUN);
 }
 
