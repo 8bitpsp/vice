@@ -280,6 +280,16 @@ int pl_menu_get_option_count(pl_menu_item *item)
   return i;
 }
 
+int  pl_menu_get_option_index(const pl_menu_item *item, 
+                              const pl_menu_option *option)
+{
+  int i;
+  const pl_menu_option *o2 = NULL;
+  for (i = 0, o2 = item->options; o2; i++, o2 = o2->next)
+    if (o2 == option) return i;
+  return -1;
+}
+
 pl_menu_option* pl_menu_find_option_by_index(const pl_menu_item *item,
                                              int index)
 {

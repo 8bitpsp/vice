@@ -111,6 +111,8 @@ pl_menu_option*
                            const void *value,
                            int select);
 int  pl_menu_get_option_count(pl_menu_item *item);
+int  pl_menu_get_option_index(const pl_menu_item *item, 
+                              const pl_menu_option *option);
 pl_menu_option*
      pl_menu_find_option_by_index(const pl_menu_item *item,
                                   int index);

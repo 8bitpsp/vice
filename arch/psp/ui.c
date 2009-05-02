@@ -29,7 +29,9 @@
 #include "machine.h"
 #include "ui.h"
 #include "attach.h"
+#include "util.h"
 #include "cartridge.h"
+#include "imagecontents.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -69,7 +71,7 @@
 #define SYSTEM_DRIVE8       0x18
 
 #define GET_DRIVE(code) ((code)&0x0F)
-#define GET_DRIVE_ID(code) (((code)&0x0F)|0x10)
+#define GET_DRIVE_MENU_ID(code) (((code)&0x0F)|0x10)
 
 static const char 
   PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete\t\026"PSP_CHAR_START"\020 Export",
@@ -225,7 +227,7 @@ PL_MENU_OPTIONS_END
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
   PL_MENU_HEADER("Drives")
   PL_MENU_ITEM("Drive 8",SYSTEM_DRIVE8,NULL,
-               "\026\001\020 Browse\t\026\243\020 Eject")
+               "\026\001\020 Browse\t\026\250\020 Autoload program\t\026\243\020 Eject")
   PL_MENU_HEADER("Options")
   PL_MENU_ITEM("Reset",SYSTEM_RESET,NULL,
                "\026\001\020 Reset system")
@@ -541,15 +543,40 @@ void ui_shutdown()
 
 static void psp_refresh_devices()
 {
-  int i;
+  int unit;
   pl_menu_item *item;
   const char *name;
+  char *contents, *line;
 
-  for (i = 8; i <= 8; i++)
+  /* Refresh drive list */  
+  for (unit = 8; unit <= 8; unit++)
   {
-    name = file_system_get_disk_name(i);
-    item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, GET_DRIVE_ID(i));
-    pl_menu_append_option(item, (name) ? name : "[EMPTY]", NULL, 1);
+    name = file_system_get_disk_name(unit); /* Filename */
+    item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, GET_DRIVE_MENU_ID(unit));
+    pl_menu_clear_options(item); /* Clear current names */
+
+    if (!name) continue;
+
+    /* Read contents into a string (\n delimited) */
+    contents = image_contents_read_string(IMAGE_CONTENTS_DISK, name, unit,
+                                          IMAGE_CONTENTS_STRING_ASCII);
+
+    if (!contents) continue;
+
+    /* Add an entry for each line */
+    line = strtok(contents, "\n");
+    while (line)
+    {
+      pl_menu_append_option(item, line, line, 1);
+      line = strtok(NULL, "\n");
+    }
+
+    /* Free TOC */
+    if (contents)
+      free(contents);
+
+    /* Select first option */
+    pl_menu_select_option_by_index(item, 0);
   }
 }
 
@@ -1113,6 +1140,7 @@ static int OnMenuOk(const void *uimenu, const void* sel_item)
     FileBrowser.Userdata = (void*)GET_DRIVE(((const pl_menu_item*)sel_item)->id);
     FileBrowser.Filter = DiskFilter;
     pspUiOpenBrowser(&FileBrowser, (*psp_game_path) ? psp_game_path : NULL);
+    psp_refresh_devices();
     break;
   case SYSTEM_RESET:
     if (pspUiConfirm("Reset the system?"))
@@ -1216,12 +1244,28 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       break;
     case OPTION_CONTROL_MODE:
       psp_options.control_mode = (int)option->value;
-      UiMetric.OkButton = (!psp_options.control_mode) ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
-      UiMetric.CancelButton = (!psp_options.control_mode) ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
+      UiMetric.OkButton = (!psp_options.control_mode) 
+                          ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
+      UiMetric.CancelButton = (!psp_options.control_mode) 
+                              ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
       break;
     case OPTION_ANIMATE:
       psp_options.animate_menu = (int)option->value;
       UiMetric.Animate = psp_options.animate_menu;
+      break;
+    case SYSTEM_DRIVE8:
+      {
+        int index = pl_menu_get_option_index(item, option);
+        const char *name = file_system_get_disk_name(GET_DRIVE((int)item->id));
+
+        pspUiFlashMessage("Autoloading, please wait...");
+
+        if (autostart_autodetect(name, NULL, index, AUTOSTART_MODE_RUN))
+        {
+          pspUiAlert("Error loading program");
+          return 0;
+        }
+      }
       break;
     }
   }
