@@ -218,10 +218,8 @@ static void video_psp_display_menu()
 
 void input_poll()
 {
-  int joy_port = 2;
-
   /* Reset joystick */
-  joystick_value[joy_port] = 0;
+  joystick_value[psp_options.joyport] = 0;
 
   /* Parse input */
   static SceCtrlData pad;
@@ -256,7 +254,7 @@ void input_poll()
         }
         else if ((code & JOY) && on)
         {
-          joystick_value[joy_port] |= CODE_MASK(code);
+          joystick_value[psp_options.joyport] |= CODE_MASK(code);
           continue;
         }
       }

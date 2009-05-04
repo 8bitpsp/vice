@@ -32,6 +32,7 @@ typedef struct psp_options
   int toggle_vk;
   int clock_freq;
   int autoload_slot;
+  int joyport;
 } psp_options_t;
 
 #define SPC 0x100

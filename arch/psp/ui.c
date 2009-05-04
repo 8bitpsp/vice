@@ -30,6 +30,7 @@
 #include "ui.h"
 #include "attach.h"
 #include "util.h"
+#include "tape.h"
 #include "cartridge.h"
 #include "imagecontents.h"
 
@@ -68,7 +69,10 @@
 
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
+#define SYSTEM_JOYPORT      0x13
 #define SYSTEM_DRIVE8       0x18
+#define SYSTEM_CART         0x20
+#define SYSTEM_TAPE         0x21
 
 #define GET_DRIVE(code) ((code)&0x0F)
 #define GET_DRIVE_MENU_ID(code) (((code)&0x0F)|0x10)
@@ -87,11 +91,11 @@ static const char
        "PRG","P00",
        "CRT",'\0' },
   *DiskFilter[] =
-     { "ZIP", 
-       "D64","D71","D80","D81","D82","G64","G41","X64",'\0' },
+     { "ZIP", "D64","D71","D80","D81","D82","G64","G41","X64",'\0' },
+  *CartFilter[] =
+     { "ZIP", "CRT",'\0' },
   *TapeFilter[] =
-     { "ZIP", 
-       "T64","TAP",'\0' };
+     { "ZIP", "T64","TAP",'\0' };
 
 /* Tab labels */
 static const char *TabLabel[] = 
@@ -118,6 +122,10 @@ PL_MENU_OPTIONS_BEGIN(PspClockFreqOptions)
   PL_MENU_OPTION("266 MHz", 266)
   PL_MENU_OPTION("300 MHz", 300)
   PL_MENU_OPTION("333 MHz", 333)
+PL_MENU_OPTIONS_END
+PL_MENU_OPTIONS_BEGIN(JoyPortOptions)
+  PL_MENU_OPTION("Port 1", 1)
+  PL_MENU_OPTION("Port 2", 2)
 PL_MENU_OPTIONS_END
 PL_MENU_OPTIONS_BEGIN(ControlModeOptions)
   PL_MENU_OPTION("\026\242\020 cancels, \026\241\020 confirms (US)", 0)
@@ -225,7 +233,14 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
 PL_MENU_OPTIONS_END
 
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
-  PL_MENU_HEADER("Drives")
+  PL_MENU_HEADER("Input")
+  PL_MENU_ITEM("Joystick port",SYSTEM_JOYPORT,JoyPortOptions,
+               "\026\250\020 Select joystick port")
+  PL_MENU_HEADER("Peripherals")
+  PL_MENU_ITEM("Cartridge",SYSTEM_CART,NULL,
+               "\026\001\020 Browse\t\026\243\020 Eject")
+  PL_MENU_ITEM("Tape",SYSTEM_TAPE,NULL,
+               "\026\001\020 Browse\t\026\250\020 Autoload program\t\026\243\020 Eject")
   PL_MENU_ITEM("Drive 8",SYSTEM_DRIVE8,NULL,
                "\026\001\020 Browse\t\026\250\020 Autoload program\t\026\243\020 Eject")
   PL_MENU_HEADER("Options")
@@ -548,7 +563,38 @@ static void psp_refresh_devices()
   const char *name;
   char *contents, *line;
 
-  /* Refresh drive list */  
+  /* Refresh tape contents */
+  do /* For flow control - not a loop */
+  {
+    name = tape_image_dev1->name; /* Filename */
+    item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_TAPE);
+    pl_menu_clear_options(item); /* Clear current names */
+
+    if (!name) break;
+
+    /* Read contents into a string (\n delimited) */
+    contents = image_contents_read_string(IMAGE_CONTENTS_TAPE, name, 0,
+                                          IMAGE_CONTENTS_STRING_ASCII);
+
+    if (!contents) break;
+
+    /* Add an entry for each line */
+    line = strtok(contents, "\n");
+    while (line)
+    {
+      pl_menu_append_option(item, line, line, 1);
+      line = strtok(NULL, "\n");
+    }
+
+    /* Free TOC */
+    if (contents)
+      free(contents);
+
+    /* Select first option */
+    pl_menu_select_option_by_index(item, 0);
+  } while (0);
+
+  /* Refresh drive contents */  
   for (unit = 8; unit <= 8; unit++)
   {
     name = file_system_get_disk_name(unit); /* Filename */
@@ -745,6 +791,7 @@ static void psp_load_options()
   pl_ini_load(&file, path);
 
   psp_options.autoload_slot = pl_ini_get_int(&file, "System", "Autoload Slot", 9);
+  psp_options.joyport = pl_ini_get_int(&file, "System", "Joystick Port", 2);
   psp_options.display_mode = pl_ini_get_int(&file, "Video", "Display Mode", 
                                             DISPLAY_MODE_UNSCALED);
   psp_options.clock_freq = pl_ini_get_int(&file, "Video", "PSP Clock Frequency", 222);
@@ -767,6 +814,7 @@ static int psp_save_options()
   pl_ini_file file;
   pl_ini_create(&file);
   pl_ini_set_int(&file, "System", "Autoload Slot", psp_options.autoload_slot);
+  pl_ini_set_int(&file, "System", "Joystick Port", psp_options.joyport);
   pl_ini_set_int(&file, "Video", "Display Mode", psp_options.display_mode);
   pl_ini_set_int(&file, "Video", "PSP Clock Frequency", psp_options.clock_freq);
   pl_ini_set_int(&file, "Video", "Show FPS", psp_options.show_fps);
@@ -898,10 +946,20 @@ static int psp_load_game(const char *path)
 {
   const char *game_path = prepare_file(path);
 
+  if (!game_path)
+  {
+    pspUiAlert("Error loading compressed file");
+    return 0;
+  }
+
+  /* Eject all cartridges, tapes & disks */
+  cartridge_detach_image();
+  tape_image_detach(1);
+  file_system_detach_disk(GET_DRIVE(8));
+
   if (pl_file_is_of_type(game_path, "CRT"))
     return !cartridge_attach_image(CARTRIDGE_CRT, game_path);
 
-  cartridge_detach_image();
   return !autostart_autodetect(game_path, NULL, 0, AUTOSTART_MODE_RUN);
 }
 
@@ -1136,6 +1194,17 @@ static int OnMenuOk(const void *uimenu, const void* sel_item)
 {
   switch (((const pl_menu_item*)sel_item)->id)
   {
+  case SYSTEM_CART:
+    FileBrowser.Userdata = (void*)0; /* Cartridge */
+    FileBrowser.Filter = CartFilter;
+    pspUiOpenBrowser(&FileBrowser, (*psp_game_path) ? psp_game_path : NULL);
+    break;
+  case SYSTEM_TAPE:
+    FileBrowser.Userdata = (void*)1; /* Tape */
+    FileBrowser.Filter = TapeFilter;
+    pspUiOpenBrowser(&FileBrowser, (*psp_game_path) ? psp_game_path : NULL);
+    psp_refresh_devices();
+    break;
   case SYSTEM_DRIVE8:
     FileBrowser.Userdata = (void*)GET_DRIVE(((const pl_menu_item*)sel_item)->id);
     FileBrowser.Filter = DiskFilter;
@@ -1206,6 +1275,13 @@ static int OnMenuButtonPress(const struct PspUiMenu *uimenu,
     {
       switch (id)
       {
+      case SYSTEM_CART:
+        cartridge_detach_image();
+        break;
+      case SYSTEM_TAPE:
+        tape_image_detach(1);
+        psp_refresh_devices();
+        break;
       case SYSTEM_DRIVE8:
         file_system_detach_disk(GET_DRIVE(id));
         psp_refresh_devices();
@@ -1253,6 +1329,20 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       psp_options.animate_menu = (int)option->value;
       UiMetric.Animate = psp_options.animate_menu;
       break;
+    case SYSTEM_TAPE:
+      {
+        int index = pl_menu_get_option_index(item, option);
+        const char *name = tape_image_dev1->name; /* Filename */
+
+        pspUiFlashMessage("Autoloading, please wait...");
+
+        if (autostart_autodetect(name, NULL, index, AUTOSTART_MODE_RUN))
+        {
+          pspUiAlert("Error loading program");
+          return 0;
+        }
+      }
+      break;
     case SYSTEM_DRIVE8:
       {
         int index = pl_menu_get_option_index(item, option);
@@ -1293,27 +1383,52 @@ static int OnFileOk(const void *browser, const void *path)
 {
   int drive_num = (int)((const PspUiFileBrowser*)browser)->Userdata;
   const char *game_path;
+  int set_as_current = 0;
+
   if (!(game_path = prepare_file(path)))
   {
     pspUiAlert("Error loading file");
     return 0;
   }
 
-  if (file_system_attach_disk(drive_num, game_path) < 0)
+  if (drive_num == 0) /* Cart */
   {
-    pspUiAlert("Error loading file");
-    return 0;
+    if (cartridge_attach_image(CARTRIDGE_CRT, game_path) < 0)
+    {
+      pspUiAlert("Error loading cartridge");
+      return 0;
+    }
+
+    set_as_current = 1;
+  }
+  else if (drive_num == 1) /* Tape */
+  {
+    if (tape_image_attach(1, game_path) < 0)
+    {
+      pspUiAlert("Error loading tape image");
+      return 0;
+    }
+
+    set_as_current = 1;
+  }
+  else /* Disk */
+  {
+    if (file_system_attach_disk(drive_num, game_path) < 0)
+    {
+      pspUiAlert("Error loading disk image");
+      return 0;
+    }
+
+    /* If disk 8, set as currently loaded game */
+    set_as_current = (drive_num == 8);
   }
 
-  if (drive_num == 8)
+  if (set_as_current)
   {
+    /* Set as currently loaded game */
     SET_AS_CURRENT_GAME(path);
-    pl_file_get_parent_directory(path,
-                                 psp_game_path,
-                                 sizeof(psp_game_path));
-    if (!psp_load_controls((GAME_LOADED)
-                             ? pl_file_get_filename(psp_current_game) : "BASIC",
-                           &current_map));
+    pl_file_get_parent_directory(path, psp_game_path, sizeof(psp_game_path));
+    psp_load_controls(pl_file_get_filename(psp_current_game), &current_map);
 
     /* Reset selected state */
     SaveStateGallery.Menu.selected = NULL;
