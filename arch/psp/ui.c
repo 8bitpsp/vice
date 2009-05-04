@@ -66,6 +66,7 @@
 #define OPTION_ANIMATE       0x06
 #define OPTION_TOGGLE_VK     0x08
 #define OPTION_AUTOLOAD      0x09
+#define OPTION_SHOW_OSI      0x0A
 
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
@@ -264,6 +265,8 @@ PL_MENU_ITEMS_BEGIN(OptionMenuDef)
                "\026\250\020 Larger values: faster emulation, faster battery depletion (default: 222MHz)")
   PL_MENU_ITEM("Show FPS counter",OPTION_SHOW_FPS,ToggleOptions,
                "\026\250\020 Show/hide the frames-per-second counter")
+  PL_MENU_ITEM("Show system indicators",OPTION_SHOW_OSI,ToggleOptions,
+               "\026\250\020 Show/hide system status indicators (LED's, etc...)")
   PL_MENU_HEADER("Menu")
   PL_MENU_ITEM("Button mode",OPTION_CONTROL_MODE,ControlModeOptions,
                "\026\250\020 Change OK and Cancel button mapping")
@@ -796,6 +799,7 @@ static void psp_load_options()
                                             DISPLAY_MODE_UNSCALED);
   psp_options.clock_freq = pl_ini_get_int(&file, "Video", "PSP Clock Frequency", 222);
   psp_options.show_fps = pl_ini_get_int(&file, "Video", "Show FPS", 0);
+  psp_options.show_osi = pl_ini_get_int(&file, "Video", "Show OSI", 0);
   psp_options.control_mode = pl_ini_get_int(&file, "Menu", "Control Mode", 0);
   psp_options.animate_menu = pl_ini_get_int(&file, "Menu", "Animate", 1);
   psp_options.toggle_vk = pl_ini_get_int(&file, "Input", "VK Mode", 0);
@@ -818,6 +822,7 @@ static int psp_save_options()
   pl_ini_set_int(&file, "Video", "Display Mode", psp_options.display_mode);
   pl_ini_set_int(&file, "Video", "PSP Clock Frequency", psp_options.clock_freq);
   pl_ini_set_int(&file, "Video", "Show FPS", psp_options.show_fps);
+  pl_ini_set_int(&file, "Video", "Show OSI", psp_options.show_osi);
   pl_ini_set_int(&file, "Menu", "Control Mode", psp_options.control_mode);
   pl_ini_set_int(&file, "Menu", "Animate", psp_options.animate_menu);
   pl_ini_set_int(&file, "Input", "VK Mode", psp_options.toggle_vk);
@@ -994,6 +999,8 @@ void psp_display_menu()
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.clock_freq);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_SHOW_FPS);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.show_fps);
+      item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_SHOW_OSI);
+      pl_menu_select_option_by_value(item, (void*)(int)psp_options.show_osi);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_CONTROL_MODE);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.control_mode);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_ANIMATE);
@@ -1315,6 +1322,9 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
     case OPTION_SHOW_FPS:
       psp_options.show_fps = (int)option->value;
       break;
+    case OPTION_SHOW_OSI:
+      psp_options.show_osi = (int)option->value;
+      break;
     case OPTION_TOGGLE_VK:
       psp_options.toggle_vk = (int)option->value;
       break;
@@ -1588,5 +1598,21 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
   }
 
   return OnGenericButtonPress(NULL, NULL, button_mask);
+}
+
+/* Show a CPU JAM dialog.  */
+ui_jam_action_t ui_jam_dialog(const char *format, ...)
+{
+  static char message[512];
+
+  va_list ap;
+  va_start (ap, format);
+  vsnprintf(message, sizeof(message) - 1, format, ap);
+  va_end (ap);
+
+  pspUiAlert(message);
+  machine_trigger_reset(MACHINE_RESET_MODE_HARD);
+
+  return UI_JAM_NONE;
 }
 

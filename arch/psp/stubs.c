@@ -54,17 +54,8 @@ void ui_display_paused(int flag)
 {
 }
 
-void ui_display_drive_led(int drive_number, unsigned int pwm1,
-                                 unsigned int led_pwm2)
-{
-}
-
 void ui_display_drive_current_image(unsigned int drive_number,
                                            const char *image)
-{
-}
-
-void ui_display_tape_motor_status(int motor)
 {
 }
 
@@ -107,12 +98,6 @@ void ui_set_tape_status(int tape_status)
 /* Update all the menus according to the current settings.  */
 void ui_update_menus(void)
 {
-}
-
-/* Show a CPU JAM dialog.  */
-ui_jam_action_t ui_jam_dialog(const char *format, ...)
-{
-  return UI_JAM_NONE;
 }
 
 int ui_extend_image_dialog()

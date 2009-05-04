@@ -30,6 +30,8 @@ static int screen_h;
 static int clear_screen;
 static int line_height;
 static int psp_first_time = 1;
+static int drive_led_on = 0, tape_led_on = 0;
+static int disk_icon_offset, tape_icon_offset;
 
 static int show_kybd_held;
 static int keyboard_visible;
@@ -212,6 +214,10 @@ static void video_psp_display_menu()
   show_kybd_held = 0;
   keyboard_visible = 0;
 
+  disk_icon_offset = 0;
+  tape_icon_offset = disk_icon_offset + 
+    pspFontGetTextWidth(&PspStockFont, PSP_CHAR_FLOPPY);
+
   keyboard_clear_keymatrix();
   video_psp_refresh_screen();
 }
@@ -332,7 +338,7 @@ void video_psp_refresh_screen()
   }
   else
   {
-    if (psp_options.show_fps)
+    if (psp_options.show_fps || psp_options.show_osi)
       pspVideoFillRect(0, 0, SCR_WIDTH, line_height, PSP_COLOR_BLACK);
   }
 
@@ -351,6 +357,16 @@ void video_psp_refresh_screen()
     int width = pspFontGetTextWidth(&PspStockFont, fps_display);
 
     pspVideoPrint(&PspStockFont, SCR_WIDTH - width, 0, fps_display, PSP_COLOR_WHITE);
+  }
+
+  /* Display any status indicators */
+  if (psp_options.show_osi)
+  {
+    /* "Disk busy" indicator */
+    if (drive_led_on)
+      pspVideoPrint(&PspStockFont, disk_icon_offset, 0, PSP_CHAR_FLOPPY, PSP_COLOR_GREEN);
+    if (tape_led_on)
+      pspVideoPrint(&PspStockFont, tape_icon_offset, 0, PSP_CHAR_TAPE, PSP_COLOR_GREEN);
   }
 
   pspVideoEnd();
@@ -396,3 +412,18 @@ static inline void psp_keyboard_toggle(unsigned int code, int on)
   }
   keyboard_set_keyarr(CKROW(code),CKCOL(code), on);
 }
+
+void ui_display_drive_led(int drive_number, unsigned int led_pwm1,
+                                 unsigned int led_pwm2)
+{
+  int status = 0;
+	if (led_pwm1 > 100) status |= 1;
+	if (led_pwm2 > 100) status |= 2;
+  drive_led_on = status;
+}
+
+void ui_display_tape_motor_status(int motor)
+{
+  tape_led_on = motor;
+}
+

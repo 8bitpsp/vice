@@ -27,6 +27,7 @@ typedef struct psp_options
 {
   int display_mode;
   int show_fps;
+  int show_osi;
   int control_mode;
   int animate_menu;
   int toggle_vk;
