@@ -734,7 +734,6 @@ static PspImage* psp_load_state_icon(const char *path)
 /* Load state */
 static int psp_load_state(const char *path)
 {
-return 0; // TODO
   /* Open file for reading */
   FILE *f = fopen(path, "r");
   if (!f) return 0;
@@ -744,7 +743,8 @@ return 0; // TODO
   pspImageDestroy(image);
 
   /* Load the state data */
-  int error;// = !snapshot_read_file(path, f);
+  /* HACK: snapshot saving overridden in snapshot.c */
+  int error = (machine_read_snapshot((char*)f, 0) < 0);
   fclose(f);
 
   return error;
@@ -753,7 +753,6 @@ return 0; // TODO
 /* Save state */
 static PspImage* psp_save_state(const char *path, PspImage *icon)
 {
-return 0; /*TODO */
   /* Open file for writing */
   FILE *f;
   if (!(f = fopen(path, "w")))
@@ -774,7 +773,8 @@ return 0; /*TODO */
   }
 
   /* Write the state */
-//  if (snapshot_write_file(path, f))
+  /* HACK: snapshot saving overridden in snapshot.c */
+  if (machine_write_snapshot((char*)f, 0, 0, 0) < 0)
   {
     pspImageDestroy(thumb);
     thumb = NULL;

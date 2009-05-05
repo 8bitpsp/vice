@@ -562,8 +562,11 @@ snapshot_t *snapshot_create(const char *filename,
 {
     FILE *f;
     snapshot_t *s;
-
+#ifdef PSP
+    f = (FILE*)filename;
+#else
     f = fopen(filename, MODE_WRITE);
+#endif
     if (f == NULL)
         return NULL;
 
@@ -605,8 +608,11 @@ snapshot_t *snapshot_open(const char *filename,
     char read_name[SNAPSHOT_MACHINE_NAME_LEN];
     snapshot_t *s = NULL;
     int machine_name_len;
-
+#ifdef PSP
+    f = (FILE*)filename;
+#else
     f = zfile_fopen(filename, MODE_READ);
+#endif
     if (f == NULL)
         return NULL;
 
@@ -650,7 +656,9 @@ fail:
 int snapshot_close(snapshot_t *s)
 {
     int retval;
-
+#ifdef PSP
+    retval = 0;
+#else
     if (!s->write_mode) {
         if (zfile_fclose(s->file) == EOF)
             retval = -1;
@@ -662,7 +670,7 @@ int snapshot_close(snapshot_t *s)
         else
             retval = 0;
     }
-
+#endif
     lib_free(s);
     return retval;
 }

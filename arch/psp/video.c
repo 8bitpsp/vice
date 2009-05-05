@@ -178,10 +178,10 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
 }
 
 static void video_psp_display_menu()
-{ 
-  vsync_suspend_speed_eval();
+{
   psp_display_menu();
-  vsync_sync_reset();
+  vsync_suspend_speed_eval();
+//  vsync_sync_reset();
 
   last_framerate = 0;
   last_percent = 0;
@@ -309,9 +309,9 @@ void input_poll()
 }
 
 void video_canvas_refresh(struct video_canvas_s *canvas,
-                                 unsigned int xs, unsigned int ys,
-                                 unsigned int xi, unsigned int yi,
-                                 unsigned int w, unsigned int h)
+                          unsigned int xs, unsigned int ys,
+                          unsigned int xi, unsigned int yi,
+                          unsigned int w, unsigned int h)
 {
   if (canvas->width == 0)
     return;
