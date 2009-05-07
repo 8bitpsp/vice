@@ -33,6 +33,7 @@
 #include "tape.h"
 #include "cartridge.h"
 #include "imagecontents.h"
+#include "interrupt.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -79,8 +80,8 @@
 #define GET_DRIVE_MENU_ID(code) (((code)&0x0F)|0x10)
 
 static const char 
-  PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete\t\026"PSP_CHAR_START"\020 Export",
-  EmptySlotText[]   = "\026\244\020 Save\t\026"PSP_CHAR_START"\020 Export",
+  PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete",
+  EmptySlotText[]   = "\026\244\020 Save",
   ControlHelpText[] = "\026\250\020 Change mapping\t"
                       "\026\244\020 Set as default\t\026\243\020 Load defaults";
 
@@ -457,7 +458,7 @@ static int  psp_save_controls(const char *filename, const psp_ctrl_map_t *config
 
 static PspImage* psp_load_state_icon(const char *path);
 static int psp_load_state(const char *path);
-static PspImage* psp_save_state(const char *path, PspImage *icon);
+static PspImage* psp_save_state(const char *path);
 
 static void psp_display_state_tab();
 static void psp_display_control_tab();
@@ -731,12 +732,40 @@ static PspImage* psp_load_state_icon(const char *path)
   return image;
 }
 
-/* Load state */
-static int psp_load_state(const char *path)
+static void save_snapshot_trap(WORD unused_addr, void *path)
+{
+  /* Open file for writing */
+  FILE *f;
+  if (!(f = fopen((char*)path, "w")))
+    return;
+
+  /* Create thumbnail */
+  PspImage *thumb;
+  thumb = (Screen->Viewport.Width <= 256)
+    ? pspImageCreateCopy(Screen) : pspImageCreateThumbnail(Screen);
+  if (!thumb) { fclose(f); return; }
+
+  /* Write the thumbnail */
+  if (!pspImageSavePngFd(f, thumb))
+  {
+    pspImageDestroy(thumb);
+    fclose(f);
+    return;
+  }
+
+  pspImageDestroy(thumb);
+
+  /* Write the state */
+  /* HACK: snapshot saving overridden in snapshot.c */
+  machine_write_snapshot((char*)f, 0, 0, 0);
+  fclose(f);
+}
+
+static void load_snapshot_trap(WORD unused_addr, void *path)
 {
   /* Open file for reading */
-  FILE *f = fopen(path, "r");
-  if (!f) return 0;
+  FILE *f = fopen((char*)path, "r");
+  if (!f) return;
 
   /* Load image into temporary object */
   PspImage *image = pspImageLoadPngFd(f);
@@ -744,43 +773,28 @@ static int psp_load_state(const char *path)
 
   /* Load the state data */
   /* HACK: snapshot saving overridden in snapshot.c */
-  int error = (machine_read_snapshot((char*)f, 0) < 0);
+  machine_read_snapshot((char*)f, 0);
   fclose(f);
+}
 
-  return error;
+/* Load state */
+static int psp_load_state(const char *path)
+{
+  interrupt_maincpu_trigger_trap(load_snapshot_trap, (void*)path);
+  return 1;
 }
 
 /* Save state */
-static PspImage* psp_save_state(const char *path, PspImage *icon)
+static PspImage* psp_save_state(const char *path)
 {
-  /* Open file for writing */
-  FILE *f;
-  if (!(f = fopen(path, "w")))
-    return NULL;
-
   /* Create thumbnail */
   PspImage *thumb;
-  thumb = (icon->Viewport.Width <= 256)
-    ? pspImageCreateCopy(icon) : pspImageCreateThumbnail(icon);
-  if (!thumb) { fclose(f); return NULL; }
+  thumb = (Screen->Viewport.Width <= 256)
+    ? pspImageCreateCopy(Screen) : pspImageCreateThumbnail(Screen);
 
-  /* Write the thumbnail */
-  if (!pspImageSavePngFd(f, thumb))
-  {
-    pspImageDestroy(thumb);
-    fclose(f);
-    return NULL;
-  }
+  if (!thumb) return NULL;
 
-  /* Write the state */
-  /* HACK: snapshot saving overridden in snapshot.c */
-  if (machine_write_snapshot((char*)f, 0, 0, 0) < 0)
-  {
-    pspImageDestroy(thumb);
-    thumb = NULL;
-  }
-
-  fclose(f);
+  interrupt_maincpu_trigger_trap(save_snapshot_trap, (void*)path);
   return thumb;
 }
 
@@ -1541,7 +1555,7 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
         pspUiFlashMessage("Saving, please wait ...");
 
         PspImage *icon;
-        if (!(icon = psp_save_state(path, Screen)))
+        if (!(icon = psp_save_state(path)))
         {
           pspUiAlert("ERROR: State not saved");
           break;
