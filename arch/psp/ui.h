@@ -32,7 +32,6 @@ typedef struct psp_options
   int animate_menu;
   int toggle_vk;
   int clock_freq;
-  int autoload_slot;
   int joyport;
 } psp_options_t;
 

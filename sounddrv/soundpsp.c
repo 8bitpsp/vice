@@ -37,6 +37,7 @@
 #include "sfifo.h"
 
 static sfifo_t sound_fifo;
+static int sound_initted = 0;
 
 static void psp_sound_callback(pl_snd_sample* stream, unsigned int samples, void *userdata);
 
@@ -53,6 +54,7 @@ static int psp_sound_init(const char *param, int *speed,
 
   pl_snd_set_callback(0, psp_sound_callback, 0);
   pl_snd_resume(0);
+  sound_initted = 1;
 
   return 0;
 }
@@ -79,6 +81,18 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
   return 0;
 }
 
+static int psp_sound_suspend(void)
+{
+  if (sound_initted) pl_snd_pause(0);
+  return 0;
+}
+
+static int psp_sound_resume(void)
+{
+  if (sound_initted) pl_snd_resume(0);
+  return 0;
+}
+
 static void psp_sound_close(void)
 {
   pl_snd_pause(0);
@@ -95,8 +109,8 @@ static sound_device_t psp_sound =
     NULL,
     NULL,
     psp_sound_close,
-    NULL,
-    NULL,
+    psp_sound_suspend,
+    psp_sound_resume,
     0
 };
 

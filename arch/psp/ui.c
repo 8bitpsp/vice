@@ -27,6 +27,9 @@
 #include "autostart.h"
 #include "vice.h"
 #include "machine.h"
+#include "interrupt.h"
+#include "log.h"
+#include "vsync.h"
 #include "ui.h"
 #include "attach.h"
 #include "util.h"
@@ -65,7 +68,6 @@
 #define OPTION_CONTROL_MODE  0x05
 #define OPTION_ANIMATE       0x06
 #define OPTION_TOGGLE_VK     0x08
-#define OPTION_AUTOLOAD      0x09
 #define OPTION_SHOW_OSI      0x0A
 
 #define SYSTEM_SCRNSHOT     0x11
@@ -135,19 +137,6 @@ PL_MENU_OPTIONS_END
 PL_MENU_OPTIONS_BEGIN(VkModeOptions)
   PL_MENU_OPTION("Display when button is held down (classic mode)", 0)
   PL_MENU_OPTION("Toggle display on and off when button is pressed", 1)
-PL_MENU_OPTIONS_END
-PL_MENU_OPTIONS_BEGIN(AutoloadSlots)
-  PL_MENU_OPTION("Disabled", -1)
-  PL_MENU_OPTION("1", 0)
-  PL_MENU_OPTION("2", 1)
-  PL_MENU_OPTION("3", 2)
-  PL_MENU_OPTION("4", 3)
-  PL_MENU_OPTION("5", 4)
-  PL_MENU_OPTION("6", 5)
-  PL_MENU_OPTION("7", 6)
-  PL_MENU_OPTION("8", 7)
-  PL_MENU_OPTION("9", 8)
-  PL_MENU_OPTION("10",9)
 PL_MENU_OPTIONS_END
 PL_MENU_OPTIONS_BEGIN(MappableButtons)
   /* Unmapped */
@@ -257,9 +246,6 @@ PL_MENU_ITEMS_BEGIN(OptionMenuDef)
   PL_MENU_HEADER("Input")
   PL_MENU_ITEM("Virtual keyboard mode",OPTION_TOGGLE_VK,VkModeOptions,
                "\026\250\020 Select virtual keyboard mode")
-  PL_MENU_HEADER("Enhancements")
-  PL_MENU_ITEM("Autoload slot",OPTION_AUTOLOAD,AutoloadSlots,
-               "\026\250\020 Select save state to be loaded automatically")
   PL_MENU_HEADER("Performance")
   PL_MENU_ITEM("PSP clock frequency",OPTION_CLOCK_FREQ,PspClockFreqOptions,
                "\026\250\020 Larger values: faster emulation, faster battery depletion (default: 222MHz)")
@@ -456,8 +442,10 @@ static int  psp_load_controls(const char *filename, psp_ctrl_map_t *config);
 static int  psp_save_controls(const char *filename, const psp_ctrl_map_t *config);
 
 static PspImage* psp_load_state_icon(const char *path);
-static int psp_load_state(const char *path);
-static PspImage* psp_save_state(const char *path, PspImage *icon);
+static void psp_load_state(const char *path);
+static void psp_save_state(const char *path);
+static void load_snapshot_trap(WORD unused_addr, void *data);
+static void save_snapshot_trap(WORD unused_addr, void *data);
 
 static void psp_display_state_tab();
 static void psp_display_control_tab();
@@ -741,59 +729,82 @@ static PspImage* psp_load_state_icon(const char *path)
   return image;
 }
 
-/* Load state */
-static int psp_load_state(const char *path)
+static void load_snapshot_trap(WORD unused_addr, void *data)
 {
-  /* Open file for reading */
-  FILE *f = fopen(path, "r");
-  if (!f) return 0;
+  pspUiFlashMessage("Loading, please wait ...");
 
-  pspUiFlashMessage("Loading state, please wait...");
+  /* Open file for reading */
+  FILE *f = fopen((char*)data, "r");
+  if (!f) goto error;
 
   /* Load image into temporary object */
   PspImage *image = pspImageLoadPngFd(f);
+  if (!image) goto error;
   pspImageDestroy(image);
 
   /* Load the state data */
   /* HACK: snapshot saving overridden in snapshot.c */
   int status = machine_read_snapshot((char*)f, 0);
-  fclose(f);
+  if (status < 0) goto error;
 
-  return status == 0;
+  goto ok;
+
+error:
+  pspUiAlert("Error loading state");
+ok:
+  if (f) fclose(f);
+  vsync_suspend_speed_eval();
 }
 
-/* Save state */
-static PspImage* psp_save_state(const char *path, PspImage *icon)
+static void save_snapshot_trap(WORD unused_addr, void *data)
 {
+  pspUiFlashMessage("Saving, please wait ...");
+
   /* Open file for writing */
   FILE *f;
-  if (!(f = fopen(path, "w")))
-    return NULL;
+  PspImage *thumb = NULL;
+  if (!(f = fopen((char*)data, "w")))
+    goto error;
 
   /* Create thumbnail */
-  PspImage *thumb;
-  thumb = (icon->Viewport.Width <= 256)
-    ? pspImageCreateCopy(icon) : pspImageCreateThumbnail(icon);
-  if (!thumb) { fclose(f); return NULL; }
+  thumb = (Screen->Viewport.Width <= 256)
+    ? pspImageCreateCopy(Screen) : pspImageCreateThumbnail(Screen);
+  if (!thumb) goto error;
 
   /* Write the thumbnail */
   if (!pspImageSavePngFd(f, thumb))
-  {
-    pspImageDestroy(thumb);
-    fclose(f);
-    return NULL;
-  }
+    goto error;
+
+  pspImageDestroy(thumb);
+  thumb = NULL;
 
   /* Write the state */
   /* HACK: snapshot saving overridden in snapshot.c */
   if (machine_write_snapshot((char*)f, 0, 0, 0) < 0)
-  {
-    pspImageDestroy(thumb);
-    thumb = NULL;
-  }
+    goto error;
 
-  fclose(f);
-  return thumb;
+  goto ok;
+
+error:
+  pspUiAlert("Error saving state");
+  if (thumb) pspImageDestroy(thumb);
+ok:
+  if (f) fclose(f);
+  vsync_suspend_speed_eval();
+}
+
+/* Load state */
+static void psp_load_state(const char *path)
+{
+  interrupt_maincpu_trigger_trap(load_snapshot_trap, (void *)path);
+  psp_exit_menu = 1;
+}
+
+/* Save state */
+static void psp_save_state(const char *path)
+{
+  interrupt_maincpu_trigger_trap(save_snapshot_trap, (void *)path);
+  psp_exit_menu = 1;
 }
 
 static void psp_load_options()
@@ -805,7 +816,6 @@ static void psp_load_options()
   pl_ini_file file;
   pl_ini_load(&file, path);
 
-  psp_options.autoload_slot = pl_ini_get_int(&file, "System", "Autoload Slot", 9);
   psp_options.joyport = pl_ini_get_int(&file, "System", "Joystick Port", 2);
   psp_options.display_mode = pl_ini_get_int(&file, "Video", "Display Mode", 
                                             DISPLAY_MODE_UNSCALED);
@@ -829,7 +839,6 @@ static int psp_save_options()
   /* Initialize INI structure */
   pl_ini_file file;
   pl_ini_create(&file);
-  pl_ini_set_int(&file, "System", "Autoload Slot", psp_options.autoload_slot);
   pl_ini_set_int(&file, "System", "Joystick Port", psp_options.joyport);
   pl_ini_set_int(&file, "Video", "Display Mode", psp_options.display_mode);
   pl_ini_set_int(&file, "Video", "PSP Clock Frequency", psp_options.clock_freq);
@@ -1019,8 +1028,6 @@ void psp_display_menu()
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.animate_menu);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_TOGGLE_VK);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.toggle_vk);
-      item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_AUTOLOAD);
-      pl_menu_select_option_by_value(item, (void*)(int)psp_options.autoload_slot);
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;
@@ -1081,13 +1088,12 @@ static void psp_display_state_tab()
           latest = stat.st_mtime;
         }
 
-        sprintf(caption, "%02i/%02i/%02i %02i:%02i%s", 
+        sprintf(caption, "%02i/%02i/%02i %02i:%02i", 
           stat.st_mtime.month,
           stat.st_mtime.day,
           stat.st_mtime.year - (stat.st_mtime.year / 100) * 100,
           stat.st_mtime.hour,
-          stat.st_mtime.minute,
-          ((int)item->id == psp_options.autoload_slot) ? "*" : "");
+          stat.st_mtime.minute);
       }
 
       pl_menu_set_item_caption(item, caption);
@@ -1096,8 +1102,7 @@ static void psp_display_state_tab()
     }
     else
     {
-      pl_menu_set_item_caption(item, ((int)item->id == psp_options.autoload_slot)
-          ? "Autoload" : "Empty");
+      pl_menu_set_item_caption(item, "Empty");
       item->param = psp_blank_ss_icon;
       pl_menu_set_item_help_text(item, EmptySlotText);
     }
@@ -1484,20 +1489,6 @@ static int OnQuickloadOk(const void *browser, const void *path)
                            ? pl_file_get_filename(psp_current_game) : "BASIC",
                          &current_map));
 
-  /* Autoload saved state */
-  if (psp_options.autoload_slot >= 0)
-  {
-    const char *config_name = (GAME_LOADED)
-                              ? pl_file_get_filename(psp_current_game) : "BASIC";
-    pl_file_path state_file;
-    snprintf(state_file, sizeof(state_file) - 1, 
-             "%s%s_%02i.sna", psp_save_state_path, config_name, 
-             psp_options.autoload_slot);
-
-    /* Attempt loading saved state (don't care if fails) */
-    psp_load_state(state_file);
-  }
-
   /* Reset selected state */
   SaveStateGallery.Menu.selected = NULL;
 
@@ -1506,30 +1497,19 @@ static int OnQuickloadOk(const void *browser, const void *path)
 
 static int OnSaveStateOk(const void *gallery, const void *item)
 {
-  char *path;
+  static pl_file_path path;
   const char *config_name = (GAME_LOADED) 
     ? pl_file_get_filename(psp_current_game) : "BASIC";
 
-  path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
   sprintf(path, "%s%s_%02i.sna", psp_save_state_path, config_name,
     ((const pl_menu_item*)item)->id);
 
   if (pl_file_exists(path) && pspUiConfirm("Load state?"))
   {
-    if (psp_load_state(path))
-    {
-      psp_exit_menu = 1;
-      pl_menu_find_item_by_id(&((PspUiGallery*)gallery)->Menu,
-        ((pl_menu_item*)item)->id);
-      free(path);
-
-      return 1;
-    }
-
-    pspUiAlert("ERROR: State failed to load\nSee documentation for possible reasons");
+    psp_load_state(path);
+    return 1;
   }
 
-  free(path);
   return 0;
 }
 
@@ -1541,13 +1521,10 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
     || button_mask & PSP_CTRL_TRIANGLE
     || button_mask & PSP_CTRL_START)
   {
-    char *path;
-    char caption[32];
+    static pl_file_path path;
     const char *config_name = (GAME_LOADED) 
       ? pl_file_get_filename(psp_current_game) : "BASIC";
     pl_menu_item *item = pl_menu_find_item_by_id(&gallery->Menu, sel->id);
-
-    path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
     sprintf(path, "%s%s_%02i.sna", psp_save_state_path, config_name, item->id);
 
     do /* not a real loop; flow control construct */
@@ -1557,37 +1534,8 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
         if (pl_file_exists(path) && !pspUiConfirm("Overwrite existing state?"))
           break;
 
-        pspUiFlashMessage("Saving, please wait ...");
-
-        PspImage *icon;
-        if (!(icon = psp_save_state(path, Screen)))
-        {
-          pspUiAlert("ERROR: State not saved");
-          break;
-        }
-
-        SceIoStat stat;
-
-        /* Trash the old icon (if any) */
-        if (item->param && item->param != psp_blank_ss_icon)
-          pspImageDestroy((PspImage*)item->param);
-
-        /* Update icon, help text */
-        item->param = icon;
-        pl_menu_set_item_help_text(item, PresentSlotText);
-
-        /* Get file modification time/date */
-        if (sceIoGetstat(path, &stat) < 0)
-          sprintf(caption, "ERROR");
-        else
-          sprintf(caption, "%02i/%02i/%02i %02i:%02i", 
-            stat.st_mtime.month,
-            stat.st_mtime.day,
-            stat.st_mtime.year - (stat.st_mtime.year / 100) * 100,
-            stat.st_mtime.hour,
-            stat.st_mtime.minute);
-
-        pl_menu_set_item_caption(item, caption);
+        psp_save_state(path);
+        return 1;
       }
       else if (button_mask & PSP_CTRL_TRIANGLE)
       {
@@ -1607,12 +1555,10 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
         /* Update icon, caption */
         item->param = psp_blank_ss_icon;
         pl_menu_set_item_help_text(item, EmptySlotText);
-        pl_menu_set_item_caption(item, ((int)item->id == psp_options.autoload_slot)
-            ? "Autoload" : "Empty");
+        pl_menu_set_item_caption(item, "Empty");
       }
     } while (0);
 
-    if (path) free(path);
     return 0;
   }
 
