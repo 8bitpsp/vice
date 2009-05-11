@@ -241,9 +241,9 @@ PL_MENU_ITEMS_BEGIN(SystemMenuDef)
   PL_MENU_ITEM("Cartridge",SYSTEM_CART,NULL,
                "\026\001\020 Browse\t\026\243\020 Eject")
   PL_MENU_ITEM("Tape",SYSTEM_TAPE,NULL,
-               "\026\001\020 Browse\t\026\250\020 Autoload program\t\026\243\020 Eject")
+               "\026\001\020 Browse\t\026\250\020 Autoload program (if image present)\t\026\243\020 Eject")
   PL_MENU_ITEM("Drive 8",SYSTEM_DRIVE8,NULL,
-               "\026\001\020 Browse\t\026\250\020 Autoload program\t\026\243\020 Eject")
+               "\026\001\020 Browse\t\026\250\020 Autoload program (if image present)\t\026\243\020 Eject")
   PL_MENU_HEADER("Options")
   PL_MENU_ITEM("Reset",SYSTEM_RESET,NULL,
                "\026\001\020 Reset system")
@@ -585,7 +585,7 @@ static void psp_refresh_devices()
     line = strtok(contents, "\n");
     while (line)
     {
-      pl_menu_append_option(item, line, line, 1);
+      pl_menu_append_option(item, line, NULL, 0);
       line = strtok(NULL, "\n");
     }
 
@@ -616,7 +616,7 @@ static void psp_refresh_devices()
     line = strtok(contents, "\n");
     while (line)
     {
-      pl_menu_append_option(item, line, line, 1);
+      pl_menu_append_option(item, line, NULL, 0);
       line = strtok(NULL, "\n");
     }
 
@@ -627,10 +627,20 @@ static void psp_refresh_devices()
     /* Select first option */
     pl_menu_select_option_by_index(item, 0);
   }
+
+  /* Cart name */
+  name = cartridge_get_file_name(0);
+  item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_CART);
+  pl_menu_clear_options(item); /* Clear current names */
+  if (name)
+    pl_menu_append_option(item, pl_file_get_filename(name), NULL, 1);
 }
 
 static void psp_display_system_tab()
 {
+  pl_menu_item *item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_JOYPORT);
+  pl_menu_select_option_by_value(item, (void*)psp_options.joyport);
+
   psp_refresh_devices();
   pspUiOpenMenu(&SystemUiMenu, NULL);
 }
@@ -738,16 +748,18 @@ static int psp_load_state(const char *path)
   FILE *f = fopen(path, "r");
   if (!f) return 0;
 
+  pspUiFlashMessage("Loading state, please wait...");
+
   /* Load image into temporary object */
   PspImage *image = pspImageLoadPngFd(f);
   pspImageDestroy(image);
 
   /* Load the state data */
   /* HACK: snapshot saving overridden in snapshot.c */
-  int error = (machine_read_snapshot((char*)f, 0) < 0);
+  int status = machine_read_snapshot((char*)f, 0);
   fclose(f);
 
-  return error;
+  return status == 0;
 }
 
 /* Save state */
@@ -1007,6 +1019,8 @@ void psp_display_menu()
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.animate_menu);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_TOGGLE_VK);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.toggle_vk);
+      item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_AUTOLOAD);
+      pl_menu_select_option_by_value(item, (void*)(int)psp_options.autoload_slot);
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;
@@ -1052,7 +1066,7 @@ static void psp_display_state_tab()
   /* Initialize icons */
   for (item = SaveStateGallery.Menu.items; item; item = item->next)
   {
-    sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name, item->id);
+    sprintf(path, "%s%s_%02i.sna", psp_save_state_path, config_name, item->id);
 
     if (pl_file_exists(path))
     {
@@ -1205,6 +1219,7 @@ static int OnMenuOk(const void *uimenu, const void* sel_item)
     FileBrowser.Userdata = (void*)0; /* Cartridge */
     FileBrowser.Filter = CartFilter;
     pspUiOpenBrowser(&FileBrowser, (*psp_game_path) ? psp_game_path : NULL);
+    psp_refresh_devices();
     break;
   case SYSTEM_TAPE:
     FileBrowser.Userdata = (void*)1; /* Tape */
@@ -1284,6 +1299,7 @@ static int OnMenuButtonPress(const struct PspUiMenu *uimenu,
       {
       case SYSTEM_CART:
         cartridge_detach_image();
+        psp_refresh_devices();
         break;
       case SYSTEM_TAPE:
         tape_image_detach(1);
@@ -1366,6 +1382,9 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
           return 0;
         }
       }
+      break;
+    case SYSTEM_JOYPORT:
+      psp_options.joyport = (int)option->value;
       break;
     }
   }
@@ -1472,7 +1491,7 @@ static int OnQuickloadOk(const void *browser, const void *path)
                               ? pl_file_get_filename(psp_current_game) : "BASIC";
     pl_file_path state_file;
     snprintf(state_file, sizeof(state_file) - 1, 
-             "%s%s_%02i.sta", psp_save_state_path, config_name, 
+             "%s%s_%02i.sna", psp_save_state_path, config_name, 
              psp_options.autoload_slot);
 
     /* Attempt loading saved state (don't care if fails) */
@@ -1492,7 +1511,7 @@ static int OnSaveStateOk(const void *gallery, const void *item)
     ? pl_file_get_filename(psp_current_game) : "BASIC";
 
   path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
-  sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name,
+  sprintf(path, "%s%s_%02i.sna", psp_save_state_path, config_name,
     ((const pl_menu_item*)item)->id);
 
   if (pl_file_exists(path) && pspUiConfirm("Load state?"))
@@ -1529,7 +1548,7 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
     pl_menu_item *item = pl_menu_find_item_by_id(&gallery->Menu, sel->id);
 
     path = (char*)malloc(strlen(psp_save_state_path) + strlen(config_name) + 8);
-    sprintf(path, "%s%s_%02i.sta", psp_save_state_path, config_name, item->id);
+    sprintf(path, "%s%s_%02i.sna", psp_save_state_path, config_name, item->id);
 
     do /* not a real loop; flow control construct */
     {
