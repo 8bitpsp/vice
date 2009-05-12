@@ -30,6 +30,7 @@
 #include <pspkernel.h>
 
 #include "vice.h"
+#include "log.h"
 
 #include "sound.h"
 #include "lib/pl_snd.h"
@@ -38,6 +39,7 @@
 
 static sfifo_t sound_fifo;
 static int sound_initted = 0;
+static int sound_rendering = 0;
 
 static void psp_sound_callback(pl_snd_sample* stream, unsigned int samples, void *userdata);
 
@@ -45,15 +47,17 @@ static int psp_sound_init(const char *param, int *speed,
 		    int *fragsize, int *fragnr, int *channels)
 {
   *speed = 44100;
-  *fragsize = 44100/60;
-  *fragnr = 368;
-  *channels = 2;
+  *fragsize = 44100/50;
+  //*fragnr = 4;//SOUND_BUFFER_SIZE;
+  *channels = 1;
 
-  if (sfifo_init(&sound_fifo, (*fragnr) * (*channels) * (*fragsize) + 1))
+  int buffer_size = (*fragnr) * (*channels) * (*fragsize) + 1;
+  if (sfifo_init(&sound_fifo, buffer_size))
     return 1;
 
   pl_snd_set_callback(0, psp_sound_callback, 0);
   pl_snd_resume(0);
+  sound_rendering = 1;
   sound_initted = 1;
 
   return 0;
@@ -67,7 +71,7 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
   BYTE *bytes = (BYTE*)pbuf;
   nr <<= 1;
 
-  while (nr)
+  while (nr && sound_rendering)
   {
     if ((i = sfifo_write(&sound_fifo, bytes, nr)) < 0)
       break;
@@ -83,13 +87,17 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
 
 static int psp_sound_suspend(void)
 {
-  if (sound_initted) pl_snd_pause(0);
+  if (!sound_initted) return 0;
+  pl_snd_pause(0);
+  sound_rendering = 0;
   return 0;
 }
 
 static int psp_sound_resume(void)
 {
-  if (sound_initted) pl_snd_resume(0);
+  if (!sound_initted) return 0;
+  pl_snd_resume(0);
+  sound_rendering = 1;
   return 0;
 }
 
@@ -100,13 +108,18 @@ static void psp_sound_close(void)
   sfifo_close(&sound_fifo);
 }
 
+static int psp_sound_flush(char *state)
+{
+  return 0;
+}
+
 static sound_device_t psp_sound =
 {
     "PSP",
     psp_sound_init,
     psp_sound_write,
     NULL,
-    NULL,
+    psp_sound_flush,
     NULL,
     psp_sound_close,
     psp_sound_suspend,

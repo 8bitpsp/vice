@@ -33,15 +33,6 @@ int main(int argc, char *argv[])
   pl_psp_start_callback_thread();
 
   main_program(argc, argv);
-
-/* TODO
-  if (InitMenu())
-  {
-    DisplayMenu();
-    TrashMenu();
-  }
-*/
-
   main_exit();
 
   /* Release PSP resources */

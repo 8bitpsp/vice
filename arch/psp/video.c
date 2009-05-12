@@ -1,4 +1,5 @@
 #include "vice.h"
+#include "interrupt.h"
 #include "cmdline.h"
 #include "video.h"
 #include "videoarch.h"
@@ -37,9 +38,11 @@ static int show_kybd_held;
 static int keyboard_visible;
 static pl_vk_layout psp_keyboard;
 
-static void video_psp_display_menu();
 static void video_psp_refresh_screen();
 static inline void psp_keyboard_toggle(unsigned int code, int on);
+
+static void video_psp_display_menu();
+static void pause_trap(WORD unused_addr, void *data);
 
 typedef struct psp_ctrl_mask_to_index_map
 {
@@ -148,8 +151,7 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
   return 0;
 }
 
-static void video_frame_buffer_free(video_canvas_t *canvas, 
-                                    BYTE *draw_buffer)
+static void video_frame_buffer_free(video_canvas_t *canvas, BYTE *draw_buffer)
 {
 }
 
@@ -179,9 +181,13 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
 
 static void video_psp_display_menu()
 {
+  interrupt_maincpu_trigger_trap(pause_trap, NULL);
+}
+
+static void pause_trap(WORD unused_addr, void *data)
+{
   psp_display_menu();
   vsync_suspend_speed_eval();
-//  vsync_sync_reset();
 
   last_framerate = 0;
   last_percent = 0;
@@ -416,10 +422,7 @@ static inline void psp_keyboard_toggle(unsigned int code, int on)
 void ui_display_drive_led(int drive_number, unsigned int led_pwm1,
                                  unsigned int led_pwm2)
 {
-  int status = 0;
-	if (led_pwm1 > 100) status |= 1;
-	if (led_pwm2 > 100) status |= 2;
-  drive_led_on = status;
+  drive_led_on = (led_pwm1 > 100);
 }
 
 void ui_display_tape_motor_status(int motor)

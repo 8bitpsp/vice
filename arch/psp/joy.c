@@ -42,6 +42,7 @@ int joystick_port_map[2];
 
 int joystick_arch_init_resources(void)
 {
+  return 0;
 }
 
 /**********************************************************
@@ -54,6 +55,7 @@ int joy_arch_init(void)
 
 int joystick_close()
 {
+  return 0;
 }
 
 void kbd_initialize_numpad_joykeys(int* joykeys)
@@ -62,4 +64,5 @@ void kbd_initialize_numpad_joykeys(int* joykeys)
 
 int joystick_init_cmdline_options()
 {
+  return 0;
 }
