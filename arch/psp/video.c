@@ -186,6 +186,7 @@ static void video_psp_display_menu()
 
 static void pause_trap(WORD unused_addr, void *data)
 {
+  sound_suspend();
   psp_display_menu();
   vsync_suspend_speed_eval();
 
@@ -226,6 +227,7 @@ static void pause_trap(WORD unused_addr, void *data)
 
   keyboard_clear_keymatrix();
   video_psp_refresh_screen();
+  sound_resume();
 }
 
 void input_poll()
