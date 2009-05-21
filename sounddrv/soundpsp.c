@@ -31,6 +31,7 @@
 
 #include "vice.h"
 #include "log.h"
+#include "vsync.h"
 
 #include "sound.h"
 #include "lib/pl_snd.h"
@@ -47,8 +48,8 @@ static int psp_sound_init(const char *param, int *speed,
 		    int *fragsize, int *fragnr, int *channels)
 {
   *speed = 44100;
-  *fragsize = 44100/50;
-  //*fragnr = 4;//SOUND_BUFFER_SIZE;
+  *fragsize = 1024;//(*speed)/50;
+  //*fragnr = 16;//SOUND_BUFFER_SIZE;
   *channels = 1;
 
   int buffer_size = (*fragnr) * (*channels) * (*fragsize) + 1;
@@ -76,8 +77,8 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
     if ((i = sfifo_write(&sound_fifo, bytes, nr)) < 0)
       break;
     else if (!i)
-      sfifo_flush(&sound_fifo);
-//      sceKernelDelayThread(0);
+sfifo_flush(&sound_fifo);
+//      sceKernelDelayThread(10);
 
     bytes += i;
     nr -= i;
@@ -109,18 +110,13 @@ static void psp_sound_close(void)
   sfifo_close(&sound_fifo);
 }
 
-static int psp_sound_flush(char *state)
-{
-  return 0;
-}
-
 static sound_device_t psp_sound =
 {
     "PSP",
     psp_sound_init,
     psp_sound_write,
     NULL,
-NULL,//    psp_sound_flush,
+    NULL,
     NULL,
     psp_sound_close,
     psp_sound_suspend,

@@ -24,7 +24,7 @@ int main(int argc, char *argv[])
 {
   /* Initialize PSP */
   pl_psp_init(argv[0]);
-  pl_snd_init(SOUND_BUFFER_SIZE, 0);
+  pl_snd_init(320, 0);
   pspCtrlInit();
   pspVideoInit();
 

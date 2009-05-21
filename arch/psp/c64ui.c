@@ -74,14 +74,16 @@
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
 #define SYSTEM_JOYPORT      0x13
-#define SYSTEM_SND_ENGINE   0x14
-#define SYSTEM_TRUE_DRIVE   0x15
-#define SYSTEM_CART         0x16
-#define SYSTEM_TAPE         0x17
-#define SYSTEM_DRIVE8       0x18
+#define SYSTEM_SOUND        0x14
+#define SYSTEM_SND_ENGINE   0x15
+#define SYSTEM_TRUE_DRIVE   0x16
+
+#define SYSTEM_CART         0x26
+#define SYSTEM_TAPE         0x27
+#define SYSTEM_DRIVE8       0x28
 
 #define GET_DRIVE(code) ((code)&0x0F)
-#define GET_DRIVE_MENU_ID(code) (((code)&0x0F)|0x10)
+#define GET_DRIVE_MENU_ID(code) (((code)&0x0F)|0x20)
 
 static const char 
   PresentSlotText[] = "\026\244\020 Save\t\026\001\020 Load\t\026\243\020 Delete",
@@ -246,7 +248,9 @@ PL_MENU_OPTIONS_END
 
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
   PL_MENU_HEADER("Sound")
-  PL_MENU_ITEM("Sound Engine",SYSTEM_SND_ENGINE,SoundEngineOptions,
+  PL_MENU_ITEM("Playback",SYSTEM_SOUND,ToggleOptions,
+               "\026\250\020 Enable/disable sound playback")
+  PL_MENU_ITEM("SID engine",SYSTEM_SND_ENGINE,SoundEngineOptions,
                "\026\250\020 Select sound engine")
   PL_MENU_HEADER("Input")
   PL_MENU_ITEM("Joystick port",SYSTEM_JOYPORT,JoyPortOptions,
@@ -675,6 +679,9 @@ static void psp_display_system_tab()
   resources_get_int("SidEngine", &setting);
   item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_SND_ENGINE);
   pl_menu_select_option_by_value(item, (void*)setting);
+  resources_get_int("Sound", &setting);
+  item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_SOUND);
+  pl_menu_select_option_by_value(item, (void*)setting);
   resources_get_int("DriveTrueEmulation", &setting);
   item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_TRUE_DRIVE);
   pl_menu_select_option_by_value(item, (void*)setting);
@@ -861,6 +868,8 @@ static void psp_load_options()
   resources_set_int("SidEngine", vice_setting);
   vice_setting = pl_ini_get_int(&file, "VICE", "DriveTrueEmulation", 1);
   resources_set_int("DriveTrueEmulation", vice_setting);
+  vice_setting = pl_ini_get_int(&file, "VICE", "Sound", 1);
+  resources_set_int("Sound", vice_setting);
 
   /* Clean up */
   pl_ini_destroy(&file);
@@ -891,6 +900,8 @@ static int psp_save_options()
   pl_ini_set_int(&file, "VICE", "SidEngine", vice_setting);
   resources_get_int("DriveTrueEmulation", &vice_setting);
   pl_ini_set_int(&file, "VICE", "DriveTrueEmulation", vice_setting);
+  resources_get_int("Sound", &vice_setting);
+  pl_ini_set_int(&file, "VICE", "Sound", vice_setting);
 
   int status = pl_ini_save(&file, path);
   pl_ini_destroy(&file);
@@ -1411,6 +1422,9 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       break;
     case SYSTEM_SND_ENGINE:
       resources_set_int("SidEngine", (int)option->value);
+      break;
+    case SYSTEM_SOUND:
+      resources_set_int("Sound", (int)option->value);
       break;
     case SYSTEM_TRUE_DRIVE:
       resources_set_int("DriveTrueEmulation", (int)option->value);
