@@ -77,8 +77,9 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
     if ((i = sfifo_write(&sound_fifo, bytes, nr)) < 0)
       break;
     else if (!i)
-sfifo_flush(&sound_fifo);
+//sfifo_flush(&sound_fifo);
 //      sceKernelDelayThread(10);
+return -1;
 
     bytes += i;
     nr -= i;

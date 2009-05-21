@@ -77,8 +77,11 @@ void vsyncarch_sleep(signed long delay)
 
 void vsyncarch_presync(void)
 {
-    input_poll();
+    psp_input_poll();
     kbdbuf_flush();
+
+    /* Refresh screen */
+    psp_refresh_screen();
 }
 
 void_hook_t vsync_set_event_dispatcher(void_hook_t hook)

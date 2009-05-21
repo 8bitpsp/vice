@@ -11,6 +11,7 @@
 #include "ui.h"
 #include "vsync.h"
 #include "raster.h"
+#include "sound.h"
 
 #include "lib/video.h"
 #include "lib/ctrl.h"
@@ -38,7 +39,6 @@ static int show_kybd_held;
 static int keyboard_visible;
 static pl_vk_layout psp_keyboard;
 
-static void video_psp_refresh_screen();
 static inline void psp_keyboard_toggle(unsigned int code, int on);
 
 static void video_psp_display_menu();
@@ -188,7 +188,6 @@ static void pause_trap(WORD unused_addr, void *data)
 {
   sound_suspend();
   psp_display_menu();
-  vsync_suspend_speed_eval();
 
   last_framerate = 0;
   last_percent = 0;
@@ -226,12 +225,19 @@ static void pause_trap(WORD unused_addr, void *data)
     pspFontGetTextWidth(&PspStockFont, PSP_CHAR_FLOPPY);
 
   keyboard_clear_keymatrix();
-  video_psp_refresh_screen();
+  psp_refresh_screen();
   sound_resume();
+  vsync_suspend_speed_eval();
 }
 
-void input_poll()
+void psp_input_poll()
 {
+  if (psp_first_time)
+  {
+    video_psp_display_menu();
+    psp_first_time = 0;
+  }
+
   /* Reset joystick */
   joystick_value[psp_options.joyport] = 0;
 
@@ -321,20 +327,13 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
                           unsigned int xi, unsigned int yi,
                           unsigned int w, unsigned int h)
 {
-  if (canvas->width == 0)
-    return;
-
-  if (psp_first_time)
-  {
-    video_psp_display_menu();
-    psp_first_time = 0;
-  }
-
-  video_psp_refresh_screen();
 }
 
-void video_psp_refresh_screen()
+void psp_refresh_screen()
 {
+  if (!Screen)
+    return;
+
   /* Update the display */
   pspVideoBegin();
 

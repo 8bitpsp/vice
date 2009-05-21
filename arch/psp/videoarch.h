@@ -22,6 +22,7 @@ struct video_canvas_s {
 };
 typedef struct video_canvas_s video_canvas_t;
 
-extern void input_poll();
+extern void psp_input_poll();
+extern void psp_refresh_screen();
 
 #endif
