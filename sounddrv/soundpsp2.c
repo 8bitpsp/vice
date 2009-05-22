@@ -1,5 +1,5 @@
 /*
- * soundsdl.c - Implementation of the Simple Directmedia Layer sound device
+ * soundpsp2.c - Implementation of the PSP sound device (alternate)
  *
  * Written by
  *  Teemu Rantanen <tvr@cs.hut.fi>
