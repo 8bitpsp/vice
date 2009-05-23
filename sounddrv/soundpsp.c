@@ -48,7 +48,8 @@ static int psp_sound_init(const char *param, int *speed,
 		    int *fragsize, int *fragnr, int *channels)
 {
   *speed = 44100;
-  *fragsize = 1024;//(*speed)/50;
+  *fragsize = 320;//(*speed)/50;
+  //*fragsize = 1024;//(*speed)/50;
   //*fragnr = 16;//SOUND_BUFFER_SIZE;
   *channels = 1;
 
@@ -77,7 +78,7 @@ static int psp_sound_write(SWORD *pbuf, size_t nr)
     if ((i = sfifo_write(&sound_fifo, bytes, nr)) < 0)
       break;
     else if (!i)
-      sceKernelDelayThread(5000);
+      sceKernelDelayThread(50);
 /*
     {
       sfifo_flush(&sound_fifo);

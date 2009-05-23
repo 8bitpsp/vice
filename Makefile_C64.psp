@@ -149,10 +149,10 @@ BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o arch/psp/stubs.o \
            arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o \
            arch/psp/blockdev.o arch/psp/c64ui.o arch/psp/console.o \
            arch/psp/uicmdline.o arch/psp/uimon.o arch/psp/signals.o \
-           arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp2.o
+           arch/psp/vsyncarch.o arch/psp/sfifo.o sounddrv/soundpsp.o
 OBJS=$(BUILD_EMUL) $(BUILD_PORT)
 
-DEFINES=-DVERSION=\"2.1\" -DPSP_DEBUG
+DEFINES=-DVERSION=\"2.1\" 
 BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAME)\""
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti
