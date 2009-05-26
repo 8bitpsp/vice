@@ -78,6 +78,7 @@
 #define SYSTEM_SOUND        0x14
 #define SYSTEM_SND_ENGINE   0x15
 #define SYSTEM_TRUE_DRIVE   0x16
+#define SYSTEM_VIDEO_STD    0x17
 
 #define SYSTEM_CART         0x26
 #define SYSTEM_TAPE         0x27
@@ -149,6 +150,11 @@ PL_MENU_OPTIONS_BEGIN(SoundEngineOptions)
 #ifdef HAVE_RESID
   PL_MENU_OPTION("ReSID", SID_ENGINE_RESID)
 #endif
+PL_MENU_OPTIONS_END
+PL_MENU_OPTIONS_BEGIN(VideoStandardOptions)
+  PL_MENU_OPTION("PAL-G", MACHINE_SYNC_PAL)
+  PL_MENU_OPTION("NTSC-M", MACHINE_SYNC_NTSC)
+  PL_MENU_OPTION("Old NTSC-M", MACHINE_SYNC_NTSCOLD)
 PL_MENU_OPTIONS_END
 PL_MENU_OPTIONS_BEGIN(AutoloadSlots)
   PL_MENU_OPTION("Disabled", -1)
@@ -248,6 +254,9 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
 PL_MENU_OPTIONS_END
 
 PL_MENU_ITEMS_BEGIN(SystemMenuDef)
+  PL_MENU_HEADER("Video")
+  PL_MENU_ITEM("Video standard",SYSTEM_VIDEO_STD,VideoStandardOptions,
+               "\026\250\020 Select video standard")
   PL_MENU_HEADER("Sound")
   PL_MENU_ITEM("Playback",SYSTEM_SOUND,ToggleOptions,
                "\026\250\020 Enable/disable sound playback")
@@ -688,6 +697,9 @@ static void psp_display_system_tab()
   resources_get_int("DriveTrueEmulation", &setting);
   item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_TRUE_DRIVE);
   pl_menu_select_option_by_value(item, (void*)setting);
+  resources_get_int("MachineVideoStandard", &setting);
+  item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, SYSTEM_VIDEO_STD);
+  pl_menu_select_option_by_value(item, (void*)setting);
 
   psp_refresh_devices();
   pspUiOpenMenu(&SystemUiMenu, NULL);
@@ -874,6 +886,8 @@ static void psp_load_options()
   resources_set_int("DriveTrueEmulation", vice_setting);
   vice_setting = pl_ini_get_int(&file, "VICE", "Sound", 1);
   resources_set_int("Sound", vice_setting);
+  vice_setting = pl_ini_get_int(&file, "VICE", "MachineVideoStandard", MACHINE_SYNC_PAL);
+  resources_set_int("MachineVideoStandard", vice_setting);
 
   /* Clean up */
   pl_ini_destroy(&file);
@@ -907,6 +921,8 @@ static int psp_save_options()
   pl_ini_set_int(&file, "VICE", "DriveTrueEmulation", vice_setting);
   resources_get_int("Sound", &vice_setting);
   pl_ini_set_int(&file, "VICE", "Sound", vice_setting);
+  resources_get_int("MachineVideoStandard", &vice_setting);
+  pl_ini_set_int(&file, "VICE", "MachineVideoStandard", vice_setting);
 
   int status = pl_ini_save(&file, path);
   pl_ini_destroy(&file);
@@ -1438,6 +1454,9 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       break;
     case SYSTEM_TRUE_DRIVE:
       resources_set_int("DriveTrueEmulation", (int)option->value);
+      break;
+    case SYSTEM_VIDEO_STD:
+      resources_set_int("MachineVideoStandard", (int)option->value);
       break;
     case SYSTEM_TAPE:
       {
