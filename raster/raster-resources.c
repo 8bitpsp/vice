@@ -38,7 +38,7 @@
 #include "video.h"
 
 
-#if defined (__MSDOS__) || defined(PSP)
+#ifdef __MSDOS__
 #define DEFAULT_VideoCache_VALUE 0
 #else
 #define DEFAULT_VideoCache_VALUE 99
