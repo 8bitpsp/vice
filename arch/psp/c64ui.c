@@ -70,6 +70,7 @@
 #define OPTION_TOGGLE_VK     0x08
 #define OPTION_AUTOLOAD      0x09
 #define OPTION_SHOW_OSI      0x0A
+#define OPTION_SHOW_BORDER   0x0B
 
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
@@ -274,6 +275,8 @@ PL_MENU_ITEMS_BEGIN(OptionMenuDef)
   PL_MENU_HEADER("Video")
   PL_MENU_ITEM("Screen size",OPTION_DISPLAY_MODE,ScreenSizeOptions,
                "\026\250\020 Change screen size")
+  PL_MENU_ITEM("Border",OPTION_SHOW_BORDER,ToggleOptions,
+               "\026\250\020 Show/hide border surrounding the main display area")
   PL_MENU_HEADER("Input")
   PL_MENU_ITEM("Virtual keyboard mode",OPTION_TOGGLE_VK,VkModeOptions,
                "\026\250\020 Select virtual keyboard mode")
@@ -852,6 +855,7 @@ static void psp_load_options()
 
   psp_options.autoload_slot = pl_ini_get_int(&file, "System", "AutoloadSlot", 9);
   psp_options.joyport = pl_ini_get_int(&file, "System", "JoystickPort", 2);
+  psp_options.show_border = pl_ini_get_int(&file, "Video", "ShowBorder", 1);
   psp_options.display_mode = pl_ini_get_int(&file, "Video", "DisplayMode", 
                                             DISPLAY_MODE_UNSCALED);
   psp_options.clock_freq = pl_ini_get_int(&file, "Video", "PSPClockFrequency", 300);
@@ -885,6 +889,7 @@ static int psp_save_options()
   pl_ini_create(&file);
   pl_ini_set_int(&file, "System", "AutoloadSlot", psp_options.autoload_slot);
   pl_ini_set_int(&file, "System", "JoystickPort", psp_options.joyport);
+  pl_ini_set_int(&file, "Video", "ShowBorder", psp_options.show_border);
   pl_ini_set_int(&file, "Video", "DisplayMode", psp_options.display_mode);
   pl_ini_set_int(&file, "Video", "PSPClockFrequency", psp_options.clock_freq);
   pl_ini_set_int(&file, "Video", "ShowFPS", psp_options.show_fps);
@@ -1083,6 +1088,8 @@ void psp_display_menu()
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.toggle_vk);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_AUTOLOAD);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.autoload_slot);
+      item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_SHOW_BORDER);
+      pl_menu_select_option_by_value(item, (void*)(int)psp_options.show_border);
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;
@@ -1419,6 +1426,9 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       break;
     case OPTION_AUTOLOAD:
       psp_options.autoload_slot = (int)option->value;
+      break;
+    case OPTION_SHOW_BORDER:
+      psp_options.show_border = (int)option->value;
       break;
     case SYSTEM_SND_ENGINE:
       resources_set_int("SidEngine", (int)option->value);

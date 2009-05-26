@@ -22,6 +22,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define C64_CANVAS_HOFFSET 0
+#define C64_CANVAS_VOFFSET 16
+#define C64_SCREEN_WIDTH   384
+#define C64_SCREEN_HEIGHT  272
+
 PspImage *Screen = NULL;
 static float last_framerate = 0;
 static float last_percent = 0;
@@ -140,9 +145,10 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
     if (!(Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED)))
       return -1;
 
-    Screen->Viewport.Y = 16; /* TODO: determine these values properly */
-    Screen->Viewport.Height = 272;
-    Screen->Viewport.Width = 384;
+    /* TODO: determine these values properly */
+    Screen->Viewport.Y = C64_CANVAS_VOFFSET;
+    Screen->Viewport.Height = C64_SCREEN_HEIGHT;
+    Screen->Viewport.Width = C64_SCREEN_WIDTH;
   }
 
   *fb_pitch = (Screen->Depth / 8) * Screen->Width;
@@ -186,11 +192,23 @@ static void video_psp_display_menu()
 
 static void pause_trap(WORD unused_addr, void *data)
 {
-  sound_suspend();
-  psp_display_menu();
+  /* Reset the viewport information for the menu */
+  Screen->Viewport.X = C64_CANVAS_HOFFSET;
+  Screen->Viewport.Y = C64_CANVAS_VOFFSET;
+  Screen->Viewport.Height = C64_SCREEN_HEIGHT;
+  Screen->Viewport.Width = C64_SCREEN_WIDTH;
 
-  last_framerate = 0;
-  last_percent = 0;
+  sound_suspend();
+  psp_display_menu(); /* Display menu */
+
+  /* Resize viewport to accommodate the border */
+  if (!psp_options.show_border)
+  {
+    Screen->Viewport.X = C64_CANVAS_HOFFSET + 32;
+    Screen->Viewport.Y = C64_CANVAS_VOFFSET + 36;
+    Screen->Viewport.Width = 320;
+    Screen->Viewport.Height = 200;
+  }
 
   /* Set up viewing ratios */
   float ratio;
@@ -224,8 +242,10 @@ static void pause_trap(WORD unused_addr, void *data)
   tape_icon_offset = disk_icon_offset + 
     pspFontGetTextWidth(&PspStockFont, PSP_CHAR_FLOPPY);
 
+  last_framerate = 0;
+  last_percent = 0;
+
   keyboard_clear_keymatrix();
-  psp_refresh_screen();
   sound_resume();
   vsync_suspend_speed_eval();
 }
