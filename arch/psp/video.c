@@ -12,6 +12,8 @@
 #include "vsync.h"
 #include "raster.h"
 #include "sound.h"
+#include "machine.h"
+#include "resources.h"
 
 #include "lib/video.h"
 #include "lib/ctrl.h"
@@ -21,11 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#define C64_CANVAS_HOFFSET 0
-#define C64_CANVAS_VOFFSET 16
-#define C64_SCREEN_WIDTH   384
-#define C64_SCREEN_HEIGHT  272
 
 PspImage *Screen = NULL;
 static float last_framerate = 0;
@@ -39,6 +36,7 @@ static int line_height;
 static int psp_first_time = 1;
 static int drive_led_on = 0, tape_led_on = 0;
 static int disk_icon_offset, tape_icon_offset;
+static int c64_screen_w, c64_screen_h;
 
 static int show_kybd_held;
 static int keyboard_visible;
@@ -46,6 +44,7 @@ static pl_vk_layout psp_keyboard;
 
 static inline void psp_keyboard_toggle(unsigned int code, int on);
 
+static void video_psp_reset_viewport(PspViewport *port, int show_border);
 static void video_psp_display_menu();
 static void pause_trap(WORD unused_addr, void *data);
 
@@ -86,8 +85,8 @@ static const psp_ctrl_mask_to_index_map_t physical_to_emulated_button_map[] =
 void video_canvas_resize(struct video_canvas_s *canvas,
                                 unsigned int width, unsigned int height)
 {
-  canvas->width = width;
-  canvas->height = height;
+  c64_screen_w = canvas->width = width;
+  c64_screen_h = canvas->height = height;
 }
 
 video_canvas_t *video_canvas_create(video_canvas_t *canvas, 
@@ -142,13 +141,8 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
 {
   if (!Screen)
   {
-    if (!(Screen = pspImageCreateVram(512, fb_height, PSP_IMAGE_INDEXED)))
+    if (!(Screen = pspImageCreateVram(512, 512, PSP_IMAGE_INDEXED)))
       return -1;
-
-    /* TODO: determine these values properly */
-    Screen->Viewport.Y = C64_CANVAS_VOFFSET;
-    Screen->Viewport.Height = C64_SCREEN_HEIGHT;
-    Screen->Viewport.Width = C64_SCREEN_WIDTH;
   }
 
   *fb_pitch = (Screen->Depth / 8) * Screen->Width;
@@ -185,6 +179,28 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
   return 0;
 }
 
+static void video_psp_reset_viewport(PspViewport *port, int show_border)
+{
+  /* Initialize viewport */
+  port->X = 0;
+  port->Y = (c64_screen_h == 247) ? 28 : 15; /* TODO: HACK */
+
+  if (show_border)
+  {
+    /* Show normal size */ 
+    port->Width = c64_screen_w;
+    port->Height = c64_screen_h;
+  }
+  else
+  {
+    /* Shrink the viewport */
+    port->Width = 320;
+    port->Height = 200;
+    port->X += (c64_screen_w - port->Width) / 2;
+    port->Y += (c64_screen_h - port->Height) / 2;
+  }
+}
+
 static void video_psp_display_menu()
 {
   interrupt_maincpu_trigger_trap(pause_trap, NULL);
@@ -192,23 +208,12 @@ static void video_psp_display_menu()
 
 static void pause_trap(WORD unused_addr, void *data)
 {
-  /* Reset the viewport information for the menu */
-  Screen->Viewport.X = C64_CANVAS_HOFFSET;
-  Screen->Viewport.Y = C64_CANVAS_VOFFSET;
-  Screen->Viewport.Height = C64_SCREEN_HEIGHT;
-  Screen->Viewport.Width = C64_SCREEN_WIDTH;
-
+  video_psp_reset_viewport(&Screen->Viewport, 1);
   sound_suspend();
+
   psp_display_menu(); /* Display menu */
 
-  /* Resize viewport to accommodate the border */
-  if (!psp_options.show_border)
-  {
-    Screen->Viewport.X = C64_CANVAS_HOFFSET + 32;
-    Screen->Viewport.Y = C64_CANVAS_VOFFSET + 36;
-    Screen->Viewport.Width = 320;
-    Screen->Viewport.Height = 200;
-  }
+  video_psp_reset_viewport(&Screen->Viewport, psp_options.show_border);
 
   /* Set up viewing ratios */
   float ratio;
@@ -419,7 +424,8 @@ void video_shutdown()
 
 int video_arch_resources_init()
 {
-  if (!pl_vk_load(&psp_keyboard, "c64.l2", "c64keys.png", NULL, psp_keyboard_toggle))
+  if (!pl_vk_load(&psp_keyboard, 
+                  "c64.l2", "c64keys.png", NULL, psp_keyboard_toggle))
     return 1;
   return 0;
 }
