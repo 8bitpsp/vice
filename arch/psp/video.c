@@ -36,7 +36,7 @@ static int line_height;
 static int psp_first_time = 1;
 static int drive_led_on = 0, tape_led_on = 0;
 static int disk_icon_offset, tape_icon_offset;
-static int c64_screen_w, c64_screen_h;
+static int c64_screen_w, c64_screen_h, c64_screen_fb_height;
 
 static int show_kybd_held;
 static int keyboard_visible;
@@ -146,6 +146,7 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
       return -1;
   }
 
+  c64_screen_fb_height = 302; //fb_height; /* fb_height is 312? */
   *fb_pitch = (Screen->Depth / 8) * Screen->Width;
   *draw_buffer = Screen->Pixels;
 
@@ -184,7 +185,7 @@ static void video_psp_reset_viewport(PspViewport *port, int show_border)
 {
   /* Initialize viewport */
   port->X = 0;
-  port->Y = (c64_screen_h == 247) ? 28 : 15; /* TODO: HACK */
+  port->Y = (c64_screen_fb_height - c64_screen_h) / 2;
 
   if (show_border)
   {
@@ -194,7 +195,7 @@ static void video_psp_reset_viewport(PspViewport *port, int show_border)
   }
   else
   {
-    /* Shrink the viewport */
+    /* Shrink & reposition the viewport to show screen w/o border */
     port->Width = 320;
     port->Height = 200;
     port->X += (c64_screen_w - port->Width) / 2;
@@ -216,7 +217,7 @@ static void pause_trap(WORD unused_addr, void *data)
 
   video_psp_reset_viewport(&Screen->Viewport, psp_options.show_border);
 
-  /* Set up viewing ratios */
+  /* Set up viewing sizes */
   float ratio;
   switch (psp_options.display_mode)
   {
@@ -227,11 +228,11 @@ static void pause_trap(WORD unused_addr, void *data)
     break;
   case DISPLAY_MODE_FIT_HEIGHT:
     ratio = (float)PL_GFX_SCREEN_HEIGHT / (float)Screen->Viewport.Height;
-    screen_w = (float)Screen->Viewport.Width * ratio - 2;
+    screen_w = (float)Screen->Viewport.Width * ratio;
     screen_h = PL_GFX_SCREEN_HEIGHT;
     break;
   case DISPLAY_MODE_FILL_SCREEN:
-    screen_w = PL_GFX_SCREEN_WIDTH - 3;
+    screen_w = PL_GFX_SCREEN_WIDTH;
     screen_h = PL_GFX_SCREEN_HEIGHT;
     break;
   }
@@ -239,6 +240,7 @@ static void pause_trap(WORD unused_addr, void *data)
   screen_x = (PL_GFX_SCREEN_WIDTH / 2) - (screen_w / 2);
   screen_y = (PL_GFX_SCREEN_HEIGHT / 2) - (screen_h / 2);
 
+  /* Determine if NTSC mode is active */
   int vice_setting;
   resources_get_int("MachineVideoStandard", &vice_setting);
   ntsc_mode = (vice_setting == MACHINE_SYNC_NTSC);
@@ -357,6 +359,8 @@ void video_canvas_refresh(struct video_canvas_s *canvas,
                           unsigned int xi, unsigned int yi,
                           unsigned int w, unsigned int h)
 {
+  /* This is where the emulator usually performs screen refresh */
+  /* Moved it to pre-sync routine, so that drawing is performed constantly */
 }
 
 void psp_refresh_screen()
