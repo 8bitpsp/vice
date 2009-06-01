@@ -40,6 +40,7 @@ static int c64_screen_w, c64_screen_h;
 
 static int show_kybd_held;
 static int keyboard_visible;
+static int ntsc_mode = 0;
 static pl_vk_layout psp_keyboard;
 
 static inline void psp_keyboard_toggle(unsigned int code, int on);
@@ -238,6 +239,10 @@ static void pause_trap(WORD unused_addr, void *data)
   screen_x = (PL_GFX_SCREEN_WIDTH / 2) - (screen_w / 2);
   screen_y = (PL_GFX_SCREEN_HEIGHT / 2) - (screen_h / 2);
 
+  int vice_setting;
+  resources_get_int("MachineVideoStandard", &vice_setting);
+  ntsc_mode = (vice_setting == MACHINE_SYNC_NTSC);
+
   line_height = pspFontGetLineHeight(&PspStockFont);
   clear_screen = 1;
   show_kybd_held = 0;
@@ -358,6 +363,10 @@ void psp_refresh_screen()
 {
   if (!Screen)
     return;
+
+  /* Wait for video synch, if enabled */
+  if (psp_options.vsync && ntsc_mode)
+    pspVideoWaitVSync();
 
   /* Update the display */
   pspVideoBegin();

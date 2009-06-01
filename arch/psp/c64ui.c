@@ -71,6 +71,8 @@
 #define OPTION_AUTOLOAD      0x09
 #define OPTION_SHOW_OSI      0x0A
 #define OPTION_SHOW_BORDER   0x0B
+#define OPTION_REFRESH_RATE  0x0C
+#define OPTION_VSYNC         0x0D
 
 #define SYSTEM_SCRNSHOT     0x11
 #define SYSTEM_RESET        0x12
@@ -169,6 +171,14 @@ PL_MENU_OPTIONS_BEGIN(AutoloadSlots)
   PL_MENU_OPTION("8", 7)
   PL_MENU_OPTION("9", 8)
   PL_MENU_OPTION("10",9)
+PL_MENU_OPTIONS_END
+PL_MENU_OPTIONS_BEGIN(RefreshRateOptions)
+  PL_MENU_OPTION("Automatic", 0)
+  PL_MENU_OPTION("Don't skip frames", 1)
+  PL_MENU_OPTION("Skip 1 frame", 2)
+  PL_MENU_OPTION("Skip 2 frames", 3)
+  PL_MENU_OPTION("Skip 3 frames", 4)
+  PL_MENU_OPTION("Skip 4 frames", 5)
 PL_MENU_OPTIONS_END
 PL_MENU_OPTIONS_BEGIN(MappableButtons)
   /* Unmapped */
@@ -294,6 +304,10 @@ PL_MENU_ITEMS_BEGIN(OptionMenuDef)
   PL_MENU_ITEM("Autoload slot",OPTION_AUTOLOAD,AutoloadSlots,
                "\026\250\020 Select save state to be loaded automatically")
   PL_MENU_HEADER("Performance")
+  PL_MENU_ITEM("VSync",OPTION_VSYNC,ToggleOptions,
+               "\026\250\020 Enable/disable vertical blanking synchronization (NTSC only)")
+  PL_MENU_ITEM("Frame skipping",OPTION_REFRESH_RATE,RefreshRateOptions,
+               "\026\250\020 Set frameskip preferences")
   PL_MENU_ITEM("PSP clock frequency",OPTION_CLOCK_FREQ,PspClockFreqOptions,
                "\026\250\020 Larger values: faster emulation, faster battery depletion (default: 222MHz)")
   PL_MENU_ITEM("Show FPS counter",OPTION_SHOW_FPS,ToggleOptions,
@@ -869,6 +883,7 @@ static void psp_load_options()
   psp_options.clock_freq = pl_ini_get_int(&file, "Video", "PSPClockFrequency", 300);
   psp_options.show_fps = pl_ini_get_int(&file, "Video", "ShowFPS", 0);
   psp_options.show_osi = pl_ini_get_int(&file, "Video", "ShowOSI", 0);
+  psp_options.vsync = pl_ini_get_int(&file, "Video", "VSync", 0);
   psp_options.control_mode = pl_ini_get_int(&file, "Menu", "ControlMode", 0);
   psp_options.animate_menu = pl_ini_get_int(&file, "Menu", "Animate", 1);
   psp_options.toggle_vk = pl_ini_get_int(&file, "Input", "VKMode", 0);
@@ -884,6 +899,8 @@ static void psp_load_options()
   resources_set_int("Sound", vice_setting);
   vice_setting = pl_ini_get_int(&file, "VICE", "MachineVideoStandard", MACHINE_SYNC_PAL);
   resources_set_int("MachineVideoStandard", vice_setting);
+  vice_setting = pl_ini_get_int(&file, "VICE", "RefreshRate", MACHINE_SYNC_PAL);
+  resources_set_int("RefreshRate", vice_setting);
 
   /* Clean up */
   pl_ini_destroy(&file);
@@ -911,6 +928,7 @@ static int psp_save_options()
   pl_ini_set_int(&file, "Video", "PSPClockFrequency", psp_options.clock_freq);
   pl_ini_set_int(&file, "Video", "ShowFPS", psp_options.show_fps);
   pl_ini_set_int(&file, "Video", "ShowOSI", psp_options.show_osi);
+  pl_ini_set_int(&file, "Video", "VSync", psp_options.vsync);
   pl_ini_set_int(&file, "Menu", "ControlMode", psp_options.control_mode);
   pl_ini_set_int(&file, "Menu", "Animate", psp_options.animate_menu);
   pl_ini_set_int(&file, "Input", "VKMode", psp_options.toggle_vk);
@@ -926,6 +944,8 @@ static int psp_save_options()
   pl_ini_set_int(&file, "VICE", "Sound", vice_setting);
   resources_get_int("MachineVideoStandard", &vice_setting);
   pl_ini_set_int(&file, "VICE", "MachineVideoStandard", vice_setting);
+  resources_get_int("RefreshRate", &vice_setting);
+  pl_ini_set_int(&file, "VICE", "RefreshRate", vice_setting);
 
   int status = pl_ini_save(&file, path);
   pl_ini_destroy(&file);
@@ -1075,6 +1095,7 @@ void psp_display_menu()
     psp_options_loaded = 1;
   }
 
+  int setting;
   pl_menu_item *item;
   psp_exit_menu = 0;
 
@@ -1116,6 +1137,14 @@ void psp_display_menu()
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.autoload_slot);
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_SHOW_BORDER);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.show_border);
+      if ((item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_VSYNC)))
+      {
+        /* resources_get_int("VBLANKSync", &setting); // for future */
+        pl_menu_select_option_by_value(item, (void*)(int)psp_options.vsync);
+      }
+      resources_get_int("RefreshRate", &setting);
+      item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, OPTION_REFRESH_RATE);
+      pl_menu_select_option_by_value(item, (void*)setting);
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;
@@ -1455,6 +1484,13 @@ static int OnMenuItemChanged(const struct PspUiMenu *uimenu,
       break;
     case OPTION_SHOW_BORDER:
       psp_options.show_border = (int)option->value;
+      break;
+    case OPTION_REFRESH_RATE:
+      resources_set_int("RefreshRate", (int)option->value);
+      break;
+    case OPTION_VSYNC:
+      psp_options.vsync = (int)option->value;
+      resources_set_int("VBLANKSync", (int)option->value);
       break;
     case SYSTEM_SND_ENGINE:
       resources_set_int("SidEngine", (int)option->value);
