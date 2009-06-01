@@ -479,6 +479,7 @@ static int psp_tab_index;
 static PspImage *psp_menu_bg;
 static PspImage *psp_blank_ss_icon;
 static int psp_exit_menu;
+static int psp_options_loaded = 0;
 extern PspImage *Screen;
 psp_ctrl_map_t current_map;
 
@@ -535,8 +536,6 @@ int c64ui_init(int *argc, char **argv)
   /* Load the background image */
   psp_menu_bg = pspImageLoadPng("background.png");
 
-  psp_load_options();
-
   /* Initialize UI components */
   UiMetric.Background = psp_menu_bg;
   UiMetric.Font = &PspStockFont;
@@ -544,10 +543,6 @@ int c64ui_init(int *argc, char **argv)
   UiMetric.Top = 24;
   UiMetric.Right = 472;
   UiMetric.Bottom = 240;
-  UiMetric.OkButton = (!psp_options.control_mode)
-    ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
-  UiMetric.CancelButton = (!psp_options.control_mode)
-    ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
   UiMetric.ScrollbarColor = PSP_COLOR_GRAY;
   UiMetric.ScrollbarBgColor = 0x44ffffff;
   UiMetric.ScrollbarWidth = 10;
@@ -569,11 +564,11 @@ int c64ui_init(int *argc, char **argv)
   UiMetric.TitleColor = PSP_COLOR_WHITE;
   UiMetric.MenuFps = 30;
   UiMetric.TabBgColor = PSP_COLOR_WHITE;
-  UiMetric.Animate = psp_options.animate_menu;
   UiMetric.BrowserScreenshotPath = psp_screenshot_path;
   UiMetric.BrowserScreenshotDelay = 30;
 
   psp_tab_index = TAB_ABOUT;
+  psp_options_loaded = 0;
 
   /* Load default configuration */
   psp_load_controls("DEFAULT", &default_map);
@@ -892,6 +887,13 @@ static void psp_load_options()
 
   /* Clean up */
   pl_ini_destroy(&file);
+
+  /* Reset menu prefs */
+  UiMetric.OkButton = (!psp_options.control_mode)
+    ? PSP_CTRL_CROSS : PSP_CTRL_CIRCLE;
+  UiMetric.CancelButton = (!psp_options.control_mode)
+    ? PSP_CTRL_CIRCLE : PSP_CTRL_CROSS;
+  UiMetric.Animate = psp_options.animate_menu;
 }
 
 static int psp_save_options()
@@ -1066,6 +1068,13 @@ static int psp_load_game(const char *path)
 
 void psp_display_menu()
 {
+  /* Load the options. Loading them in c64_init crashes the emulator */
+  if (!psp_options_loaded)
+  {
+    psp_load_options();
+    psp_options_loaded = 1;
+  }
+
   pl_menu_item *item;
   psp_exit_menu = 0;
 

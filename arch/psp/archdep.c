@@ -274,7 +274,8 @@ int archdep_path_is_relative(const char *path)
 {
     if (path == NULL)
         return 0;
-
+    if (strncasecmp(path, "ms0", 3) == 0)
+        return 0;
     return *path != '/';
 }
 

@@ -563,6 +563,9 @@ snapshot_t *snapshot_create(const char *filename,
     FILE *f;
     snapshot_t *s;
 #ifdef PSP
+    /* HACK: if it's a filename, fail */
+    if (strncasecmp(filename, "ms0", 3) == 0)
+        return NULL;
     f = (FILE*)filename;
 #else
     f = fopen(filename, MODE_WRITE);
@@ -608,7 +611,11 @@ snapshot_t *snapshot_open(const char *filename,
     char read_name[SNAPSHOT_MACHINE_NAME_LEN];
     snapshot_t *s = NULL;
     int machine_name_len;
+
 #ifdef PSP
+    /* HACK: if it's a filename, fail.. */
+    if (strncasecmp(filename, "ms0", 3) == 0)
+        return NULL;
     f = (FILE*)filename;
 #else
     f = zfile_fopen(filename, MODE_READ);
