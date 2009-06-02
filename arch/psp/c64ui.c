@@ -304,10 +304,12 @@ PL_MENU_ITEMS_BEGIN(OptionMenuDef)
   PL_MENU_ITEM("Autoload slot",OPTION_AUTOLOAD,AutoloadSlots,
                "\026\250\020 Select save state to be loaded automatically")
   PL_MENU_HEADER("Performance")
-  PL_MENU_ITEM("VSync",OPTION_VSYNC,ToggleOptions,
-               "\026\250\020 Enable/disable vertical blanking synchronization (NTSC only)")
+  PL_MENU_ITEM("VSync (NTSC only)",OPTION_VSYNC,ToggleOptions,
+               "\026\250\020 Enable/disable vertical blanking synchronization")
+#if 0
   PL_MENU_ITEM("Frame skipping",OPTION_REFRESH_RATE,RefreshRateOptions,
                "\026\250\020 Set frameskip preferences")
+#endif
   PL_MENU_ITEM("PSP clock frequency",OPTION_CLOCK_FREQ,PspClockFreqOptions,
                "\026\250\020 Larger values: faster emulation, faster battery depletion (default: 222MHz)")
   PL_MENU_ITEM("Show FPS counter",OPTION_SHOW_FPS,ToggleOptions,
@@ -1095,7 +1097,7 @@ void psp_display_menu()
     psp_options_loaded = 1;
   }
 
-  int setting;
+  int setting = 0;
   pl_menu_item *item;
   psp_exit_menu = 0;
 
@@ -1138,13 +1140,10 @@ void psp_display_menu()
       item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_SHOW_BORDER);
       pl_menu_select_option_by_value(item, (void*)(int)psp_options.show_border);
       if ((item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_VSYNC)))
-      {
-        /* resources_get_int("VBLANKSync", &setting); // for future */
         pl_menu_select_option_by_value(item, (void*)(int)psp_options.vsync);
-      }
       resources_get_int("RefreshRate", &setting);
-      item = pl_menu_find_item_by_id(&SystemUiMenu.Menu, OPTION_REFRESH_RATE);
-      pl_menu_select_option_by_value(item, (void*)setting);
+      if ((item = pl_menu_find_item_by_id(&OptionUiMenu.Menu, OPTION_REFRESH_RATE)))
+        pl_menu_select_option_by_value(item, (void*)setting);
 
       pspUiOpenMenu(&OptionUiMenu, NULL);
       break;

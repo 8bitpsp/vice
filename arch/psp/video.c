@@ -20,6 +20,7 @@
 #include "lib/pl_gfx.h"
 #include "lib/pl_vk.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -146,7 +147,7 @@ static int video_frame_buffer_alloc(video_canvas_t *canvas,
       return -1;
   }
 
-  c64_screen_fb_height = 302; //fb_height; /* fb_height is 312? */
+  c64_screen_fb_height = 302; /* fb_height is 312? */
   *fb_pitch = (Screen->Depth / 8) * Screen->Width;
   *draw_buffer = Screen->Pixels;
 
@@ -185,7 +186,7 @@ static void video_psp_reset_viewport(PspViewport *port, int show_border)
 {
   /* Initialize viewport */
   port->X = 0;
-  port->Y = (c64_screen_fb_height - c64_screen_h) / 2;
+  port->Y = (int)ceil((c64_screen_fb_height - c64_screen_h) / 2);
 
   if (show_border)
   {
