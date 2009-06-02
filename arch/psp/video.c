@@ -1,3 +1,8 @@
+#include "lib/video.h"
+#include "lib/ctrl.h"
+#include "lib/pl_gfx.h"
+#include "lib/pl_vk.h"
+
 #include "vice.h"
 #include "interrupt.h"
 #include "cmdline.h"
@@ -14,11 +19,6 @@
 #include "sound.h"
 #include "machine.h"
 #include "resources.h"
-
-#include "lib/video.h"
-#include "lib/ctrl.h"
-#include "lib/pl_gfx.h"
-#include "lib/pl_vk.h"
 
 #include <math.h>
 #include <stdio.h>
@@ -46,7 +46,6 @@ static pl_vk_layout psp_keyboard;
 
 static inline void psp_keyboard_toggle(unsigned int code, int on);
 
-static void video_psp_reset_viewport(PspViewport *port, int show_border);
 static void video_psp_display_menu();
 static void pause_trap(WORD unused_addr, void *data);
 
@@ -182,7 +181,7 @@ int video_canvas_set_palette(struct video_canvas_s *canvas,
   return 0;
 }
 
-static void video_psp_reset_viewport(PspViewport *port, int show_border)
+void psp_reset_viewport(PspViewport *port, int show_border)
 {
   /* Initialize viewport */
   port->X = 0;
@@ -211,12 +210,12 @@ static void video_psp_display_menu()
 
 static void pause_trap(WORD unused_addr, void *data)
 {
-  video_psp_reset_viewport(&Screen->Viewport, 1);
+  psp_reset_viewport(&Screen->Viewport, 1);
   sound_suspend();
 
   psp_display_menu(); /* Display menu */
 
-  video_psp_reset_viewport(&Screen->Viewport, psp_options.show_border);
+  psp_reset_viewport(&Screen->Viewport, psp_options.show_border);
 
   /* Set up viewing sizes */
   float ratio;

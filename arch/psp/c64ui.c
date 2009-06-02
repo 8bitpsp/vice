@@ -24,6 +24,22 @@
  *
  */
 
+#include "lib/video.h"
+#include "lib/ui.h"
+#include "lib/pl_menu.h"
+#include "lib/pl_file.h"
+#include "lib/ctrl.h"
+#include "lib/pl_psp.h"
+#include "lib/pl_ini.h"
+#include "lib/pl_util.h"
+#include "lib/pl_gfx.h"
+#include "libmz/unzip.h"
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <pspkernel.h>
+
 #include "autostart.h"
 #include "vice.h"
 #include "machine.h"
@@ -36,22 +52,7 @@
 #include "tape.h"
 #include "cartridge.h"
 #include "imagecontents.h"
-
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <pspkernel.h>
-
-#include "lib/video.h"
-#include "lib/ui.h"
-#include "lib/pl_menu.h"
-#include "lib/pl_file.h"
-#include "lib/ctrl.h"
-#include "lib/pl_psp.h"
-#include "lib/pl_ini.h"
-#include "lib/pl_util.h"
-#include "lib/pl_gfx.h"
-#include "libmz/unzip.h"
+#include "videoarch.h"
 
 #define TAB_QUICKLOAD 0
 #define TAB_STATE     1
@@ -508,7 +509,7 @@ static int  psp_save_controls(const char *filename, const psp_ctrl_map_t *config
 
 static PspImage* psp_load_state_icon(const char *path);
 static int psp_load_state(const char *path);
-static PspImage* psp_save_state(const char *path, PspImage *icon);
+static PspImage* psp_save_state(const char *path);
 
 static void psp_display_state_tab();
 static void psp_display_control_tab();
@@ -537,7 +538,7 @@ int c64ui_init(int *argc, char **argv)
   pl_menu_create(&ControlUiMenu.Menu, ControlMenuDef);
 
   /* Init NoSaveState icon image */
-  psp_blank_ss_icon = pspImageCreate(192, 136, PSP_IMAGE_16BPP);
+  psp_blank_ss_icon = pspImageCreate(160, 100, PSP_IMAGE_16BPP);
   pspImageClear(psp_blank_ss_icon, RGB(0x3e,0x31,0xa2));
 
   /* Initialize state menu */
@@ -835,18 +836,27 @@ static int psp_load_state(const char *path)
 }
 
 /* Save state */
-static PspImage* psp_save_state(const char *path, PspImage *icon)
+static PspImage* psp_save_state(const char *path)
 {
+  /* Create copy of the screen */
+  PspImage *copy = pspImageCreateCopy(Screen);
+  if (!copy) return NULL;
+
+  /* Reset viewport to 320x200 */
+  psp_reset_viewport(&copy->Viewport, 0);
+
+  /* Create thumbnail, destroy copy */
+  PspImage *thumb = pspImageCreateThumbnail(copy);
+  pspImageDestroy(copy);
+  if (!thumb) return NULL;
+
   /* Open file for writing */
   FILE *f;
   if (!(f = fopen(path, "w")))
+  {
+    pspImageDestroy(thumb);
     return NULL;
-
-  /* Create thumbnail */
-  PspImage *thumb;
-  thumb = (icon->Viewport.Width <= 256)
-    ? pspImageCreateCopy(icon) : pspImageCreateThumbnail(icon);
-  if (!thumb) { fclose(f); return NULL; }
+  }
 
   /* Write the thumbnail */
   if (!pspImageSavePngFd(f, thumb))
@@ -1727,7 +1737,7 @@ static int OnSaveStateButtonPress(const PspUiGallery *gallery,
         pspUiFlashMessage("Saving, please wait ...");
 
         PspImage *icon;
-        if (!(icon = psp_save_state(path, Screen)))
+        if (!(icon = psp_save_state(path)))
         {
           pspUiAlert("ERROR: State not saved");
           break;
