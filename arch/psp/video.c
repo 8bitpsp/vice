@@ -185,7 +185,7 @@ void psp_reset_viewport(PspViewport *port, int show_border)
 {
   /* Initialize viewport */
   port->X = 0;
-  port->Y = (int)ceil((c64_screen_fb_height - c64_screen_h) / 2);
+  port->Y = (int)ceil((c64_screen_fb_height - c64_screen_h) / 2.0);
 
   if (show_border)
   {
