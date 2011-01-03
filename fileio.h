@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _FILEIO_H
-#define _FILEIO_H
+#ifndef VICE_FILEIO_H
+#define VICE_FILEIO_H
 
 #include "types.h"
 
@@ -77,5 +77,7 @@ extern unsigned int fileio_rename(const char *src_name, const char *dest_name,
                                   const char *path, unsigned int format);
 extern unsigned int fileio_scratch(const char *file_name, const char *path,
                                    unsigned int format);
+extern unsigned int fileio_get_bytes_left(fileio_info_t *info);
+
 #endif
 

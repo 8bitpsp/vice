@@ -48,8 +48,11 @@
 #include "log.h"
 #include "machine-bus.h"
 #include "machine.h"
-#include "monitor.h"
 #include "maincpu.h"
+#include "monitor.h"
+#ifdef HAVE_NETWORK
+#include "monitor_network.h"
+#endif
 #include "network.h"
 #include "palette.h"
 #include "ram.h"
@@ -58,7 +61,7 @@
 #include "screenshot.h"
 #include "signals.h"
 #include "sysfile.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "vdrive.h"
 
 
@@ -139,7 +142,12 @@ int init_resources(void)
         init_resource_fail("network");
         return -1;
     }
-
+#ifdef HAVE_NETWORK
+    if (monitor_network_resources_init() < 0) {
+        init_resource_fail("monitor");
+        return -1;
+    }
+#endif
     return 0;
 }
 
@@ -167,7 +175,7 @@ int init_cmdline_options(void)
         init_cmdline_options_fail("system file locator");
         return -1;
     }
-    if (!vsid_mode && ui_cmdline_options_init() < 0) {
+    if ((!(vsid_mode && video_disabled_mode)) && ui_cmdline_options_init() < 0) {
         init_cmdline_options_fail("UI");
         return -1;
     }
@@ -206,30 +214,32 @@ int init_cmdline_options(void)
         return -1;
     }
 
-    if (vsid_mode) {
-        return 0;
-    }
-
-    if (fsdevice_cmdline_options_init() < 0) {
+    if (!vsid_mode && fsdevice_cmdline_options_init() < 0) {
         init_cmdline_options_fail("file system");
         return -1;
     }
-    if (joystick_init_cmdline_options() < 0) {
+    if ((!(vsid_mode && video_disabled_mode)) && joystick_init_cmdline_options() < 0) {
         init_cmdline_options_fail("joystick");
         return -1;
     }
-    if (kbdbuf_cmdline_options_init() < 0) {
+    if (!vsid_mode && kbdbuf_cmdline_options_init() < 0) {
         init_cmdline_options_fail("keyboard");
         return -1;
     }
-    if (ram_cmdline_options_init() < 0) {
+    if (!vsid_mode && ram_cmdline_options_init() < 0) {
         init_cmdline_options_fail("RAM");
         return -1;
     }
-    if (gfxoutput_cmdline_options_init() < 0) {
+    if (!vsid_mode && gfxoutput_cmdline_options_init() < 0) {
         init_cmdline_options_fail("GFXOUTPUT");
         return -1;
     }
+#ifdef HAVE_NETWORK
+    if (monitor_network_cmdline_options_init() < 0) {
+        init_cmdline_options_fail("MONITOR_NETWORK");
+        return -1;
+    }
+#endif
     return 0;
 }
 
@@ -239,8 +249,11 @@ int init_main(void)
 
     romset_init();
 
-    if (!vsid_mode) {
+    if (!video_disabled_mode) {
         palette_init();
+    }
+
+    if (!vsid_mode) {
         gfxoutput_init();
         screenshot_init();
 
@@ -266,8 +279,11 @@ int init_main(void)
 
     keyboard_init();
 
-    if (!vsid_mode) {
+    if (!video_disabled_mode) {
         joystick_init();
+    }
+
+    if (!vsid_mode) {
         disk_image_init();
         vdrive_init();
     }

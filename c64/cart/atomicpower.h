@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _ATOMICPOWER_H
-#define _ATOMICPOWER_H
+#ifndef VICE_ATOMICPOWER_H
+#define VICE_ATOMICPOWER_H
 
 #include <stdio.h>
 
@@ -51,4 +51,3 @@ extern int atomicpower_crt_attach(FILE *fd, BYTE *rawcart);
 extern void atomicpower_detach(void);
 
 #endif
-

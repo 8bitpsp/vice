@@ -543,11 +543,54 @@ char *lib_stralloc(const char *str)
         exit(-1);
 
     size = strlen(str) + 1;
-    ptr = (char *)lib_malloc(size);
+    ptr = lib_malloc(size);
 
     memcpy(ptr, str, size);
     return ptr;
 }
+
+#ifdef HAVE_WORKING_VSNPRINTF
+
+/* taken shamelessly from printf(3) man page of the Linux Programmer's Manual */
+
+char *lib_mvsprintf(const char *fmt, va_list args)
+{
+    /* Guess we need no more than 100 bytes. */
+    int n, size = 100;
+    char *p, *np;
+
+    if ((p = lib_malloc (size)) == NULL) {
+        return NULL;
+    }
+
+    while (1) {
+        /* Try to print in the allocated space. */
+        n = vsnprintf (p, size, fmt, args /* ap */);
+
+        /* If that worked, return the string. */
+        if (n > -1 && n < size) {
+            return p;
+        }
+
+        /* Else try again with more space. */
+        if (n > -1) {     /* glibc 2.1 and C99 */
+            size = n + 1; /* precisely what is needed */
+        }
+        else {            /* glibc 2.0 */
+            size *= 2;    /* twice the old size */
+        }
+
+        if ((np = lib_realloc (p, size)) == NULL) {
+            lib_free(p);
+            return NULL;
+        }
+        else {
+            p = np;
+        }
+    }
+}
+
+#else
 
 /* xmsprintf() is like sprintf() but lib_malloc's the buffer by itself.  */
 
@@ -644,7 +687,7 @@ static void xmvsprintf_number(char **buf, unsigned int *bufsize,
         precision = i;
         size -= precision;
     if (!(type & (ZEROPAD + LEFT)))
-        while(size-->0)
+        while (size-->0)
             xmvsprintf_add(buf, bufsize, position, ' ');
     if (sign)
         xmvsprintf_add(buf, bufsize, position, sign);
@@ -672,7 +715,8 @@ char *lib_mvsprintf(const char *fmt, va_list args)
     char *buf;
     unsigned int position, bufsize;
 
-    int len, i, base;
+    size_t len;
+    int i, base;
     unsigned long num;
     const char *s;
 
@@ -773,11 +817,11 @@ repeat:
             len = xmvsprintf_strnlen(s, precision);
 
             if (!(flags & LEFT))
-                while (len < field_width--)
+                while (field_width > 0 && len < field_width--)
                     xmvsprintf_add(&buf, &bufsize, &position, ' ');
             for (i = 0; i < len; ++i)
                 xmvsprintf_add(&buf, &bufsize, &position, *s++);
-            while (len < field_width--)
+            while (field_width > 0 && len < field_width--)
                 xmvsprintf_add(&buf, &bufsize, &position, ' ');
             continue;
 
@@ -787,7 +831,7 @@ repeat:
                 flags |= ZEROPAD;
             }
             xmvsprintf_number(&buf, &bufsize, &position,
-                              (unsigned long) va_arg(args, void *), 16,
+                              vice_ptr_to_uint(va_arg(args, void *)), 16,
                               field_width, precision, flags);
             continue;
 
@@ -838,6 +882,7 @@ repeat:
 
     return buf;
 }
+#endif /* #ifdef HAVE_WORKING_VSNPRINTF */
 
 char *lib_msprintf(const char *fmt, ...)
 {

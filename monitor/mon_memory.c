@@ -69,7 +69,7 @@ void mon_memory_move(MON_ADDR start_addr, MON_ADDR end_addr, MON_ADDR dest)
     dst = addr_location(dest);
     dest_mem = addr_memspace(dest);
 
-    buf = (BYTE *)lib_malloc(sizeof(BYTE) * len);
+    buf = lib_malloc(sizeof(BYTE) * len);
 
     for (i = 0; (int)i < len; i++)
         buf[i] = mon_get_mem_val(src_mem, (WORD)ADDR_LIMIT(start + i));
@@ -163,7 +163,7 @@ void mon_memory_hunt(MON_ADDR start_addr, MON_ADDR end_addr,
     mem = addr_memspace(start_addr);
     start = addr_location(start_addr);
 
-    buf = (BYTE *)lib_malloc(sizeof(BYTE) * data_buf_len);
+    buf = lib_malloc(sizeof(BYTE) * data_buf_len);
 
     /* Fill buffer */
     for (i = 0; i < data_buf_len; i++)
@@ -284,7 +284,7 @@ void mon_memory_display(int radix_type, MON_ADDR start_addr, MON_ADDR end_addr, 
                 break;
               case e_hexadecimal:
                 memset(printables, 0, 50);
-                if(!(cnt % 4))
+                if (!(cnt % 4))
                     mon_out(" ");
                 if (cnt < len) {
                     mon_out("%02x ", v);
@@ -347,7 +347,7 @@ void mon_memory_display_data(MON_ADDR start_addr, MON_ADDR end_addr,
     while (cnt < len) {
         for (i = 0; i < y; i++) {
             mon_out(">%s:%04x ", mon_memspace_string[mem], addr);
-            for(j = 0; j < (x / 8); j++) {
+            for (j = 0; j < (x / 8); j++) {
                 mon_print_bin(mon_get_mem_val(mem,
                               (WORD)(ADDR_LIMIT(addr + j))), '.', '*');
                 cnt++;

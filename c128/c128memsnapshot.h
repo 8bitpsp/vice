@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _C128MEMSNAPSHOT_H
-#define _C128MEMSNAPSHOT_H
+#ifndef VICE_C128MEMSNAPSHOT_H
+#define VICE_C128MEMSNAPSHOT_H
 
 struct snapshot_s;
 
@@ -34,4 +34,3 @@ extern int c128_snapshot_write_module(struct snapshot_s *s, int save_roms);
 extern int c128_snapshot_read_module(struct snapshot_s *s);
  
 #endif
-

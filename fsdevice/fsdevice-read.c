@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -162,7 +162,7 @@ static void command_directory_get(vdrive_t *vdrive, bufinfo_t *bufinfo,
     unsigned int format = 0;
     char *buf;
 
-    buf = (char *)lib_malloc(ioutil_maxpathlen());
+    buf = lib_malloc(ioutil_maxpathlen());
 
     bufinfo->bufp = bufinfo->name;
 
@@ -200,7 +200,7 @@ static void command_directory_get(vdrive_t *vdrive, bufinfo_t *bufinfo,
         if (bufinfo->dirmask[0] == '\0')
             break;
 
-        l = strlen(bufinfo->dirmask);
+        l = (int)strlen(bufinfo->dirmask);
 
         for (p = finfo->name, i = 0;
             *p && bufinfo->dirmask[i] && i < l; i++) {
@@ -315,7 +315,7 @@ static void command_directory_get(vdrive_t *vdrive, bufinfo_t *bufinfo,
 
         /* some (really very) old programs rely on the directory
            entry to be 32 Bytes in total (incl. nullbyte) */
-        l = strlen((char *)(bufinfo->name + 4)) + 4;
+        l = (int)strlen((char *)(bufinfo->name + 4)) + 4;
         while (l < 31) {
             *p++ = ' ';
             l++;

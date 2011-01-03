@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _LOG_H
-#define _LOG_H
+#ifndef VICE_LOG_H
+#define VICE_LOG_H
 
 #include <stdio.h>
 
@@ -41,6 +41,7 @@ extern int log_init_with_fd(FILE *f);
 extern log_t log_open(const char *id);
 extern int log_close(log_t log);
 extern void log_close_all(void);
+extern void log_enable(int on);
 
 #ifdef __GNUC__
 extern int log_message(log_t log, const char *format, ...)

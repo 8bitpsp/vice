@@ -340,7 +340,8 @@ void REGPARM3 viacore_store(via_context_t *via_context, WORD addr, BYTE byte)
         (*(via_context->clk_ptr))++;
     }
 
-    rclk = *(via_context->clk_ptr) - 1; /* stores have a one-cylce offset */
+    /* stores have a one-cycle offset if CLK++ happens before store */
+    rclk = *(via_context->clk_ptr) - via_context->write_offset;
 
     addr &= 0xf;
 
@@ -352,7 +353,7 @@ void REGPARM3 viacore_store(via_context_t *via_context, WORD addr, BYTE byte)
         if (!IS_CA2_INDINPUT()) {
             via_context->ifr &= ~VIA_IM_CA2;
         }
-        if(IS_CA2_HANDSHAKE()) {
+        if (IS_CA2_HANDSHAKE()) {
             via_context->ca2_state = 0;
             (via_context->set_ca2)(via_context->ca2_state);
             if (IS_CA2_PULSE_MODE()) {
@@ -614,10 +615,10 @@ BYTE REGPARM2 viacore_read_(via_context_t *via_context, WORD addr)
         if ((via_context->via[VIA_PCR] & 0x0a) != 0x02) {
             via_context->ifr &= ~VIA_IM_CA2;
         }
-        if(IS_CA2_HANDSHAKE()) {
+        if (IS_CA2_HANDSHAKE()) {
             via_context->ca2_state = 0;
             (via_context->set_ca2)(via_context->ca2_state);
-            if(IS_CA2_PULSE_MODE()) {
+            if (IS_CA2_PULSE_MODE()) {
                 via_context->ca2_state = 1;
                 (via_context->set_ca2)(via_context->ca2_state);
             }
@@ -835,7 +836,6 @@ static void viacore_intt2(CLOCK offset, void *data)
 
 static void viacore_clk_overflow_callback(CLOCK sub, void *data)
 {
-    unsigned int t;
     via_context_t *via_context;
 
     via_context = (via_context_t *)data;
@@ -843,11 +843,13 @@ static void viacore_clk_overflow_callback(CLOCK sub, void *data)
     if (via_context->enabled == 0)
         return;
 
-    t = (via_context->tau - (*(via_context->clk_ptr) + sub)) & 0xffff;
-    via_context->tau = *(via_context->clk_ptr) + t;
+    via_context->tau = via_context->tal + 2 - 
+						((*(via_context->clk_ptr) + sub - via_context->tau)
+								% (via_context->tal + 2));
 
-    t = (via_context->tbu - (*(via_context->clk_ptr) + sub)) & 0xffff;
-    via_context->tbu = *(via_context->clk_ptr) + t;
+	via_context->tbu = via_context->tbl + 2 - 
+						((*(via_context->clk_ptr) + sub - via_context->tbu)
+								% (via_context->tbl + 2));
 
     if (via_context->tai)
         via_context->tai -= sub;
@@ -866,6 +868,8 @@ void viacore_setup_context(via_context_t *via_context)
 
     via_context->my_module_name_alt1 = NULL;
     via_context->my_module_name_alt2 = NULL;
+
+    via_context->write_offset = 1;
  }
 
 void viacore_init(via_context_t *via_context, alarm_context_t *alarm_context,

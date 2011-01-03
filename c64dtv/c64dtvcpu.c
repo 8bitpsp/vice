@@ -27,8 +27,12 @@
 
 #include "vice.h"
 
+#include <stdio.h>
+
+#include "alarm.h"
 #include "c64mem.h"
 #include "c64dtvblitter.h"
+#include "c64dtvcpu.h"
 #include "c64dtvdma.h"
 #include "monitor.h"
 
@@ -65,11 +69,14 @@ BYTE dtvrewind;
 
 int dtvclockneg = 0;
 
-#if defined CYCLE_EXACT_DMA || defined CYCLE_EXACT_BLITTER
-#define REWIND_FETCH_OPCODE(clock) clock-=dtvrewind; dtvclockneg+=dtvrewind
-#else
-#define REWIND_FETCH_OPCODE(clock) clock-=dtvrewind
+/* Experimental cycle exact alarm handling */
+/* #define CYCLE_EXACT_ALARM */
+
+#ifdef CYCLE_EXACT_ALARM
+alarm_context_t *maincpu_alarm_context = NULL;
 #endif
+
+#define REWIND_FETCH_OPCODE(clock) clock-=dtvrewind; dtvclockneg+=dtvrewind
 
 /* Burst mode implementation */
 
@@ -80,29 +87,30 @@ WORD burst_addr, burst_last_addr;
 
 inline static void c64dtvcpu_clock_add(CLOCK *clock, int amount)
 {
-    if(burst_diff && (amount>0)) {
-        if(burst_diff>=amount) {
+    if (burst_diff && (amount > 0)) {
+        if (burst_diff >= amount) {
             burst_diff -= amount;
             return;
         }
         amount -= burst_diff;
         burst_diff = 0;
     }
-#if defined CYCLE_EXACT_DMA || defined CYCLE_EXACT_BLITTER
-    if(amount>0) {
-        while(amount) {
+
+    if (amount >= 0) {
+        while (amount) {
+#ifdef CYCLE_EXACT_ALARM
+            while ((*clock) >= alarm_context_next_pending_clk(maincpu_alarm_context)) {
+                alarm_context_dispatch(maincpu_alarm_context, (*clock));
+            }
+#endif
             (*clock)++;
             --amount;
             if (dtvclockneg == 0) {
-#if defined CYCLE_EXACT_DMA && defined CYCLE_EXACT_BLITTER
-                if (!c64dtvblitter_perform_blitter()) c64dtvdma_perform_dma();
-#else
-#ifdef CYCLE_EXACT_BLITTER
-                c64dtvblitter_perform_blitter();
-#else
-                c64dtvdma_perform_dma();
-#endif
-#endif
+                if (blitter_active) {
+                    c64dtvblitter_perform_blitter();
+                } else if (dma_active) {
+                    c64dtvdma_perform_dma();
+                }
             } else {
                 --dtvclockneg;
             }
@@ -111,9 +119,6 @@ inline static void c64dtvcpu_clock_add(CLOCK *clock, int amount)
         dtvclockneg -= amount;
         *clock += amount;
     }
-#else
-    *clock += amount;
-#endif
 }
 
 #define CLK_ADD(clock, amount) c64dtvcpu_clock_add(&clock, amount)
@@ -124,9 +129,9 @@ DWORD mem_burst_read(WORD addr)
     read_func_ptr_t mrtf;
     int paddr = ((((int) dtv_registers[12 + (addr >> 14)]) << 14) + (addr & 0x3fff)) & (C64_RAM_SIZE - 1);
 
-    if(paddr <= 0xffff) {
+    if (paddr <= 0xffff) {
         mrtf = _mem_read_tab_ptr[paddr >> 8];
-        if(mrtf != ram_read) {
+        if (mrtf != ram_read) {
 #ifdef WORDS_BIGENDIAN
             return (((DWORD) mrtf(paddr + 0)) << 24) +
                    (((DWORD) mrtf(paddr + 1)) << 16) +
@@ -328,10 +333,10 @@ static const BYTE burst_status_tab[] = {
 #define FETCH_OPCODE(o) \
     do { \
         dtvrewind = 0; \
-        if((dtv_registers[9]&2)&&(((dtv_registers[8] >> ((reg_pc >> 13)&6)) & 0x03) == 0x01)) { \
+        if ((dtv_registers[9]&2)&&(((dtv_registers[8] >> ((reg_pc >> 13)&6)) & 0x03) == 0x01)) { \
             burst_last_addr = burst_addr; \
             burst_addr = reg_pc & 0xfffc; \
-            if((burst_addr != burst_last_addr)||burst_broken) { \
+            if ((burst_addr != burst_last_addr)||burst_broken) { \
                 *((DWORD *)burst_cache) = mem_burst_read(burst_addr); \
             } \
             burst_idx = reg_pc & 3; \
@@ -339,8 +344,8 @@ static const BYTE burst_status_tab[] = {
             burst_status = burst_status_tab[o]; \
             burst_fetch = burst_status & 7; \
             burst_diff = (burst_status >> 3) & 7; \
-            if(burst_fetch--) { \
-                if(burst_idx>3) { \
+            if (burst_fetch--) { \
+                if (burst_idx>3) { \
                     burst_addr += 4; \
                     burst_addr &= 0xfffc; \
                     burst_last_addr = burst_addr; \
@@ -349,8 +354,8 @@ static const BYTE burst_status_tab[] = {
                     *((DWORD *)burst_cache) = mem_burst_read(burst_addr); \
                 } \
                 o |= (burst_cache[burst_idx++] << 8); \
-                if(burst_fetch--) { \
-                    if(burst_idx>3) { \
+                if (burst_fetch--) { \
+                    if (burst_idx>3) { \
                         burst_addr += 4; \
                         burst_addr &= 0xfffc; \
                         burst_last_addr = burst_addr; \
@@ -386,17 +391,17 @@ static const BYTE burst_status_tab[] = {
                  CLK_ADD(CLK,1);                                \
             }                                                   \
         } \
-    } while(0)
+    } while (0)
 
 #else /* !ALLOW_UNALIGNED_ACCESS */
 /* TODO optimize */
 #define FETCH_OPCODE(o) \
     do { \
         dtvrewind = 0; \
-        if((dtv_registers[9]&2)&&(((dtv_registers[8] >> ((reg_pc >> 13)&6)) & 0x03) == 0x01)) { \
+        if ((dtv_registers[9]&2)&&(((dtv_registers[8] >> ((reg_pc >> 13)&6)) & 0x03) == 0x01)) { \
             burst_last_addr = burst_addr; \
             burst_addr = reg_pc & 0xfffc; \
-            if((burst_addr != burst_last_addr)||burst_broken) { \
+            if ((burst_addr != burst_last_addr)||burst_broken) { \
                 burst_cache[0] = LOAD(burst_addr+0); \
                 burst_cache[1] = LOAD(burst_addr+1); \
                 burst_cache[2] = LOAD(burst_addr+2); \
@@ -407,8 +412,8 @@ static const BYTE burst_status_tab[] = {
             burst_status = burst_status_tab[(o).ins]; \
             burst_fetch = burst_status & 7; \
             burst_diff = (burst_status >> 3) & 7; \
-            if(burst_fetch--) { \
-                if(burst_idx>3) { \
+            if (burst_fetch--) { \
+                if (burst_idx>3) { \
                     burst_addr += 4; \
                     burst_addr &= 0xfffc; \
                     burst_last_addr = burst_addr; \
@@ -420,8 +425,8 @@ static const BYTE burst_status_tab[] = {
                     burst_cache[3] = LOAD(burst_addr+3); \
                 } \
                 (o).op.op16 = burst_cache[burst_idx++]; \
-                if(burst_fetch--) { \
-                    if(burst_idx>3) { \
+                if (burst_fetch--) { \
+                    if (burst_idx>3) { \
                         burst_addr += 4; \
                         burst_addr &= 0xfffc; \
                         burst_last_addr = burst_addr; \
@@ -460,7 +465,7 @@ static const BYTE burst_status_tab[] = {
                  CLK_ADD(CLK,1);                                \
             }                                                   \
         } \
-    } while(0)
+    } while (0)
 
 #endif /* !ALLOW_UNALIGNED_ACCESS */
 

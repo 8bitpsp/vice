@@ -26,7 +26,7 @@
 
 #include "vice.h"
 
-#if !defined (HAVE_LIBM) && !defined(__riscos) && !defined(__BEOS__)
+#if !defined (HAVE_LIBM) && !defined(__riscos) && !defined(__BEOS__) && !defined(_UWIN)
 #include <errno.h>
 
 #ifdef HAVE_MATH_H
@@ -186,13 +186,13 @@ double log(double arg)
   double x,z, zsq, temp;
   int exp;
 
-  if(arg <= 0.)
+  if (arg <= 0.)
   {
     errno = EDOM;
     return (-HUGE);
   }
   x = frexp(arg, &exp);
-  while(x < 0.5)
+  while (x < 0.5)
   {
     x = x*2;
     exp = exp - 1;
@@ -246,7 +246,7 @@ double sqrt(double arg)
   int exp;
   int i;
 
-  if(arg <= 0.)
+  if (arg <= 0.)
   {
     if (arg < 0.)
     {

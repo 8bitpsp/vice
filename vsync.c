@@ -40,10 +40,10 @@
 
 int vsync_frame_counter;
 
-/* Port me... */
-#if !defined(MSDOS) && !defined(RISCOS)
-
 #include "vice.h"
+
+/* Port me... */
+#if (!defined(MSDOS) && !defined(RISCOS)) || (defined(RISCOS) && defined(USE_SDLUI))
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -58,11 +58,15 @@ int vsync_frame_counter;
 #include "log.h"
 #include "maincpu.h"
 #include "machine.h"
+#ifdef HAVE_NETWORK
+#include "monitor_network.h"
+#endif
 #include "network.h"
 #include "resources.h"
 #include "sound.h"
 #include "translate.h"
 #include "types.h"
+#include "videoarch.h"
 #include "vsync.h"
 #include "vsyncapi.h"
 
@@ -280,8 +284,6 @@ void vsync_sync_reset(void)
     sync_reset = 1;
 }
 
-#include "videoarch.h"
-
 /* This is called at the end of each screen frame. It flushes the
    audio buffer and keeps control of the emulation speed. */
 int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
@@ -290,7 +292,7 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
     unsigned long network_hook_time = 0;
 
     /*
-     * this are the counters to show how many frames are skipped
+     * these are the counters to show how many frames are skipped
      * since the last vsync_display_speed
      */
     static int frame_counter  = 0;
@@ -304,7 +306,7 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
     /* Adjustment of frame output frequency. */
     static unsigned long adjust_start;
     static int frames_adjust;
-    static signed long min_sdelay, prev_sdelay;
+    static signed long avg_sdelay, prev_sdelay;
 
     double sound_delay;
     int skip_next_frame;
@@ -312,9 +314,14 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
     signed long delay;
     long frame_ticks_remainder, frame_ticks_integer, compval;
 
-#if defined(WIN32) || defined(HAVE_OPENGL_SYNC)
+#if (defined(WIN32) || defined(HAVE_OPENGL_SYNC)) && !defined(USE_SDLUI)
     float refresh_cmp;
     int refresh_div;
+#endif
+
+#ifdef HAVE_NETWORK
+    /* check if someone wants to connect remotely to the monitor */
+    monitor_check_remote();
 #endif
 
     vsync_frame_counter++;
@@ -371,7 +378,7 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
     }
 
     /* Flush sound buffer, get delay in seconds. */
-    sound_delay = sound_flush(warp_mode_enabled ? 0 : relative_speed);
+    sound_delay = sound_flush();
 
     /* Get current time, directly after getting the sound delay. */
     now = vsyncarch_gettime();
@@ -396,16 +403,16 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
 
         adjust_start = now;
         frames_adjust = 0;
-        min_sdelay = LONG_MAX;
+        avg_sdelay = 0;
         prev_sdelay = 0;
 
-        frame_ticks = frame_ticks_orig;
+        frame_ticks = (frame_ticks_orig + frame_ticks) / 2;
     }
 
 
     /* This is the time between the start of the next frame and now. */
     delay = (signed long)(now - next_frame_start);
-#if defined(WIN32) || defined(HAVE_OPENGL_SYNC)
+#if (defined(WIN32) || defined(HAVE_OPENGL_SYNC)) && !defined(USE_SDLUI)
     refresh_cmp = (float)(c->refreshrate / refresh_frequency);
     refresh_div = (int)(refresh_cmp + 0.5f);
     refresh_cmp /= (float)refresh_div;
@@ -430,7 +437,7 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
     if (!warp_mode_enabled && timer_speed && delay < 0) {
         vsyncarch_sleep(-delay);
     }
-#if defined(WIN32) || defined(HAVE_OPENGL_SYNC)
+#if (defined(WIN32) || defined(HAVE_OPENGL_SYNC)) && !defined(USE_SDLUI)
     vsyncarch_prepare_vbl();
 #endif
     /*
@@ -466,7 +473,7 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
         skip_next_frame = 0;
         skipped_redraw = 0;
     }
-#if defined(WIN32) || defined(HAVE_OPENGL_SYNC)
+#if (defined(WIN32) || defined(HAVE_OPENGL_SYNC)) && !defined(USE_SDLUI)
 	}
 #endif
 
@@ -490,49 +497,43 @@ int vsync_do_vsync(struct video_canvas_s *c, int been_skipped)
         frames_adjust++;
     }
 
+    /* Adjust audio-video sync */
     if (!network_connected()
-        && (signed long)(now - adjust_start) >= vsyncarch_freq) {
-        if (min_sdelay != LONG_MAX) {
-            /* Account for both relative and absolute delay. */
-            signed long adjust = (min_sdelay - prev_sdelay + min_sdelay / 2)
-                                 / frames_adjust;
-            /* Maximum adjustment step 1%. */
-            if (labs(adjust) > frame_ticks/100) {
-                adjust = adjust / labs(adjust) * frame_ticks / 100;
-            }
-            frame_ticks -= adjust;
-
-            frames_adjust = 0;
-            prev_sdelay = min_sdelay;
-            min_sdelay = LONG_MAX;
+        && (signed long)(now - adjust_start) >= vsyncarch_freq / 5) {
+        signed long adjust;
+        avg_sdelay /= frames_adjust;
+        /* Account for both relative and absolute delay. */
+        adjust = (avg_sdelay - prev_sdelay + avg_sdelay / 8) / frames_adjust;
+        /* Maximum adjustment step 1%. */
+        if (labs(adjust) > frame_ticks/100) {
+            adjust = adjust / labs(adjust) * frame_ticks / 100;
         }
+        frame_ticks -= adjust;
+
+        frames_adjust = 0;
+        prev_sdelay = avg_sdelay;
+        avg_sdelay = 0;
 
         adjust_start = now;
     } else {
-        if (sound_delay) {
-            /* Actual sound delay is sound delay minus vsync delay. */
-            signed long sdelay =
-                (signed long)(sound_delay*vsyncarch_freq) - delay;
-
-            /* Find smallest delay in this period. We don't compare
-               absolute values since we trust negative delays more
-               than positive delays. The reason for this is that a
-               higher delay has a greater chance of being caused by
-               e.g. OS scheduling. */
-            if (sdelay < min_sdelay) {
-                min_sdelay = sdelay;
-            }
-        }
+        /* Actual sound delay is sound delay minus vsync delay. */
+        signed long sdelay = (signed long)(sound_delay*vsyncarch_freq);
+        avg_sdelay += sdelay;
     }
 
     next_frame_start += frame_ticks;
 
     vsyncarch_postsync();
-
+#if 0
+    FILE *fd = fopen("latencylog.txt", "a");
+    fprintf(fd, "%d %ld %ld %lf\n",
+        vsync_frame_counter, frame_ticks, delay, sound_delay * 1000000);
+    fclose(fd);
+#endif
     return skip_next_frame;
 }
 
-#if defined(WIN32) || defined (HAVE_OPENGL_SYNC) 
+#if (defined(WIN32) || defined (HAVE_OPENGL_SYNC)) && !defined(USE_SDLUI)
 
 static unsigned long last = 0;
 static unsigned long nosynccount = 0;

@@ -40,6 +40,7 @@
 #include "vice.h"
 #include "diskimage.h"
 #include "diskimage/fsimage.h"
+#include "diskcontents.h"
 
 #include <ctype.h>
 #include <stdarg.h>
@@ -183,6 +184,10 @@ void network_event_record(unsigned int type, void *data, unsigned int size)
 
 void event_record_in_list(event_list_state_t *list, unsigned int type,
                           void *data, unsigned int size)
+{
+}
+
+void ui_error(const char *format, ...)
 {
 }
 
@@ -348,15 +353,13 @@ static char *read_line(const char *prompt)
 
 #else
 
-extern char *readline(const char *);    /* FIXME: This sucks.  */
-extern void add_history(const char *);  /* FIXME: This stinks.  */
+# include "editline.h"
 
 static char *read_line(const char *prompt)
 {
     static char *line;
 
-    if (line != NULL)
-        lib_free(line);
+    lib_free(line);
     line = readline(prompt);
     if (line != 0 && *line != 0)
         add_history(line);
@@ -1001,7 +1004,7 @@ static int delete_cmd(int nargs, char **args)
         printf("Deleting `%s' on unit %d.\n", name, dnr + 8);
 
         status = vdrive_command_execute(drives[dnr], (BYTE *)command,
-                                        strlen(command));
+                                        (unsigned int)strlen(command));
 
         lib_free(command);
 
@@ -1059,7 +1062,7 @@ static int extract_cmd(int nargs, char **args)
         int i, res;
 
         str = (BYTE *)lib_msprintf("B-R:%d 0 %d %d", channel, track, sector);
-        res = vdrive_command_execute(floppy, str, strlen((char *)str));
+        res = vdrive_command_execute(floppy, str, (unsigned int)strlen((char *)str));
 
         lib_free(str);
 
@@ -1201,7 +1204,7 @@ static int format_cmd(int nargs, char **args)
     charset_petconvstring((BYTE *)command, 0);
 
     printf("Formatting in unit %d...\n", unit + 8);
-    vdrive_command_execute(drives[unit], (BYTE *)command, strlen(command));
+    vdrive_command_execute(drives[unit], (BYTE *)command, (unsigned int)strlen(command));
 
     lib_free(command);
     return FD_OK;
@@ -1303,7 +1306,8 @@ static int info_cmd(int nargs, char **args)
 
 static int list_cmd(int nargs, char **args)
 {
-    char *listing, *pattern, *name;
+    char *pattern, *name;
+    image_contents_t *listing;
     unsigned int dnr;
     vdrive_t *vdrive;
 
@@ -1326,13 +1330,30 @@ static int list_cmd(int nargs, char **args)
     vdrive = drives[dnr & 3];
     name = disk_image_name_get(vdrive->image);
 
-    listing = image_contents_read_string(IMAGE_CONTENTS_DISK, name, dnr + 8,
-                                         IMAGE_CONTENTS_STRING_ASCII);
+    listing = diskcontents_read(name, dnr + 8);
 
     if (listing != NULL) {
+        char *string = image_contents_to_string(listing, 1);
+        image_contents_file_list_t *element = listing->file_list;
+
         pager_init();
-        pager_print(listing);
-        lib_free(listing);
+        pager_print(string);
+        pager_print("\n");
+        lib_free(string);
+        if (element == NULL) {
+            pager_print("Empty image\n");
+        }
+        else do {
+            string = image_contents_file_to_string(element, 1);
+            pager_print(string);
+            pager_print("\n");
+            lib_free(string);
+        } while ( (element = element->next) != NULL);
+        if (listing->blocks_free >= 0) {
+            string = lib_msprintf("%d blocks free.\n", listing->blocks_free);
+            pager_print(string);
+            lib_free(string);
+        }
     }
 
     return FD_OK;
@@ -1776,7 +1797,7 @@ static int read_geos_cmd(int nargs, char **args)
 
         dest_name_ascii = actual_name;
         vdrive_dir_no_a0_pads((BYTE *) dest_name_ascii, 16);
-        l = strlen(dest_name_ascii) - 1;
+        l = (int)strlen(dest_name_ascii) - 1;
         while (dest_name_ascii[l] == ' ') {
             dest_name_ascii[l] = 0;
             l--;
@@ -2208,7 +2229,7 @@ static int rename_cmd(int nargs, char **args)
     charset_petconvstring((BYTE *)command, 0);
 
     vdrive_command_execute(drives[dest_unit],
-                           (BYTE *)command, strlen(command));
+                           (BYTE *)command, (unsigned int)strlen(command));
 
     lib_free(command);
     lib_free(dest_name);
@@ -2368,7 +2389,7 @@ static int tape_cmd(int nargs, char **args)
                         lib_free(dest_name_ascii);
                         return FD_WRTERR;
                     }
-                } while(retval == 1);
+                } while (retval == 1);
             }
 
             vdrive_iec_close(drive, 1);
@@ -2479,7 +2500,7 @@ static int unlynx_loop(FILE *f, FILE *f2, vdrive_t *vdrive, long dentries)
 
         cmd_parse.parsecmd = lib_stralloc(cname);
         cmd_parse.secondary = 1;
-        cmd_parse.parselength = strlen(cname);
+        cmd_parse.parselength = (unsigned int)strlen(cname);
         cmd_parse.readmode = CBMDOS_FAM_WRITE;
         cmd_parse.filetype = filetype;
 
@@ -2688,7 +2709,7 @@ static int write_cmd(int nargs, char **args)
         dest_name = lib_stralloc((char *)(finfo->name));
         dest_len = finfo->length;
     } else {
-        dest_len = strlen(dest_name);
+        dest_len = (unsigned int)strlen(dest_name);
     }
 
     if (vdrive_iec_open(drives[dnr], (BYTE *)dest_name, (int)dest_len, 1,
@@ -2867,7 +2888,7 @@ static int raw_cmd(int nargs, char **args)
         char *command = lib_stralloc(args[1]);
 
         charset_petconvstring((BYTE *)command, 0);
-        vdrive_command_execute(vdrive, (BYTE *)command, strlen(command));
+        vdrive_command_execute(vdrive, (BYTE *)command, (unsigned int)strlen(command));
         lib_free(command);
     }
 
@@ -2897,8 +2918,8 @@ int main(int argc, char **argv)
         args[i] = NULL;
     nargs = 0;
 
-    drives[0] = (vdrive_t *)lib_calloc(1, sizeof(vdrive_t));
-    drives[1] = (vdrive_t *)lib_calloc(1, sizeof(vdrive_t));
+    drives[0] = lib_calloc(1, sizeof(vdrive_t));
+    drives[1] = lib_calloc(1, sizeof(vdrive_t));
 
     retval = 0;
 
@@ -2929,8 +2950,7 @@ int main(int argc, char **argv)
            " for details.\n");
 
         while (1) {
-            if (buf != NULL)
-                lib_free(buf);
+            lib_free(buf);
             buf = lib_msprintf("c1541 #%d> ", drive_number | 8);
             line = read_line(buf);
 
@@ -3084,14 +3104,9 @@ int machine_bus_lib_write_sector(unsigned int unit, unsigned int track,
     return serial_iec_lib_write_sector(unit, track, sector, buf);
 }
 
-unsigned int machine_bus_device_fsimage_state_get(unsigned int unit)
+unsigned int machine_bus_device_type_get(unsigned int unit)
 {
-    return serial_device_fsimage_state_get(unit);
-}
-
-unsigned int machine_bus_device_realdevice_state_get(unsigned int unit)
-{
-    return serial_device_realdevice_state_get(unit);
+    return serial_device_type_get(unit);
 }
 
 void machine_drive_flush(void)
@@ -3127,8 +3142,6 @@ char *system_mbstowcs_alloc(const char *mbs)
 
 void system_mbstowcs_free(char *wcs)
 {
-    if (wcs != NULL)
-        lib_free(wcs);
+    lib_free(wcs);
 }
 #endif
-

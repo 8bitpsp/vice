@@ -8,7 +8,7 @@
  * Based on older code by
  *  Dan Fandrich <dan@fch.wimsey.bc.ca>
  *  Jouko Valta <jopi@stekt.oulu.fi>
- *  Martin Pottendorfer <Martin.Pottendorfer@autalcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -183,7 +183,7 @@ static char *p00_file_find(const char *file_name, const char *path)
             unsigned int equal;
 
             p00_pad_a0(p00_header_file_name);
-            cname = cbmdos_dir_slot_create(file_name, strlen(file_name));
+            cname = cbmdos_dir_slot_create(file_name, (unsigned int)strlen(file_name));
             equal = cbmdos_parse_wildcard_compare(cname, p00_header_file_name);
             lib_free(cname);
 
@@ -285,7 +285,7 @@ static char *p00_filename_create(const char *file_name, unsigned int type)
     const char *typeext = NULL;
     int length;
 
-    length = strlen(file_name);
+    length = (int)strlen(file_name);
 
     if (length > 16)
         length = 16;
@@ -400,7 +400,7 @@ fileio_info_t *p00_open(const char *file_name, const char *path,
         break;
     }
 
-    info = (fileio_info_t *)lib_malloc(sizeof(fileio_info_t));
+    info = lib_malloc(sizeof(fileio_info_t));
     info->name = (BYTE *)lib_stralloc(rname);
     info->length = (unsigned int)strlen((char *)(info->name));
     info->type = (unsigned int)type;
@@ -503,5 +503,10 @@ unsigned int p00_scratch(const char *file_name, const char *path)
     lib_free(p00_src);
 
     return rc;
+}
+
+unsigned int p00_get_bytes_left(struct fileio_info_s *info)
+{
+    return rawfile_get_bytes_left(info->rawfile);
 }
 

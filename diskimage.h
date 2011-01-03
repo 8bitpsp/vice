@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _DISKIMAGE_H
-#define _DISKIMAGE_H
+#ifndef VICE_DISKIMAGE_H
+#define VICE_DISKIMAGE_H
 
 #include "types.h"
 
@@ -115,9 +115,9 @@ extern unsigned int disk_image_speed_map_1541(unsigned int track);
 extern unsigned int disk_image_speed_map_1571(unsigned int track);
 
 extern void disk_image_attach_log(disk_image_t *image, signed int lognum,
-                                  unsigned int unit, const char *type);
+                                  unsigned int unit);
 extern void disk_image_detach_log(disk_image_t *image, signed int lognum,
-                                  unsigned int unit, const char *type);
+                                  unsigned int unit);
 
 #endif
 

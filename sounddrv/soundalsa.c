@@ -89,6 +89,8 @@ static int alsa_init(const char *param, int *speed,
         printf("Rate doesn't match (requested %iHz, got %iHz)", *speed, rate);
 	*speed = rate;
     }
+    /* calculate requested buffer size */
+    alsa_bufsize = (*fragsize)*(*fragnr);
 
     period_size = *fragsize;
     dir = 0;
@@ -97,6 +99,9 @@ static int alsa_init(const char *param, int *speed,
         goto fail;
     }
     *fragsize = period_size;
+
+    /* number of periods according to the buffer size we wanted, nearest val */
+    *fragnr = (alsa_bufsize + *fragsize/2) / *fragsize;
 
     periods = *fragnr;
     dir = 0;
@@ -167,17 +172,16 @@ static int alsa_write(SWORD *pbuf, size_t nr)
 
 static int alsa_bufferspace(void)
 {
-    int err;
-    snd_pcm_sframes_t delay;
-
-    if ((err = snd_pcm_delay(handle, &delay)) < 0) {
-	if ((err = xrun_recovery(handle, err)) < 0) {
-	    log_message(LOG_DEFAULT, "Delay error: %s", snd_strerror(err));
-	}
-	return alsa_bufsize;
-    }
-
-    return alsa_bufsize - delay;
+#ifdef HAVE_SND_PCM_AVAIL
+    snd_pcm_sframes_t space = snd_pcm_avail(handle);
+#else
+    snd_pcm_sframes_t space = snd_pcm_avail_update(handle);
+#endif
+    /* keep alsa values real. Values < 0 mean errors, call to alsa_write
+     * will resume. */
+    if (space < 0 || space > alsa_bufsize)
+        space = alsa_bufsize;
+    return space;
 }
 
 static void alsa_close(void)

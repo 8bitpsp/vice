@@ -195,7 +195,7 @@ static int init_vidc_device(const char *device, int *speed, int *fragsize, int *
   if (sound_configure_vidc(speed, fragsize, fragnr, channels, 0) != 0)
     return 1;
 
-  if ((VIDCSampleBuffer = (SWORD*)lib_malloc(buffersize*(*channels)*sizeof(SWORD))) == NULL)
+  if ((VIDCSampleBuffer = lib_malloc(buffersize*(*channels)*sizeof(SWORD))) == NULL)
   {
     log_error(vidc_log, "Can't claim memory for sound buffer!");
     DigitalRenderer_Deactivate();
@@ -218,7 +218,9 @@ static int init_vidc_device(const char *device, int *speed, int *fragsize, int *
   SoundThreadActive = 1;
   timer_callback_install(&SoundTimer, timerPeriod, sound_poll, 1);
 
+#ifndef USE_SDLUI
   ui_set_sound_volume();
+#endif
 
   /*log_message(vidc_log, "vidc OK");*/
 
@@ -250,10 +252,10 @@ static void vidc_close(void)
   {
     log_error(vidc_log, err->errmess);
   }
-  if (VIDCSampleBuffer != NULL)
-  {
-    lib_free(VIDCSampleBuffer); VIDCSampleBuffer = NULL;
-  }
+
+  lib_free(VIDCSampleBuffer);
+  VIDCSampleBuffer = NULL;
+
   /* Use this to mark device inactive */
   SoundThreadActive = 0;
 
@@ -378,7 +380,9 @@ static int init_vidc_sync_device(const char *device, int *speed, int *fragsize, 
 
   log_message(LOG_DEFAULT, "fragsize %d, frags %d", *fragsize, *fragnr);
 
+#ifndef USE_SDLUI
   ui_set_sound_volume();
+#endif
 
   return 0;
 }

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _MON_BREAKPOINT_H
-#define _MON_BREAKPOINT_H
+#ifndef VICE_MON_BREAKPOINT_H
+#define VICE_MON_BREAKPOINT_H
 
 #include "montypes.h"
 
@@ -53,5 +53,8 @@ extern void mon_breakpoint_set(MON_ADDR address);
 extern void mon_breakpoint_unset(MON_ADDR address);
 extern void mon_breakpoint_enable(MON_ADDR address);
 extern void mon_breakpoint_disable(MON_ADDR address);
+
+/* defined in mon_parse.y, and thus, in mon_parse.c */
+extern void parse_and_execute_line(char *input);
 
 #endif

@@ -99,11 +99,11 @@ static int residfp_init(sound_t *psid, int speed, int cycles_per_sec)
     if (model < 8 || model > 15) {
       psid->sid->set_chip_model(MOS8580FP);
       psid->sid->set_voice_nonlinearity(1.0f);
-      psid->sid->get_filter().set_distortion_properties(0.f, 0.f, 0.f);
+      psid->sid->get_filter().set_distortion_properties(0.5f, 0.f, 0.f);
     } else {
       psid->sid->set_chip_model(MOS6581FP);
       psid->sid->set_voice_nonlinearity(0.96f);
-      psid->sid->get_filter().set_distortion_properties(3.7e-3f, 2048.f, 1.2e-4f);
+      psid->sid->get_filter().set_distortion_properties(0.50f, 3.3e6f, 1.0e-4f);
     }
 
     switch (model) {
@@ -129,34 +129,33 @@ static int residfp_init(sound_t *psid, int speed, int cycles_per_sec)
       break;
 
     case SID_MODEL_6581R3_4885:
-      psid->sid->get_filter().set_type3_properties(8.5e5f, 2.2e6f, 1.0075f, 1.8e4f);
+      psid->sid->get_filter().set_type3_properties(840577.4520801408f, 1909158.8633669745f, 1.0068865662510837f, 14858.140079688419f);
       strcpy(model_text, "6581R3 4885");
       break;
     case SID_MODEL_6581R3_0486S:
-      psid->sid->get_filter().set_type3_properties(1.1e6f, 1.5e7f, 1.006f, 1e4f);
+      psid->sid->get_filter().set_type3_properties(1164920.4999651583f, 12915042.165290257f, 1.0058853753357735f, 12914.5661141159f);
       strcpy(model_text, "6581R3 0486S");
       break;
     case SID_MODEL_6581R3_3984:
-      psid->sid->get_filter().set_type3_properties(1.8e6f, 3.5e7f, 1.0051f, 1.45e4f);
+      psid->sid->get_filter().set_type3_properties(1522171.922983084f, 21729926.667291082f, 1.004994802537475f, 14299.149638099827f);
       strcpy(model_text, "6581R3 3984");
       break;
     default:
     case SID_MODEL_6581R4AR_3789:
-      psid->sid->get_filter().set_type3_properties(1.40e6f, 1.47e8f, 1.0059f, 1.55e4f);
+      psid->sid->get_filter().set_type3_properties(1141069.9277645703f, 276016753.85303545f, 1.0066634233403395f, 16402.86712485317f);
       strcpy(model_text, "6581R4AR 3789");
       break;
     case SID_MODEL_6581R3_4485:
-      psid->sid->get_filter().set_type3_properties(1.3e6f, 5.2e8f, 1.0053f, 1.1e4f);
+      psid->sid->get_filter().set_type3_properties(1399768.3253307983f, 553018906.8926692f, 1.0051493199361266f, 11961.908870403166f);
       strcpy(model_text, "6581R3 4485");
       break;
     case SID_MODEL_6581R4_1986S:
-      psid->sid->get_filter().set_type3_properties(1.33e6f, 2.2e9f, 1.0056f, 7e3f);
+      psid->sid->get_filter().set_type3_properties(1250736.2235895505f, 1521187976.8735676f, 1.005543646897986f, 8581.78418415723f);
       strcpy(model_text, "6581R4 1986S");
       break;
     }
 
     psid->sid->enable_filter(filters_enabled ? true : false);
-    psid->sid->enable_external_filter(filters_enabled ? true : false);
 
     switch (sampling) {
       default:
@@ -198,12 +197,12 @@ static void residfp_close(sound_t *psid)
 
 static BYTE residfp_read(sound_t *psid, WORD addr)
 {
-    return psid->sid->read(addr);
+    return psid->sid->read(addr & 0xffu);
 }
 
 static void residfp_store(sound_t *psid, WORD addr, BYTE byte)
 {
-    psid->sid->write(addr, byte);
+    psid->sid->write(addr & 0xffu, byte);
 }
 
 static void residfp_reset(sound_t *psid, CLOCK cpu_clk)

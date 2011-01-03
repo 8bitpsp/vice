@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _FUNCTIONROM_H
-#define _FUNCTIONROM_H
+#ifndef VICE_FUNCTIONROM_H
+#define VICE_FUNCTIONROM_H
 
 #include "types.h"
 
@@ -42,4 +42,3 @@ extern void functionrom_resources_shutdown(void);
 extern int functionrom_cmdline_options_init(void);
 
 #endif
-

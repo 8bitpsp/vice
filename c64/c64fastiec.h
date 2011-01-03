@@ -24,10 +24,9 @@
  *
  */
 
-#ifndef _C64FASTIEC_H
-#define _C64FASTIEC_H
+#ifndef VICE_C64FASTIEC_H
+#define VICE_C64FASTIEC_H
 
 extern void c64fastiec_init(void);
 
 #endif
-

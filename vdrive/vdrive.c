@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -92,7 +92,7 @@ int vdrive_device_setup(vdrive_t *vdrive, unsigned int unit)
     vdrive->buffers[15].mode = BUFFER_COMMAND_CHANNEL;
 
     if (vdrive->buffers[15].buffer == NULL)
-        vdrive->buffers[15].buffer = (BYTE *)lib_malloc(256);
+        vdrive->buffers[15].buffer = lib_malloc(256);
     memset(vdrive->buffers[15].buffer, 0, 256);
 
     vdrive_command_set_error(vdrive, CBMDOS_IPE_DOS_VERSION, 0, 0);
@@ -189,37 +189,10 @@ int vdrive_get_max_sectors(unsigned int type, unsigned int track)
 void vdrive_detach_image(disk_image_t *image, unsigned int unit,
                          vdrive_t *vdrive)
 {
-	if (image == NULL)
-		return;
-
-    switch(image->type) {
-      case DISK_IMAGE_TYPE_D64:
-        disk_image_detach_log(image, vdrive_log, unit, "D64");
-        break;
-      case DISK_IMAGE_TYPE_D67:
-        disk_image_detach_log(image, vdrive_log, unit, "D67");
-        break;
-      case DISK_IMAGE_TYPE_D71:
-        disk_image_detach_log(image, vdrive_log, unit, "D71");
-        break;
-      case DISK_IMAGE_TYPE_D81:
-        disk_image_detach_log(image, vdrive_log, unit, "D81");
-        break;
-      case DISK_IMAGE_TYPE_D80:
-        disk_image_detach_log(image, vdrive_log, unit, "D80");
-        break;
-      case DISK_IMAGE_TYPE_D82:
-        disk_image_detach_log(image, vdrive_log, unit, "D82");
-        break;
-      case DISK_IMAGE_TYPE_G64:
-        disk_image_detach_log(image, vdrive_log, unit, "G64");
-        break;
-      case DISK_IMAGE_TYPE_X64:
-        disk_image_detach_log(image, vdrive_log, unit, "X64");
-        break;
-      default:
+    if (image == NULL)
         return;
-    }
+
+    disk_image_detach_log(image, vdrive_log, unit);
     vdrive_close_all_channels(vdrive);
     vdrive->image = NULL;
 }
@@ -229,44 +202,38 @@ int vdrive_attach_image(disk_image_t *image, unsigned int unit,
 {
     vdrive->unit = unit;
 
+    disk_image_attach_log(image, vdrive_log, unit);
+
     switch(image->type) {
       case DISK_IMAGE_TYPE_D64:
-        disk_image_attach_log(image, vdrive_log, unit, "D64");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_1541;
         vdrive->num_tracks  = image->tracks;
         break;
       case DISK_IMAGE_TYPE_D67:
-        disk_image_attach_log(image, vdrive_log, unit, "D67");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_2040;
         vdrive->num_tracks  = image->tracks;
         break;
       case DISK_IMAGE_TYPE_D71:
-        disk_image_attach_log(image, vdrive_log, unit, "D71");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_1571;
         vdrive->num_tracks  = image->tracks;
         break;
       case DISK_IMAGE_TYPE_D81:
-        disk_image_attach_log(image, vdrive_log, unit, "D81");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_1581;
         vdrive->num_tracks  = image->tracks;
         break;
       case DISK_IMAGE_TYPE_D80:
-        disk_image_attach_log(image, vdrive_log, unit, "D80");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_8050;
         vdrive->num_tracks  = image->tracks;
         break;
       case DISK_IMAGE_TYPE_D82:
-        disk_image_attach_log(image, vdrive_log, unit, "D82");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_8250;
         vdrive->num_tracks = image->tracks;
         break;
       case DISK_IMAGE_TYPE_G64:
-        disk_image_attach_log(image, vdrive_log, unit, "G64");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_1541;
         vdrive->num_tracks = 35;
         break;
       case DISK_IMAGE_TYPE_X64:
-        disk_image_attach_log(image, vdrive_log, unit, "X64");
         vdrive->image_format = VDRIVE_IMAGE_FORMAT_1541;
         vdrive->num_tracks = image->tracks;
         break;

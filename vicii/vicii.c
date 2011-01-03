@@ -52,19 +52,15 @@
 #include "c64.h"
 #include "cartridge.h"
 #include "c64cart.h"
+#include "c64dtvblitter.h"
+#include "c64dtvdma.h"
 #include "clkguard.h"
 #include "dma.h"
 #include "lib.h"
 #include "log.h"
 #include "machine.h"
 #include "maincpu.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "raster-line.h"
 #include "raster-modes.h"
 #include "raster-sprite-status.h"
@@ -84,11 +80,9 @@
 #include "vicii.h"
 #include "viciitypes.h"
 #include "vsync.h"
-#include "videoarch.h"
 #include "video.h"
+#include "videoarch.h"
 #include "viewport.h"
-#include "c64dtvblitter.h"
-#include "c64dtvdma.h"
 
 
 void vicii_set_phi1_addr_options(WORD mask, WORD offset)
@@ -386,8 +380,8 @@ raster_t *vicii_init(unsigned int flag)
 
     vicii.num_idle_3fff = 0;
     vicii.num_idle_3fff_old = 0;
-    vicii.idle_3fff = (idle_3fff_t *)lib_malloc(sizeof(idle_3fff_t) * 64);
-    vicii.idle_3fff_old = (idle_3fff_t *)lib_malloc(sizeof(idle_3fff_t) * 64);
+    vicii.idle_3fff = lib_malloc(sizeof(idle_3fff_t) * 64);
+    vicii.idle_3fff_old = lib_malloc(sizeof(idle_3fff_t) * 64);
 
     vicii.buf_offset = 0;
 
@@ -435,7 +429,7 @@ void vicii_reset(void)
     vicii.force_display_state = 0;
 
     vicii.light_pen.triggered = 0;
-    vicii.light_pen.x = vicii.light_pen.y = 0;
+    vicii.light_pen.x = vicii.light_pen.y = vicii.light_pen.x_extra_bits = 0;
 
     /* Remove all the IRQ sources.  */
     vicii.regs[0x1a] = 0;
@@ -451,7 +445,7 @@ void vicii_reset(void)
     vicii.countb = 0;
     vicii.countb_mod = 0;
     vicii.countb_step = 0;
-    for(i=0;i<256;i++) vicii.dtvpalette[i]=i;
+    for (i=0;i<256;i++) vicii.dtvpalette[i]=i;
 
     vicii.dtvpalette[0]=0;
     vicii.dtvpalette[1]=0x0f;
@@ -470,13 +464,13 @@ void vicii_reset(void)
     vicii.dtvpalette[14]=0x9a;
     vicii.dtvpalette[15]=0x0a;
 
-    /* clear colors so that standard colors can be written without
+    /* clear the high nibble from colors so that standard colors can be written without
        having extended_enable=1 */
-    vicii.regs[0x20] = 0;
-    vicii.regs[0x21] = 0;
-    vicii.regs[0x22] = 0;
-    vicii.regs[0x23] = 0;
-    vicii.regs[0x24] = 0;
+    vicii.regs[0x20] &= 0xf;
+    vicii.regs[0x21] &= 0xf;
+    vicii.regs[0x22] &= 0xf;
+    vicii.regs[0x23] &= 0xf;
+    vicii.regs[0x24] &= 0xf;
 
     vicii.regs[0x3c] = 0;
 
@@ -572,7 +566,7 @@ void vicii_powerup(void)
     vicii.bad_line = 0;
     vicii.ycounter_reset_checked = 0;
     vicii.force_black_overscan_background_color = 0;
-    vicii.light_pen.x = vicii.light_pen.y = vicii.light_pen.triggered = 0;
+    vicii.light_pen.x = vicii.light_pen.y = vicii.light_pen.x_extra_bits = vicii.light_pen.triggered = 0;
     vicii.vbank_phi1 = 0;
     vicii.vbank_phi2 = 0;
     /* vicii.vbank_ptr = ram; */
@@ -640,11 +634,36 @@ void vicii_trigger_light_pen(CLOCK mclk)
             vicii.light_pen.x = vicii.sprite_wrap_x + vicii.light_pen.x;
 
         /* FIXME: why `+2'? */
-        vicii.light_pen.x = vicii.light_pen.x / 2 + 2;
+        vicii.light_pen.x = vicii.light_pen.x / 2 + 2 + vicii.light_pen.x_extra_bits;
+        vicii.light_pen.x_extra_bits = 0;
         vicii.light_pen.y = VICII_RASTER_Y(mclk);
 
         vicii_irq_lightpen_set(mclk);
     }
+}
+
+/* Calculate lightpen pulse time based on x/y */
+CLOCK vicii_lightpen_timing(int x, int y)
+{
+    CLOCK pulse_time = maincpu_clk;
+
+    x += 0x80 - vicii.screen_leftborderwidth;
+    y += vicii.first_displayed_line;
+
+    /* Check if x would wrap to previous line */
+    if (x < 104) {
+        /* lightpen is off screen */
+        pulse_time = 0;
+    } else {
+        pulse_time += (x / 8) + (y * vicii.cycles_per_line);
+        /* Remove frame alarm jitter */
+        pulse_time -= maincpu_clk - VICII_LINE_START_CLK(maincpu_clk);
+
+        /* Store x extra bits for sub CLK precision */
+        vicii.light_pen.x_extra_bits = (x >> 1) & 0x3;
+    }
+
+    return pulse_time;
 }
 
 /* Change the base of RAM seen by the VIC-II.  */
@@ -1162,7 +1181,7 @@ void vicii_raster_draw_alarm_handler(CLOCK offset, void *data)
             }
 
             /* HACK to fix greetings in 2008 */
-            if(vicii.video_mode == VICII_8BPP_PIXEL_CELL_MODE) {
+            if (vicii.video_mode == VICII_8BPP_PIXEL_CELL_MODE) {
                 vicii_update_memory_ptrs(VICII_RASTER_CYCLE(maincpu_clk));
             }
         }
@@ -1234,7 +1253,7 @@ void vicii_raster_draw_alarm_handler(CLOCK offset, void *data)
     	    }
 
             /* HACK to fix greetings in 2008 */
-            if((vicii.video_mode == VICII_8BPP_PIXEL_CELL_MODE)&&(vicii.raster.ycounter == 7))
+            if ((vicii.video_mode == VICII_8BPP_PIXEL_CELL_MODE)&&(vicii.raster.ycounter == 7))
                 vicii.screen_base_phi2 += vicii.counta_mod;
     	}
 

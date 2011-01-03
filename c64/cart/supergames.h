@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _SUPERGAMES_H
-#define _SUPERGAMES_H
+#ifndef VICE_SUPERGAMES_H
+#define VICE_SUPERGAMES_H
 
 #include <stdio.h>
 
@@ -39,4 +39,3 @@ extern int supergames_crt_attach(FILE *fd, BYTE *rawcart);
 extern void supergames_detach(void);
 
 #endif
-

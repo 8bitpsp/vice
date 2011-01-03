@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C128MEMROM_H
-#define _C128MEMROM_H
+#ifndef VICE_C128MEMROM_H
+#define VICE_C128MEMROM_H
 
 #include "types.h"
 
@@ -44,4 +44,3 @@ extern BYTE REGPARM1 c128memrom_rom_read(WORD addr);
 extern void REGPARM2 c128memrom_rom_store(WORD addr, BYTE value);
 
 #endif
-

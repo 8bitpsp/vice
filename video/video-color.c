@@ -36,16 +36,18 @@
 #include "video-canvas.h"
 #include "video-color.h"
 #include "video-resources.h"
-#include "videoarch.h"
 #include "video.h"
+#include "videoarch.h"
 
 DWORD gamma_red[256 * 3];
 DWORD gamma_grn[256 * 3];
 DWORD gamma_blu[256 * 3];
 
-DWORD gamma_red_fac[256 * 3];
-DWORD gamma_grn_fac[256 * 3];
-DWORD gamma_blu_fac[256 * 3];
+DWORD gamma_red_fac[256 * 3 * 2];
+DWORD gamma_grn_fac[256 * 3 * 2];
+DWORD gamma_blu_fac[256 * 3 * 2];
+
+DWORD alpha = 0;
 
 static DWORD color_red[256];
 static DWORD color_grn[256];
@@ -56,6 +58,11 @@ void video_render_setrawrgb(unsigned int index, DWORD r, DWORD g, DWORD b)
     color_red[index] = r;
     color_grn[index] = g;
     color_blu[index] = b;
+}
+
+void video_render_setrawalpha(DWORD a)
+{
+    alpha = a;
 }
 
 /*
@@ -103,7 +110,7 @@ static video_ycbcr_palette_t *video_ycbcr_palette_create(unsigned int num_entrie
 {
     video_ycbcr_palette_t *p;
 
-    p = (video_ycbcr_palette_t *)lib_malloc(sizeof(video_ycbcr_palette_t));
+    p = lib_malloc(sizeof(video_ycbcr_palette_t));
 
     p->num_entries = num_entries;
     p->entries = lib_calloc(num_entries, sizeof(video_ycbcr_color_t));
@@ -304,9 +311,16 @@ static void video_calc_gammatable(void)
         vi = (DWORD)(v * scn);
         if (vi > 255)
             vi = 255;
-        gamma_red_fac[i] = color_red[vi];
-        gamma_grn_fac[i] = color_grn[vi];
-        gamma_blu_fac[i] = color_blu[vi];
+        gamma_red_fac[i * 2] = color_red[vi];
+        gamma_grn_fac[i * 2] = color_grn[vi];
+        gamma_blu_fac[i * 2] = color_blu[vi];
+        v = video_gamma((float)(i - 256) + 0.5f, gam, bri, con);
+        vi = (DWORD)(v * scn);
+        if (vi > 255)
+            vi = 255;
+        gamma_red_fac[i * 2 + 1] = color_red[vi];
+        gamma_grn_fac[i * 2 + 1] = color_grn[vi];
+        gamma_blu_fac[i * 2 + 1] = color_blu[vi];
     }
 }
 
@@ -320,25 +334,25 @@ static void video_calc_ycbcrtable(const video_ycbcr_palette_t *p,
     float sat,tin;
 
     lf = 64*video_resources.pal_blur/1000;
-    hf = 256 - (lf << 1);
+    hf = 255 - (lf << 1);
     sat = ((float)(video_resources.color_saturation)) * (256.0f / 1000.0f);
     tin = (((float)(video_resources.color_tint)) * (50.0f / 2000.0f))-25.0f;
 
-    for (i = 0;i < p->num_entries; i++) {
+    for (i = 0; i < p->num_entries; i++) {
         SDWORD val;
 	
 	/* create primary table */
         primary = &p->entries[i];
         val = (SDWORD)(primary->y * 256.0f);
-        color_tab->ytable[i] = val;
-        /* factor in 65536 offset to not do it in hot path */
-        color_tab->ytablel[i] = (val + 65536) * lf;
-        color_tab->ytableh[i] = (val + 65536) * hf;
-        color_tab->cbtable[i] = (SDWORD)((primary->cb)* sat);
+        color_tab->ytablel[i] = val * lf;
+        color_tab->ytableh[i] = val * hf;
+        color_tab->cbtable[i] = (SDWORD)((primary->cb) * sat);
+        color_tab->cutable[i] = (SDWORD)(0.493111 * primary->cb * 256);
 	/* tint, add to cr in odd lines */
 	val = (SDWORD)(tin);
-        color_tab->crtable[i] = (SDWORD)((primary->cr+val) * sat);
- 
+        color_tab->crtable[i] = (SDWORD)((primary->cr + val) * sat);
+        color_tab->cvtable[i] = (SDWORD)(0.877283 * (primary->cr + val) * 256);
+        
         /* YCbCr to YUV, scale [0, 256] to [0, 255] */
         color_tab->yuv_table[i] = ((BYTE)(primary->y * 255 / 256 + 0.5) << 16)
             | ((BYTE)(0.493111 * primary->cb * 255 / 256 + 128.5) << 8)
@@ -356,16 +370,17 @@ static void video_calc_ycbcrtable_oddlines(const video_ycbcr_palette_t *p,
     sat = ((float)(video_resources.color_saturation)) * (256.0f / 1000.0f);
     tin = (((float)(video_resources.color_tint)) * (50.0f / 2000.0f))-25.0f;
     
-    for (i = 0;i < p->num_entries; i++) {
+    for (i = 0; i < p->num_entries; i++) {
         SDWORD val;
 	
 	/* create primary table */
         primary = &p->entries[i];
-        val = (SDWORD)(primary->y * 256.0f);
-        color_tab->cbtable_odd[i] = (SDWORD)((primary->cb)* sat);
+        color_tab->cbtable_odd[i] = -(SDWORD)((primary->cb) * sat);
+        color_tab->cutable_odd[i] = -(SDWORD)(0.493111 * primary->cb * 256);
 	/* tint, substract from cr in odd lines */
 	val = (SDWORD)(tin);
-        color_tab->crtable_odd[i] = (SDWORD)((primary->cr-val) * sat);
+        color_tab->crtable_odd[i] = -(SDWORD)((primary->cr - val) * sat);
+        color_tab->cvtable_odd[i] = -(SDWORD)(0.877283 * (primary->cr - val) * 256);
     }
 }
 
@@ -476,7 +491,7 @@ static palette_t *video_load_palette(const video_cbm_palette_t *p,
     if (palette == NULL)
         return NULL;
 
-    if (!console_mode && !vsid_mode && palette_load(name, palette) < 0) {
+    if (!video_disabled_mode && palette_load(name, palette) < 0) {
         /* log_message(vicii.log, "Cannot load palette file `%s'.", name); */
         return NULL;
     }

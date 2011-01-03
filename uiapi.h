@@ -26,8 +26,10 @@
 
 /* Do not include this header file, include `ui.h' instead.  */
 
-#ifndef _UIAPI
-#define _UIAPI
+#ifndef VICE_UIAPI
+#define VICE_UIAPI
+
+#include "types.h"
 
 typedef enum {
     UI_JAM_RESET, UI_JAM_HARD_RESET, UI_JAM_MONITOR, UI_JAM_NONE
@@ -49,6 +51,9 @@ extern int ui_init(int *argc, char **argv);
 extern int ui_init_finish(void);
 extern int ui_init_finalize(void);
 extern void ui_shutdown(void);
+
+/* Print a message.  */
+extern void ui_message(const char *format,...);
 
 /* Print an error message.  */
 extern void ui_error(const char *format,...);
@@ -96,5 +101,7 @@ extern void ui_display_joyport(BYTE *joyport);
 /* Volume UI */
 void ui_display_volume(int vol);
 
-#endif
+/* Event related UI. */
+extern void ui_dispatch_next_event(void);
 
+#endif

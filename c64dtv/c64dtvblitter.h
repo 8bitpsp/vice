@@ -1,5 +1,5 @@
 /*
- * c64dtvblitter.h - C64DTV blitter and DMA controller
+ * c64dtvblitter.h - C64DTV blitter
  *
  * Written by
  *  M.Kiesel <mayne@users.sourceforge.net>
@@ -27,13 +27,12 @@
  *
  */
 
-#ifndef _C64DTVBLITTER_H
-#define _C64DTVBLITTER_H
+#ifndef VICE_C64DTVBLITTER_H
+#define VICE_C64DTVBLITTER_H
 
 #include "types.h"
 
-#define CYCLE_EXACT_BLITTER
-
+extern int blitter_active;
 extern int blitter_on_irq;
 
 extern int c64dtvblitter_resources_init(void);
@@ -42,12 +41,11 @@ extern int c64dtvblitter_cmdline_options_init(void);
 extern void c64dtvblitter_init(void);
 extern void c64dtvblitter_reset(void);
 extern void c64dtvblitter_shutdown(void);
-extern void c64dtv_blitter_irq_init(void);
 
-extern BYTE REGPARM1 c64dtv_dmablit_read(WORD addr);
-extern void REGPARM2 c64dtv_dmablit_store(WORD addr, BYTE value);
+extern BYTE REGPARM1 c64dtv_blitter_read(WORD addr);
+extern void REGPARM2 c64dtv_blitter_store(WORD addr, BYTE value);
 
-extern int c64dtvblitter_perform_blitter(void);
+extern void c64dtvblitter_perform_blitter(void);
 extern void c64dtvblitter_trigger_blitter(void);
 
 struct snapshot_s;

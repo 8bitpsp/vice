@@ -53,17 +53,16 @@ static void tape_read_contents(tape_image_t *tape_image, image_contents_t *new)
         if (rec->type) {
             image_contents_file_list_t *new_list;
 
-            new_list = (image_contents_file_list_t *)lib_malloc(
-                       sizeof(image_contents_file_list_t));
+            new_list = lib_malloc(sizeof(image_contents_file_list_t));
             memcpy(new_list->name, rec->name, 16);
             new_list->name[IMAGE_CONTENTS_FILE_NAME_LEN] = 0;
 
-            if( rec->encoding==TAPE_ENCODING_TURBOTAPE )
+            if ( rec->encoding==TAPE_ENCODING_TURBOTAPE )
               new_list->type[0] = 'T';
             else
               new_list->type[0] = ' ';
 
-            if( rec->type==4 )
+            if ( rec->type==4 )
               {
                 strcpy((char *)new_list->type+1, "SEQ ");
                 new_list->size = 0;
@@ -88,7 +87,7 @@ static void tape_read_contents(tape_image_t *tape_image, image_contents_t *new)
     }
 }
 
-image_contents_t *tapecontents_read(const char *file_name, unsigned int unit)
+image_contents_t *tapecontents_read(const char *file_name)
 {
     tape_image_t *tape_image;
     image_contents_t *new;
@@ -109,35 +108,3 @@ image_contents_t *tapecontents_read(const char *file_name, unsigned int unit)
     tape_internal_close_tape_image(tape_image);
     return new;
 }
-
-char *tapecontents_filename_by_number(const char *filename, unsigned int unit,
-                                      unsigned int file_index)
-{
-    image_contents_t *contents;
-    image_contents_file_list_t *current;
-    char *s;
-
-    contents = tapecontents_read(filename, unit);
-
-    if (contents == NULL)
-        return NULL;
-
-    s = NULL;
-
-    if (file_index != 0) {
-        current = contents->file_list;
-        file_index--;
-        while ((file_index != 0) && (current != NULL)) {
-            current = current->next;
-            file_index--;
-        }
-        if (current != NULL) {
-            s = lib_stralloc((char *)(current->name));
-        }
-    }
-
-    image_contents_destroy(contents);
-
-    return s;
-}
-

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _SOUND_H
-#define _SOUND_H
+#ifndef VICE_SOUND_H
+#define VICE_SOUND_H
 
 #include "vice.h"
 
@@ -107,13 +107,18 @@ static inline SWORD sound_audio_mix(int ch1, int ch2)
 #define SOUND_ADJUST_ADJUSTING  1
 #define SOUND_ADJUST_EXACT      2
 
+/* Fragment sizes */
+#define SOUND_FRAGMENT_SMALL    0
+#define SOUND_FRAGMENT_MEDIUM   1
+#define SOUND_FRAGMENT_LARGE    2
+
 /* external functions for vice */
 extern void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame);
 extern void sound_reset(void);
 #if defined(__MSDOS__) || defined(__riscos)
-extern int sound_flush(int relative_speed);
+extern int sound_flush(void);
 #else
-extern double sound_flush(int relative_speed);
+extern double sound_flush(void);
 #endif
 extern void sound_suspend(void);
 extern void sound_resume(void);
@@ -143,9 +148,7 @@ extern int sound_init_hpux_device(void);
 extern int sound_init_midas_device(void);
 extern int sound_init_sdl_device(void);
 extern int sound_init_sgi_device(void);
-extern int sound_init_speed_device(void);
 extern int sound_init_sun_device(void);
-extern int sound_init_test_device(void); /* XXX: missing */
 extern int sound_init_uss_device(void);
 extern int sound_init_dx_device(void);
 extern int sound_init_ce_device(void);
@@ -157,13 +160,14 @@ extern int sound_init_beos_device(void);
 extern int sound_init_arts_device(void);
 extern int sound_init_esd_device(void);
 extern int sound_init_wmm_device(void);
-extern int sound_init_ffmpegaudio_device(void);
+extern int sound_init_movie_device(void);
 extern int sound_init_coreaudio_device(void);
 extern int sound_init_ahi_device(void);
 extern int sound_init_voc_device(void);
 extern int sound_init_iff_device(void);
 extern int sound_init_aiff_device(void);
 extern int sound_init_mp3_device(void);
+extern int sound_init_pulse_device(void);
 
 /* internal function for sound device registration */
 extern int sound_register_device(sound_device_t *pdevice);

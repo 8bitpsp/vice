@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -230,7 +230,7 @@ void fsdevice_flush(vdrive_t *vdrive, unsigned int secondary)
     if (secondary != 15 || !(fsdevice_dev[dnr].cptr))
         return;
 
-    cbmcmd = (char *)lib_malloc(ioutil_maxpathlen());
+    cbmcmd = lib_malloc(ioutil_maxpathlen());
 
     /* FIXME: Use `vdrive_command_parse()'! */
     /* remove trailing cr */

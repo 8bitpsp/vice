@@ -34,8 +34,9 @@
 #include "keyboard.h"
 #include "lib.h"
 #include "machine.h"
+#include "mem.h"
 #include "resources.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "util.h"
 #include "vic20-resources.h"
 #include "vic20mem.h"
@@ -68,9 +69,6 @@ int emu_id_enabled;
 
 /* Flag: Do we enable the VIC-1112 IEEE488 interface?  */
 int ieee488_enabled;
-
-/* which ROMs are loaded - bits are VIC_BLK* */
-int mem_rom_blocks;
 
 /* Flag: Do we have RAM block `n'?  */
 int ram_block_0_enabled;
@@ -105,23 +103,40 @@ static int set_basic_rom_name(const char *val, void *param)
     return vic20rom_load_basic(basic_rom_name);
 }
 
-/* Ugly hack...  */
-#define DEFINE_SET_BLOCK_FUNC(num)                                          \
-    static int set_ram_block_##num##_enabled(int value, void *param)        \
-    {                                                                       \
-        ram_block_##num##_enabled = value;                                  \
-        if (value) {                                                        \
-            mem_rom_blocks &= (VIC_ROM_BLK##num##A | VIC_ROM_BLK##num##B);  \
-            return vic20_mem_enable_ram_block(num);                         \
-        } else                                                              \
-            return vic20_mem_disable_ram_block(num);                        \
-    }
+static int set_ram_block_0_enabled(int value, void *param)
+{
+    ram_block_0_enabled = value;
+    mem_initialize_memory();
+    return 0;
+}
 
-DEFINE_SET_BLOCK_FUNC(0)
-DEFINE_SET_BLOCK_FUNC(1)
-DEFINE_SET_BLOCK_FUNC(2)
-DEFINE_SET_BLOCK_FUNC(3)
-DEFINE_SET_BLOCK_FUNC(5)
+static int set_ram_block_1_enabled(int value, void *param)
+{
+    ram_block_1_enabled = value;
+    mem_initialize_memory();
+    return 0;
+}
+
+static int set_ram_block_2_enabled(int value, void *param)
+{
+    ram_block_2_enabled = value;
+    mem_initialize_memory();
+    return 0;
+}
+
+static int set_ram_block_3_enabled(int value, void *param)
+{
+    ram_block_3_enabled = value;
+    mem_initialize_memory();
+    return 0;
+}
+
+static int set_ram_block_5_enabled(int value, void *param)
+{
+    ram_block_5_enabled = value;
+    mem_initialize_memory();
+    return 0;
+}
 
 static int set_emu_id_enabled(int val, void *param)
 {
@@ -172,7 +187,7 @@ static int set_sync_factor(int val, void *param)
 
 static int set_romset_firmware(int val, void *param)
 {
-    unsigned int num = (unsigned int)param;
+    unsigned int num = vice_ptr_to_uint(param);
 
     romset_firmware[num] = val;
 
@@ -206,15 +221,15 @@ static const resource_int_t resources_int[] =
       &romset_firmware[1], set_romset_firmware, (void *)1 },
     { "RomsetBasicName", 0, RES_EVENT_NO, NULL,
       &romset_firmware[2], set_romset_firmware, (void *)2 },
-    { "RAMBlock0", 1, RES_EVENT_SAME, NULL,
+    { "RAMBlock0", 0, RES_EVENT_SAME, NULL,
       &ram_block_0_enabled, set_ram_block_0_enabled, NULL },
-    { "RAMBlock1", 1, RES_EVENT_SAME, NULL,
+    { "RAMBlock1", 0, RES_EVENT_SAME, NULL,
       &ram_block_1_enabled, set_ram_block_1_enabled, NULL },
-    { "RAMBlock2", 1, RES_EVENT_SAME, NULL,
+    { "RAMBlock2", 0, RES_EVENT_SAME, NULL,
       &ram_block_2_enabled, set_ram_block_2_enabled, NULL },
-    { "RAMBlock3", 1, RES_EVENT_SAME, NULL,
+    { "RAMBlock3", 0, RES_EVENT_SAME, NULL,
       &ram_block_3_enabled, set_ram_block_3_enabled, NULL },
-    { "RAMBlock5", 1, RES_EVENT_SAME, NULL,
+    { "RAMBlock5", 0, RES_EVENT_SAME, NULL,
       &ram_block_5_enabled, set_ram_block_5_enabled, NULL },
     { "EmuID", 0, RES_EVENT_SAME, NULL,
       &emu_id_enabled, set_emu_id_enabled, NULL },

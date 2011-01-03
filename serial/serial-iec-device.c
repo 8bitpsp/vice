@@ -54,7 +54,7 @@ static int set_iec_device_enable(int enable, void *param)
 {
     unsigned int unit;
 
-    unit = (unsigned int)param;
+    unit = vice_ptr_to_uint(param);
 
     if ((unit < 4 || unit > 5) && (unit < 8 || unit > 11))
         return -1;
@@ -233,7 +233,7 @@ void serial_iec_device_reset(void)
     log_message(serial_iec_device_log, "serial_iec_device_reset()");
 #endif
 
-    for(i = 0; i < IECBUS_NUM; i++) 
+    for (i = 0; i < IECBUS_NUM; i++) 
     if (serial_iec_device_state[i].enabled) {
         iecbus_device_write(i, (BYTE)(IECBUS_DEVICE_WRITE_CLK
                             | IECBUS_DEVICE_WRITE_DATA));
@@ -284,7 +284,7 @@ void serial_iec_device_exec(CLOCK clk_value)
 {
     unsigned int i;
 
-    for(i = 0; i < IECBUS_NUM; i++)
+    for (i = 0; i < IECBUS_NUM; i++)
         if (serial_iec_device_state[i].enabled)
             serial_iec_device_exec_main(i, clk_value);
 }
@@ -468,7 +468,7 @@ static void serial_iec_device_exec_main(unsigned int devnr, CLOCK clk_value)
             /* ignore anything that happens during first 100us after falling
                flank on ATN (other devices may have been sending and need
                some time to set CLK=1) */
-            if( clk_value >= iec->timeout )
+            if ( clk_value >= iec->timeout )
             iec->state = P_PRE1;
             break;
           case P_PRE1: 
@@ -571,8 +571,8 @@ static void serial_iec_device_exec_main(unsigned int devnr, CLOCK clk_value)
                     else if (iec->secondary == 0)
                         iec->secondary = iec->byte;
 
-                    if (!(iec->primary & 0x10)
-                        && (((unsigned int)iec->primary & 0x0f) != devnr)) {
+                    if (iec->primary != 0x3f && iec->primary != 0x5f
+                        && (((unsigned int)iec->primary & 0x1f) != devnr)) {
                         /* This is NOT a UNLISTEN (0x3f) or UNTALK (0x5f)
                            command and the primary address is not ours =>
                            Don't acknowledge the frame and stop listening.
@@ -814,4 +814,3 @@ static void serial_iec_device_exec_main(unsigned int devnr, CLOCK clk_value)
         }
     }
 }
-

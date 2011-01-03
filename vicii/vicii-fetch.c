@@ -39,13 +39,7 @@
 #include "dma.h"
 #include "log.h"
 #include "maincpu.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "raster-sprite-status.h"
 #include "raster-sprite.h"
 #include "raster.h"
@@ -67,6 +61,7 @@ void vicii_fetch_matrix(int offs, int num, int num_0xff, int cycle)
     /*log_debug("OFF %02i NUM %02i NFF %02i",offs,num,num_0xff);*/
 
     if (vicii.viciidtv) {
+        num_0xff = 0;
         colorram = vicii.color_ram_ptr;
     } else {
         colorram = mem_color_ram_vicii;
@@ -75,16 +70,12 @@ void vicii_fetch_matrix(int offs, int num, int num_0xff, int cycle)
     if (num_0xff > 0) {
         if (num <= num_0xff) {
             memset(vicii.vbuf + offs, 0xff, num);
-
-            if (!vicii.colorfetch_disable)
-                memset(vicii.cbuf + offs, vicii.ram_base_phi2[reg_pc] & 0xf, num);
+            memset(vicii.cbuf + offs, vicii.ram_base_phi2[reg_pc] & 0xf, num);
+            /* FIXME: Crunch table in Multiplexer part of Krestage */
             vicii.background_color_source = 0xff;
         } else {
             memset(vicii.vbuf + offs, 0xff, num_0xff);
-
-            if (!vicii.colorfetch_disable)
-                memset(vicii.cbuf + offs, vicii.ram_base_phi2[reg_pc] & 0xf,
-                       num_0xff);
+            memset(vicii.cbuf + offs, vicii.ram_base_phi2[reg_pc] & 0xf, num_0xff);
         }
     }
 
@@ -117,37 +108,19 @@ void vicii_fetch_matrix(int offs, int num, int num_0xff, int cycle)
     /* Set correct background color in in the xsmooth area.
        As this only affects the next line, the xsmooth color is immediately
        set if the right border is opened.  */
-    /* A.M.: This is not true! Immediate change is necessary.
-       See the crunch table in Multiplexer part of Krestage */
     if (offs + num >= VICII_SCREEN_TEXTCOLS) {
         switch (vicii.get_background_from_vbuf) {
           case VICII_HIRES_BITMAP_MODE:
-#if 0
             raster_changes_next_line_add_int(
                 &vicii.raster,
                 &vicii.raster.xsmooth_color,
                 vicii.background_color_source & 0x0f);
-#else
-            raster_changes_background_add_int(
-                &vicii.raster,
-                VICII_RASTER_X(cycle),
-                &vicii.raster.xsmooth_color,
-                vicii.background_color_source & 0x0f);
-#endif
             break;
           case VICII_EXTENDED_TEXT_MODE:
-#if 0
             raster_changes_next_line_add_int(
                 &vicii.raster,
                 &vicii.raster.xsmooth_color,
                 vicii.regs[0x21 + (vicii.background_color_source >> 6)]);
-#else
-            raster_changes_background_add_int(
-                &vicii.raster,
-                VICII_RASTER_X(cycle),
-                &vicii.raster.xsmooth_color,
-                vicii.regs[0x21 + (vicii.background_color_source >> 6)]);
-#endif
             break;
         }
     }
@@ -179,9 +152,13 @@ inline static int do_matrix_fetch(CLOCK sub)
             vicii.ycounter_reset_checked = 1;
             vicii.memory_fetch_done = 2;
 
-            if ((vicii.fastmode == 0) && !vicii.badline_disable && !vicii.colorfetch_disable) 
+            if ((vicii.fastmode == 0) && !vicii.badline_disable && !vicii.colorfetch_disable) {
                 dma_maincpu_steal_cycles(vicii.fetch_clk,
                                          VICII_SCREEN_TEXTCOLS + 3 - sub, sub);
+            } else if (vicii.viciidtv && !vicii.colorfetch_disable) {
+                /* Steal cycles from DMA/Blitter */
+                dtvclockneg += VICII_SCREEN_TEXTCOLS + 3;
+            }
             vicii.bad_line = 1;
             return 1;
         }
@@ -461,8 +438,12 @@ inline static int handle_fetch_sprite(long offset, CLOCK sub,
 
     /*log_debug("SF %i VBL %i SUB %i",sf->num,vicii.bad_line,sub);*/
 
-    if ((vicii.fastmode == 0) && !vicii.badline_disable)
+    if ((vicii.fastmode == 0) && !vicii.badline_disable) {
         dma_maincpu_steal_cycles(vicii.fetch_clk, num_cycles - sub, sub);
+    } else if (vicii.viciidtv) {
+        /* Steal cycles from DMA/Blitter */
+        dtvclockneg += num_cycles;
+    }
 
     *write_offset = sub == 0 ? num_cycles : 0;
 

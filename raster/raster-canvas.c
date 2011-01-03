@@ -48,7 +48,7 @@ inline static void refresh_canvas(raster_t *raster)
     update_area = raster->update_area;
     viewport = raster->canvas->viewport;
 
-#ifndef GP2X
+#if !defined(GP2X) || defined(GP2X_SDL)
     if (update_area->is_null)
         return;
 #endif
@@ -106,7 +106,7 @@ inline static void refresh_canvas(raster_t *raster)
 
 void raster_canvas_handle_end_of_frame(raster_t *raster)
 {
-    if (console_mode || vsid_mode)
+    if (video_disabled_mode)
         return;
 
     if (raster->skip_frame)
@@ -123,8 +123,7 @@ void raster_canvas_handle_end_of_frame(raster_t *raster)
 
 void raster_canvas_init(raster_t *raster)
 {
-    raster->update_area = (raster_canvas_area_t *)lib_malloc(
-                          sizeof(raster_canvas_area_t));
+    raster->update_area = lib_malloc(sizeof(raster_canvas_area_t));
 
     raster->update_area->is_null = 1;
 }

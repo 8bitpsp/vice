@@ -34,13 +34,7 @@
 #include "lib.h"
 #include "log.h"
 #include "machine.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "plus4mem.h"
 #include "plus4memcsory256k.h"
 #include "plus4memhannes256k.h"
@@ -134,7 +128,7 @@ void cs256k_reset(void)
 
 static int cs256k_activate(void)
 {
-  cs256k_ram = (BYTE *)lib_realloc((void *)cs256k_ram, (size_t)0x40000);
+  cs256k_ram = lib_realloc((void *)cs256k_ram, (size_t)0x40000);
 
   log_message(cs256k_log, "CSORY 256K expansion installed.");
 

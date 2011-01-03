@@ -29,8 +29,8 @@
  *
  */
 
-#ifndef _REU_H
-#define _REU_H
+#ifndef VICE_REU_H
+#define VICE_REU_H
 
 #include "types.h"
 
@@ -52,4 +52,3 @@ extern int reu_write_snapshot_module(struct snapshot_s *s);
 extern int reu_enabled;
 
 #endif
-

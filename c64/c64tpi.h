@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _C64TPI_H
-#define _C64TPI_H
+#ifndef VICE_C64TPI_H
+#define VICE_C64TPI_H
 
 #include "types.h"
 
@@ -41,4 +41,3 @@ extern BYTE REGPARM1 tpi_read(WORD addr);
 extern BYTE REGPARM1 tpi_peek(WORD addr);
 
 #endif
-

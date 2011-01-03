@@ -28,9 +28,7 @@
 
 #include <stdio.h>
 
-#include "c64romset.h"
 #include "romset.h"
-
 
 const char *machine_romset_resources_list[] = {
     "ChargenName",
@@ -49,7 +47,6 @@ const char *machine_romset_resources_list[] = {
     NULL
 };
 
-
 int machine_romset_file_load(const char *filename)
 {
     return romset_file_load(filename);
@@ -67,11 +64,9 @@ char *machine_romset_file_list(void)
 
 int machine_romset_archive_item_create(const char *romset_name)
 {
-    return romset_archive_item_create(romset_name,
-        machine_romset_resources_list);
+    return romset_archive_item_create(romset_name, machine_romset_resources_list);
 }
 
 void machine_romset_init(void)
 {
 }
-

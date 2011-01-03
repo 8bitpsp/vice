@@ -24,15 +24,18 @@
  *
  */
 
-#ifndef _DISKCONTENTS_H
-#define _DISKCONTENTS_H
+#ifndef VICE_DISKCONTENTS_H
+#define VICE_DISKCONTENTS_H
 
 struct image_contents_s;
 
 extern struct image_contents_s *diskcontents_read(const char *file_name,
                                                   unsigned int unit);
-extern char *diskcontents_filename_by_number(const char *filename,
-                                             unsigned int unit,
-                                             unsigned int file_index);
+extern struct image_contents_s *diskcontents_filesystem_read(const char *file_name);
+extern struct image_contents_s *diskcontents_read_unit8(const char *file_name);
+extern struct image_contents_s *diskcontents_read_unit9(const char *file_name);
+extern struct image_contents_s *diskcontents_read_unit10(const char *file_name);
+extern struct image_contents_s *diskcontents_read_unit11(const char *file_name);
+
 #endif
 

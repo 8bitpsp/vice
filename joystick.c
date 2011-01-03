@@ -7,7 +7,7 @@
  * Based on old code by
  *  Ettore Perazzoli <ettore@comm2000.it>
  *  Jouko Valta <jopi@stekt.oulu.fi>
- *  André Fachat <fachat@physik.tu-chemnitz.de>
+ *  AndrÃ© Fachat <fachat@physik.tu-chemnitz.de>
  *  Bernhard Kuhn <kuhn@eikon.e-technik.tu-muenchen.de>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
@@ -35,32 +35,37 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "archdep.h"
 #include "alarm.h"
 #include "event.h"
 #include "keyboard.h"
 #include "joy.h"
 #include "joystick.h"
 #include "kbd.h"
+#include "machine.h"
 #include "maincpu.h"
 #include "network.h"
 #include "snapshot.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "types.h"
 #include "log.h"
 #include "resources.h"
 
 #define JOYSTICK_RAND() (rand() & 0x3fff)
 
-#define JOYSTICK_NUM 3
-
 /* Global joystick value.  */
-BYTE joystick_value[JOYSTICK_NUM] = { 0, 0, 0 };
+/*! \todo SRT: document: what are these values joystick_value[0, 1, 2, ..., 5] used for? */
+BYTE joystick_value[JOYSTICK_NUM + 1] = { 0 };
 
 /* Latched joystick status.  */
-static BYTE latch_joystick_value[JOYSTICK_NUM] = { 0, 0, 0 };
-static BYTE network_joystick_value[JOYSTICK_NUM] = { 0, 0, 0 };
+static BYTE latch_joystick_value[JOYSTICK_NUM + 1] = { 0 };
+static BYTE network_joystick_value[JOYSTICK_NUM + 1] = { 0 };
+
+/* mapping of the joystick ports */
+int joystick_port_map[JOYSTICK_NUM] = { 0 };
 
 /* to prevent illegal direction combinations */
+static int joystick_opposite_enable = 0;
 static const BYTE joystick_opposite_direction[] = 
     { 0, 2, 1, 3, 8, 10, 9, 11, 4, 6, 5, 7, 12, 14, 13, 15 };
 
@@ -71,6 +76,8 @@ static CLOCK joystick_delay;
 #ifdef COMMON_KBD
 static int joykeys[3][9];
 #endif
+
+/*! \todo @@@SRT offset is unused! */
 
 static void joystick_latch_matrix(CLOCK offset)
 {
@@ -115,6 +122,10 @@ static void joystick_latch_handler(CLOCK offset, void *data)
 
 void joystick_event_delayed_playback(void *data)
 {
+    /*! \todo @@@SRT: why network_joystick_value?
+     * and why sizeof latch_joystick_value, 
+     * if the target is network_joystick_value?
+     */
     memcpy(network_joystick_value, data, sizeof(latch_joystick_value));
     alarm_set(joystick_alarm, maincpu_clk + joystick_delay);
 }
@@ -157,7 +168,11 @@ void joystick_set_value_or(unsigned int joyport, BYTE value)
         return;
 
     latch_joystick_value[joyport] |= value;
-    latch_joystick_value[joyport] &= ~joystick_opposite_direction[value & 0xf];
+
+    if (!joystick_opposite_enable) {
+        latch_joystick_value[joyport] &= ~joystick_opposite_direction[value & 0xf];
+    }
+
     latch_joystick_value[0] = (BYTE)joyport;
     joystick_process_latch();
 }
@@ -181,8 +196,77 @@ void joystick_clear(unsigned int joyport)
 
 void joystick_clear_all(void)
 {
-    memset(latch_joystick_value, 0, JOYSTICK_NUM);
+    memset(latch_joystick_value, 0, sizeof latch_joystick_value);
     joystick_latch_matrix(0);
+}
+
+/*-----------------------------------------------------------------------*/
+
+/* Userport joystick interface emulation */
+
+int extra_joystick_enable;
+int extra_joystick_type;
+
+static int extra_joystick_cga_select = 0;
+static BYTE extra_joystick_hit_sp2_button = 0xff;
+
+BYTE extra_joystick_cga_read(void)
+{
+    return (BYTE)~((joystick_value[3] & 0x10)
+           | ((joystick_value[4] & 0x10) << 1)
+           | (joystick_value[extra_joystick_cga_select + 3] & 0xf));
+}
+
+void extra_joystick_cga_store(BYTE value)
+{
+    extra_joystick_cga_select = (value & 0x80) ? 0 : 1;
+}
+
+BYTE extra_joystick_hit_read_button2(void)
+{
+    return extra_joystick_hit_sp2_button;
+}
+
+BYTE extra_joystick_hit_read_button1(void)
+{
+    return (BYTE)((joystick_value[3] & 0x10) ? 0 : 4);
+}
+
+BYTE extra_joystick_hit_read(void)
+{
+    return (BYTE)~((joystick_value[3] & 0xf) | ((joystick_value[4] & 0xf) << 4));
+}
+
+void extra_joystick_hit_store(BYTE value)
+{
+    extra_joystick_hit_sp2_button = (joystick_value[4] & 0x10) ? 0 : 0xff;
+}
+
+BYTE extra_joystick_pet_read(void)
+{
+    BYTE retval;
+
+    retval = ((joystick_value[3] & 0xf) | (joystick_value[4] & 0xf) << 4);
+    retval |= (joystick_value[3] & 0x10) ? 3 : 0;
+    retval |= (joystick_value[4] & 0x10) ? 0x30 : 0;
+    return (BYTE)~(retval);
+}
+
+BYTE extra_joystick_hummer_read(void)
+{
+    return (BYTE)~(joystick_value[3] & 0x1f);
+}
+
+BYTE extra_joystick_oem_read(void)
+{
+    BYTE retval;
+
+    retval = ((joystick_value[3] & 1) << 7);
+    retval |= ((joystick_value[3] & 2) << 5);
+    retval |= ((joystick_value[3] & 4) << 3);
+    retval |= ((joystick_value[3] & 8) << 1);
+    retval |= ((joystick_value[3] & 16) >> 1);
+    return (BYTE)~(retval);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -241,14 +325,20 @@ static int joykeys_enable = 0;
 
 static int set_joykeys_enable(int val, void *param)
 {
-  joykeys_enable = val;
-  return 0;
+    joykeys_enable = val;
+    return 0;
+}
+
+static int set_joystick_opposite_enable(int val, void *param)
+{
+    joystick_opposite_enable = val;
+    return 0;
 }
 
 #define DEFINE_SET_KEYSET(num)                       \
     static int set_keyset##num(int val, void *param) \
     {                                                \
-        joykeys[num][(int)param] = val;              \
+        joykeys[num][vice_ptr_to_int(param)] = val;  \
                                                      \
         return 0;                                    \
     }
@@ -257,44 +347,66 @@ DEFINE_SET_KEYSET(1)
 DEFINE_SET_KEYSET(2)
 
 static const resource_int_t resources_int[] = {
-    { "KeySet1NorthWest", 0, RES_EVENT_NO, NULL,
+    { "KeySet1NorthWest", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_NW], set_keyset1, (void *)KEYSET_NW },
-    { "KeySet1North", 0, RES_EVENT_NO, NULL,
+    { "KeySet1North", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_N], set_keyset1, (void *)KEYSET_N },
-    { "KeySet1NorthEast", 0, RES_EVENT_NO, NULL,
+    { "KeySet1NorthEast", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_NE], set_keyset1, (void *)KEYSET_NE },
-    { "KeySet1East", 0, RES_EVENT_NO, NULL,
+    { "KeySet1East", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_E], set_keyset1, (void *)KEYSET_E },
-    { "KeySet1SouthEast", 0, RES_EVENT_NO, NULL,
+    { "KeySet1SouthEast", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_SE], set_keyset1, (void *)KEYSET_SE },
-    { "KeySet1South", 0, RES_EVENT_NO, NULL,
+    { "KeySet1South", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_S], set_keyset1, (void *)KEYSET_S },
-    { "KeySet1SouthWest", 0, RES_EVENT_NO, NULL,
+    { "KeySet1SouthWest", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_SW], set_keyset1, (void *)KEYSET_SW },
-    { "KeySet1West", 0, RES_EVENT_NO, NULL,
+    { "KeySet1West", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_W], set_keyset1, (void *)KEYSET_W },
-    { "KeySet1Fire", 0, RES_EVENT_NO, NULL,
+    { "KeySet1Fire", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[1][KEYSET_FIRE], set_keyset1, (void *)KEYSET_FIRE },
-    { "KeySet2NorthWest", 0, RES_EVENT_NO, NULL,
+    { "KeySet2NorthWest", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_NW], set_keyset2, (void *)KEYSET_NW },
-    { "KeySet2North", 0, RES_EVENT_NO, NULL,
+    { "KeySet2North", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_N], set_keyset2, (void *)KEYSET_N },
-    { "KeySet2NorthEast", 0, RES_EVENT_NO, NULL,
+    { "KeySet2NorthEast", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_NE], set_keyset2, (void *)KEYSET_NE },
-    { "KeySet2East", 0, RES_EVENT_NO, NULL,
+    { "KeySet2East", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_E], set_keyset2, (void *)KEYSET_E },
-    { "KeySet2SouthEast", 0, RES_EVENT_NO, NULL,
+    { "KeySet2SouthEast", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_SE], set_keyset2, (void *)KEYSET_SE },
-    { "KeySet2South", 0, RES_EVENT_NO, NULL,
+    { "KeySet2South", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_S], set_keyset2, (void *)KEYSET_S },
-    { "KeySet2SouthWest", 0, RES_EVENT_NO, NULL,
+    { "KeySet2SouthWest", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_SW], set_keyset2, (void *)KEYSET_SW },
-    { "KeySet2West", 0, RES_EVENT_NO, NULL,
+    { "KeySet2West", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_W], set_keyset2, (void *)KEYSET_W },
-    { "KeySet2Fire", 0, RES_EVENT_NO, NULL,
+    { "KeySet2Fire", ARCHDEP_KEYBOARD_SYM_NONE, RES_EVENT_NO, NULL,
       &joykeys[2][KEYSET_FIRE], set_keyset2, (void *)KEYSET_FIRE },
     { "KeySetEnable", 1, RES_EVENT_NO, NULL,
       &joykeys_enable, set_joykeys_enable, NULL },
+    { "JoyOpposite", 0, RES_EVENT_NO, NULL,
+      &joystick_opposite_enable, set_joystick_opposite_enable, NULL },
+    { NULL }
+};
+
+static int set_extra_joystick_enable(int val, void *param)
+{
+    extra_joystick_enable = val;
+    return 0;
+}
+
+static int set_extra_joystick_type(int val, void *param)
+{
+    extra_joystick_type = val;
+    return 0;
+}
+
+static const resource_int_t extra_resources_int[] = {
+    { "ExtraJoy", 0, RES_EVENT_NO, NULL,
+      &extra_joystick_enable, set_extra_joystick_enable, NULL },
+    { "ExtraJoyType", 0, RES_EVENT_NO, NULL,
+      &extra_joystick_type, set_extra_joystick_type, NULL },
     { NULL }
 };
 
@@ -303,8 +415,9 @@ int joystick_check_set(signed long key, int keysetnum, unsigned int joyport)
     int column;
 
     /* if joykeys are disabled then ignore key sets */
-    if(!joykeys_enable)
-      return 0;
+    if (!joykeys_enable) {
+        return 0;
+    }
 
     for (column = 0; column < 9; column++) {
         if (key == joykeys[keysetnum][column]) {
@@ -328,8 +441,9 @@ int joystick_check_clr(signed long key, int keysetnum, unsigned int joyport)
     int column;
 
     /* if joykeys are disabled then ignore key sets */
-    if(!joykeys_enable)
-      return 0;
+    if (!joykeys_enable) {
+        return 0;
+    }
 
     for (column = 0; column < 9; column++) {
         if (key == joykeys[keysetnum][column]) {
@@ -354,6 +468,10 @@ void joystick_joypad_clear(void)
 int joystick_init_resources(void)
 {
     resources_register_int(resources_int);
+
+    if (machine_class != VICE_MACHINE_PLUS4) {
+        resources_register_int(extra_resources_int);
+    }
 
     return joystick_arch_init_resources();
 }
@@ -380,8 +498,9 @@ int joystick_snapshot_write_module(snapshot_t *s)
     if (m == NULL)
        return -1;
 
+    /* FIXME "- 2" is to keep compatible with old snapshots */
     if (0
-        || SMW_BA(m, joystick_value, JOYSTICK_NUM) < 0)
+        || SMW_BA(m, joystick_value, (JOYSTICK_NUM + 1) - 2) < 0)
     {
         snapshot_module_close(m);
         return -1;
@@ -404,8 +523,9 @@ int joystick_snapshot_read_module(snapshot_t *s)
         return 0;
     }
 
+    /* FIXME "- 2" is to keep compatible with old snapshots */
     if (0
-        || SMR_BA(m, joystick_value, JOYSTICK_NUM) < 0)
+        || SMR_BA(m, joystick_value, (JOYSTICK_NUM + 1) - 2) < 0)
     {
         snapshot_module_close(m);
         return -1;

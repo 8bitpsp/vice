@@ -69,8 +69,6 @@ typedef struct break_list_s break_list_t;
 static int breakpoint_count;
 break_list_t *breakpoints[NUM_MEMSPACES];
 
-extern void parse_and_execute_line(char *input);
-
 void mon_breakpoint_init(void)
 {
     breakpoint_count = 1;
@@ -257,8 +255,8 @@ void mon_breakpoint_delete_checkpoint(int brknum)
     }
     if (bp != NULL) {
         mon_delete_conditional(bp->condition);
-        if (bp->command)
-            lib_free(bp->command);
+        lib_free(bp->command);
+        bp->command = NULL;
     }
 }
 
@@ -368,7 +366,8 @@ bool monitor_breakpoint_check_checkpoint(MEMSPACE mem, WORD addr,
             result = TRUE;
 
             temp = new_addr(mem,
-                            (monitor_cpu_type.mon_register_get_val)(mem, e_PC));            if (bp->trace) {
+                            (monitor_cpu_for_memspace[mem]->mon_register_get_val)(mem, e_PC));
+            if (bp->trace) {
                 type = "Trace";
                 result = FALSE;
             }
@@ -399,7 +398,7 @@ static void add_to_checkpoint_list(break_list_t **head, breakpoint_t *bp)
 {
     break_list_t *new_entry, *cur_entry, *prev_entry;
 
-    new_entry = (break_list_t *)lib_malloc(sizeof(break_list_t));
+    new_entry = lib_malloc(sizeof(break_list_t));
     new_entry->brkpt = bp;
 
     cur_entry = *head;
@@ -436,7 +435,7 @@ int breakpoint_add_checkpoint(MON_ADDR start_addr, MON_ADDR end_addr,
     long len;
 
     len = mon_evaluate_address_range(&start_addr, &end_addr, FALSE, 0);
-    new_bp = (breakpoint_t *)lib_malloc(sizeof(breakpoint_t));
+    new_bp = lib_malloc(sizeof(breakpoint_t));
 
     new_bp->brknum = breakpoint_count++;
     new_bp->start_addr = start_addr;

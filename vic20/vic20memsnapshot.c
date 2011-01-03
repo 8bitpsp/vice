@@ -38,14 +38,9 @@
 #include <memory.h>
 #endif
 
+#include "cart/vic20cart.h"
 #include "log.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "resources.h"
 #include "snapshot.h"
 #include "types.h"
@@ -64,7 +59,7 @@ static log_t vic20_snapshot_log = LOG_ERR;
  * VIC20 memory dump contains the available memory at the moment
  */
 #define VIC20MEM_DUMP_VER_MAJOR   1
-#define VIC20MEM_DUMP_VER_MINOR   0
+#define VIC20MEM_DUMP_VER_MINOR   1
 #define SNAP_MEM_MODULE_NAME      "VIC20MEM"
 
 /*
@@ -74,9 +69,11 @@ static log_t vic20_snapshot_log = LOG_ERR;
  *                                  3: 1 = expansion block 3 RAM enabled
  *                                  5: 1 = expansion block 5 RAM enabled
  *
+ * UBYTE        cpu_last_data
+ * UBYTE        v_bus_last_data
+ * UBYTE        v_bus_last_high
  * ARRAY        RAM0            1k RAM $0000-$03ff
  * ARRAY        RAM1            4k RAM $1000-$1fff
- * ARRAY        COLORRAM        2k Video RAM
  * ARRAY        BLK0            3k RAM $0400-$0fff (if blk 0 RAM enabled)
  * ARRAY        BLK1            8k RAM $2000-$3fff (if blk 1 RAM enabled)
  * ARRAY        BLK2            8k RAM $4000-$5fff (if blk 2 RAM enabled)
@@ -106,9 +103,12 @@ static int mem_write_ram_snapshot_module(snapshot_t *p)
 
     SMW_B(m, config);
 
+    SMW_B(m, vic20_cpu_last_data);
+    SMW_B(m, vic20_v_bus_last_data);
+    SMW_B(m, vic20_v_bus_last_high);
+
     SMW_BA(m, mem_ram, 0x0400);
     SMW_BA(m, mem_ram + 0x1000, 0x1000);
-    SMW_BA(m, mem_ram + 0x9400, 0x0800);
 
     if (config & 1) {
         SMW_BA(m, mem_ram + 0x0400, 0x0c00);
@@ -149,12 +149,12 @@ static int mem_read_ram_snapshot_module(snapshot_t *p)
 
     SMR_B(m, &config);
 
+    SMR_B(m, &vic20_cpu_last_data);
+    SMR_B(m, &vic20_v_bus_last_data);
+    SMR_B(m, &vic20_v_bus_last_high);
+
     SMR_BA(m, mem_ram, 0x0400);
     SMR_BA(m, mem_ram + 0x1000, 0x1000);
-    /* setup wraparound copy of chargen */
-    memcpy(vic20memrom_chargen_rom, mem_ram + 0x1c00, 0x400);
-
-    SMR_BA(m, mem_ram + 0x9400, 0x0800);
 
     resources_set_int("RAMBlock0", (config & 1) ? 1 : 0 );
     if (config & 1) {
@@ -219,7 +219,6 @@ static int mem_read_ram_snapshot_module(snapshot_t *p)
 static int mem_write_rom_snapshot_module(snapshot_t *p, int save_roms)
 {
     snapshot_module_t *m;
-    BYTE config;
     int trapfl;
 
     if (!save_roms) {
@@ -236,41 +235,15 @@ static int mem_write_rom_snapshot_module(snapshot_t *p, int save_roms)
     resources_get_int("VirtualDevices", &trapfl);
     resources_set_int("VirtualDevices", 0);
 
-    config = mem_rom_blocks;
-
-    SMW_B(m, config);
+    /* old cart system config bits.  all zero = no roms */
+    SMW_B(m, 0x00);
 
     /* save kernal */
     SMW_BA(m, vic20memrom_kernal_rom, 0x2000);
     /* save basic */
     SMW_BA(m, vic20memrom_basic_rom, 0x2000);
 
-    SMW_BA(m, vic20memrom_chargen_rom + 0x400, 0x1000);
-
-    if (config & 1) {
-        SMW_BA(m, mem_cartrom + 0x2000, 0x1000);
-    }
-    if (config & 2) {
-        SMW_BA(m, mem_cartrom + 0x3000, 0x1000);
-    }
-    if (config & 16) {
-        SMW_BA(m, mem_cartrom + 0x6000, 0x1000);
-    }
-    if (config & 32) {
-        SMW_BA(m, mem_cartrom + 0x7000, 0x1000);
-    }
-    if (config & 64) {
-        SMW_BA(m, mem_cartrom + 0xA000, 0x1000);
-    }
-    if (config & 128) {
-        SMW_BA(m, mem_cartrom + 0xB000, 0x1000);
-    }
-    if (config & 4) {
-        SMW_BA(m, mem_cartrom + 0x4000, 0x1000);
-    }
-    if (config & 8) {
-        SMW_BA(m, mem_cartrom + 0x5000, 0x1000);
-    }
+    SMW_BA(m, vic20memrom_chargen_rom, 0x1000);
 
     /* enable traps again when necessary */
     resources_set_int("VirtualDevices", trapfl);
@@ -301,6 +274,7 @@ static int mem_read_rom_snapshot_module(snapshot_t *p)
     resources_get_int("VirtualDevices", &trapfl);
     resources_set_int("VirtualDevices", 0);
 
+    /* old cart system ROMs (ignored) */
     SMR_B(m, &config);
 
     /* read kernal */
@@ -308,42 +282,7 @@ static int mem_read_rom_snapshot_module(snapshot_t *p)
     /* read basic */
     SMR_BA(m, vic20memrom_basic_rom, 0x2000);
 
-    SMR_BA(m, vic20memrom_chargen_rom + 0x400, 0x1000);
-
-    mem_rom_blocks = 0;
-
-    if (config & 1) {
-        SMR_BA(m, mem_cartrom + 0x2000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK1A;
-    }
-    if (config & 2) {
-        SMR_BA(m, mem_cartrom + 0x3000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK1B;
-    }
-    if (config & 16) {
-        SMR_BA(m, mem_cartrom + 0x6000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK3A;
-    }
-    if (config & 32) {
-        SMR_BA(m, mem_cartrom + 0x7000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK3B;
-    }
-    if (config & 64) {
-        SMR_BA(m, mem_cartrom + 0xA000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK5A;
-    }
-    if (config & 128) {
-        SMR_BA(m, mem_cartrom + 0xB000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK5B;
-    }
-    if (config & 4) {
-        SMR_BA(m, mem_cartrom + 0x4000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK2A;
-    }
-    if (config & 8) {
-        SMR_BA(m, mem_cartrom + 0x5000, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK2B;
-    }
+    SMR_BA(m, vic20memrom_chargen_rom, 0x1000);
 
     vic20rom_kernal_checksum();
     vic20rom_basic_checksum();
@@ -365,7 +304,8 @@ static int mem_read_rom_snapshot_module(snapshot_t *p)
 int vic20_snapshot_write_module(snapshot_t *m, int save_roms)
 {
     if (mem_write_ram_snapshot_module(m) < 0
-        || mem_write_rom_snapshot_module(m, save_roms) < 0 ) {
+        || mem_write_rom_snapshot_module(m, save_roms) < 0
+        || vic20cart_snapshot_write_module(m) < 0) {
         return -1;
     }
     return 0;
@@ -374,7 +314,8 @@ int vic20_snapshot_write_module(snapshot_t *m, int save_roms)
 int vic20_snapshot_read_module(snapshot_t *m)
 {
     if (mem_read_ram_snapshot_module(m) < 0
-        || mem_read_rom_snapshot_module(m) < 0 ) {
+        || mem_read_rom_snapshot_module(m) < 0
+        || vic20cart_snapshot_read_module(m) < 0) {
         return -1;
     }
     return 0;

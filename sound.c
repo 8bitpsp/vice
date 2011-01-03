@@ -51,7 +51,7 @@
 #include "sound.h"
 #include "translate.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "util.h"
 #include "vsync.h"
 
@@ -84,8 +84,15 @@ static char *recorddevice_arg = NULL; /* app_resources.soundDeviceArg */
 static int buffer_size;               /* app_resources.soundBufferSize */
 static int suspend_time;              /* app_resources.soundSuspendTime */
 static int speed_adjustment_setting;  /* app_resources.soundSpeedAdjustment */
-static int oversampling_factor;       /* app_resources.soundOversample */
 static int volume;
+static int fragment_size;
+
+/* divisors for fragment size calculation */
+static int fragment_divisor[] = {
+    4, /* 5ms */
+    2, /* 10 ms */
+    1  /* 20 ms */
+};
 
 /* I need this to serialize close_sound and enablesound/sound_open in
    the OS/2 Multithreaded environment                              */
@@ -151,6 +158,13 @@ static int set_buffer_size(int val, void *param)
     return 0;
 }
 
+static int set_fragment_size(int val, void *param)
+{
+    fragment_size = val;
+    sound_state_changed = TRUE;
+    return 0;
+}
+
 static int set_suspend_time(int val, void *param)
 {
     suspend_time = val;
@@ -165,20 +179,6 @@ static int set_suspend_time(int val, void *param)
 static int set_speed_adjustment_setting(int val, void *param)
 {
     speed_adjustment_setting = val;
-    return 0;
-}
-
-static int set_oversampling_factor(int val, void *param)
-{
-    oversampling_factor = val;
-
-    if (oversampling_factor < 0 || oversampling_factor > 3) {
-        log_warning(sound_log, "Invalid oversampling factor %d.  Forcing 3.",
-                    oversampling_factor);
-        oversampling_factor = 3;
-    }
-
-    sound_state_changed = TRUE;
     return 0;
 }
 
@@ -216,12 +216,12 @@ static const resource_int_t resources_int[] = {
       (void *)&sample_rate, set_sample_rate, NULL },
     { "SoundBufferSize", SOUND_SAMPLE_BUFFER_SIZE, RES_EVENT_NO, NULL,
       (void *)&buffer_size, set_buffer_size, NULL },
+    { "SoundFragmentSize", ARCHDEP_SOUND_FRAGMENT_SIZE, RES_EVENT_NO, NULL,
+      (void *)&fragment_size, set_fragment_size, NULL },
     { "SoundSuspendTime", 0, RES_EVENT_NO, NULL,
       (void *)&suspend_time, set_suspend_time, NULL },
     { "SoundSpeedAdjustment", SOUND_ADJUST_FLEXIBLE, RES_EVENT_NO, NULL,
       (void *)&speed_adjustment_setting, set_speed_adjustment_setting, NULL },
-    { "SoundOversample", 0, RES_EVENT_NO, NULL,
-      (void *)&oversampling_factor, set_oversampling_factor, NULL },
     { "SoundVolume", 100, RES_EVENT_NO, NULL,
       (void *)&volume, set_volume, NULL },
     { NULL }
@@ -266,6 +266,11 @@ static const cmdline_option_t cmdline_options[] = {
       USE_PARAM_ID, USE_DESCRIPTION_ID,
       IDCLS_P_VALUE, IDCLS_SET_SOUND_BUFFER_SIZE_MSEC,
       NULL, NULL },
+    { "-soundfragsize", SET_RESOURCE, 1,
+      NULL, NULL, "SoundFragmentSize", NULL,
+      USE_PARAM_STRING, USE_DESCRIPTION_STRING,
+      IDCLS_P_VALUE, IDCLS_SET_SOUND_BUFFER_SIZE_MSEC,
+      T_("value"), T_("Set sound fragment size (0 = small, 1 = medium, 2 = large)") },
     { "-sounddev", SET_RESOURCE, 1,
       NULL, NULL, "SoundDeviceName", NULL,
       USE_PARAM_ID, USE_DESCRIPTION_ID,
@@ -366,12 +371,6 @@ typedef struct
     /* is the device suspended? */
     int issuspended;
     SWORD lastsample[SOUND_CHANNELS_MAX];
-
-    /* nr of samples to oversame / real sample */
-    int oversamplenr;
-
-    /* number of shift needed on oversampling */
-    int oversampleshift;
 } snddata_t;
 
 static snddata_t snddata;
@@ -445,7 +444,7 @@ static int sound_error(const char *msg)
     sound_close();
 
     if (console_mode || vsid_mode) {
-        log_message(sound_log, msg);
+        log_message(sound_log, "%s", msg);
     } else {
         char *txt = lib_msprintf("Sound: %s", msg);
         ui_error(txt);
@@ -470,7 +469,7 @@ static void fill_buffer(int size, int rise)
     int c, i;
     SWORD *p;
 
-    p = (SWORD *)lib_malloc(size * sizeof(SWORD) * snddata.channels);
+    p = lib_malloc(size * sizeof(SWORD) * snddata.channels);
 
     if (!p)
         return;
@@ -517,28 +516,16 @@ static int sid_open(void)
 /* initialize SID engine */
 static int sid_init(void)
 {
-    int c, speed;
+    int c, speed, speed_factor;
 
     /* Special handling for cycle based as opposed to sample based sound
        engines. reSID is cycle based. */
     cycle_based = sound_machine_cycle_based();
 
-    /* Cycle based sound engines must do their own filtering,
-       and handle sample rate conversion. */
-    if (cycle_based) {
-        /* "No limit" doesn't make sense for cycle based sound engines,
-           which have a fixed sampling rate. */
-        int speed_factor = speed_percent ? speed_percent : 100;
-        snddata.oversampleshift = 0;
-        snddata.oversamplenr = 1;
-        speed = sample_rate * 100 / speed_factor;
-    } else {
-        /* For sample based sound engines, both simple average filtering
-           and sample rate conversion is handled here. */
-        snddata.oversampleshift = oversampling_factor;
-        snddata.oversamplenr = 1 << snddata.oversampleshift;
-        speed = sample_rate*snddata.oversamplenr;
-    }
+    /* "No limit" doesn't make sense for cycle based sound engines,
+       which have a fixed sampling rate. */
+    speed_factor = speed_percent ? speed_percent : 100;
+    speed = sample_rate * 100 / speed_factor;
 
     for (c = 0; c < snddata.channels; c++) {
         if (!sound_machine_init(snddata.psid[c], speed, cycles_per_sec)) {
@@ -547,12 +534,6 @@ static int sid_init(void)
     }
 
     snddata.clkstep = SOUNDCLK_CONSTANT(cycles_per_sec) / sample_rate;
-
-    if (snddata.oversamplenr > 1) {
-        snddata.clkstep /= snddata.oversamplenr;
-        log_message(sound_log, "Using %dx oversampling",
-                    snddata.oversamplenr);
-    }
 
     snddata.origclkstep = snddata.clkstep;
     snddata.clkfactor = SOUNDCLK_CONSTANT(1.0);
@@ -624,10 +605,15 @@ int sound_open(void)
     speed = (sample_rate < 8000 || sample_rate > 96000)
             ? SOUND_SAMPLE_RATE : sample_rate;
 
-    /* Calculate optimal fragments.
-       fragsize is rounded up to 2^i.
-       fragnr is rounded up to bufsize/fragsize. */
-    fragsize = speed / ((rfsh_per_sec < 1.0) ? 1 : ((int)rfsh_per_sec));
+    /* Calculate reasonable fragments. Target is 2 fragments per frame,
+     * which gives a reasonable number of fillable audio chunks to avoid
+     * ugly situation where a full frame refresh needs to occur before more
+     * audio is generated. It also improves the estimate of optimal frame
+     * length for vsync, which is closely tied to audio and uses the fragment
+     * information to calculate it. */
+    fragsize = speed / ((rfsh_per_sec < 1.0) ? 1 : ((int)rfsh_per_sec))
+               / fragment_divisor[fragment_size];
+
     for (i = 1; 1 << i < fragsize; i++);
     fragsize = 1 << i;
     fragnr = (int)((speed * bufsize + fragsize - 1) / fragsize);
@@ -917,9 +903,9 @@ void sound_synthesize(SWORD *buffer, int length)
 /* flush all generated samples from buffer to sounddevice. adjust sid runspeed
    to match real running speed of program */
 #if defined(__MSDOS__) || defined(__riscos)
-int sound_flush(int relative_speed)
+int sound_flush()
 #else
-double sound_flush(int relative_speed)
+double sound_flush()
 #endif
 {
     int c, i, nr, space = 0, used;
@@ -949,7 +935,6 @@ double sound_flush(int relative_speed)
     }
 
     if (warp_mode_enabled 
-        && snddata.playdev->bufferspace != NULL
         && snddata.recdev == NULL) {
         snddata.bufptr = 0;
         return 0;
@@ -968,37 +953,10 @@ double sound_flush(int relative_speed)
 
     /* Calculate the number of samples to flush - whole fragments. */
     nr = snddata.bufptr -
-         snddata.bufptr % (snddata.fragsize * snddata.oversamplenr);
+         snddata.bufptr % snddata.fragsize;
     if (!nr)
         return 0;
 
-    /* handle oversampling */
-    if (snddata.oversamplenr > 1) {
-        int j, newnr;
-
-        newnr = nr >> snddata.oversampleshift;
-
-        /* Simple average filtering. */
-        for (c = 0; c < snddata.channels; c++) {
-            SDWORD v;
-            for (i = 0; i < newnr; i++) {
-                for (v = j = 0; j < snddata.oversamplenr; j++)
-                    v += snddata.buffer[(i * snddata.oversamplenr + j)
-                         * snddata.channels + c];
-                snddata.buffer[i * snddata.channels + c] =
-                    v >> snddata.oversampleshift;
-            }
-        }
-
-        /* Move remaining n % oversamplenr samples to new end of buffer. */
-        for (c = 0; c < snddata.channels; c++) {
-            for (i = 0; i < snddata.bufptr - nr; i++)
-                snddata.buffer[(newnr + i) * snddata.channels + c] =
-                      snddata.buffer[(nr + i) * snddata.channels + c];
-        }
-        snddata.bufptr -= (nr - newnr);
-        nr = newnr;
-    }
     /* adjust speed */
     if (snddata.playdev->bufferspace) {
         space = snddata.playdev->bufferspace();
@@ -1009,9 +967,13 @@ double sound_flush(int relative_speed)
             sound_error(translate_text(IDGS_FRAGMENT_PROBLEMS));
             return 0;
         }
+        /* we only write complete fragments, sound drivers that can tell
+         * better accuracy aren't utilized at this stage. */
+        space -= space % snddata.fragsize;
+
         used = snddata.bufsize - space;
-        /* buffer empty */
-        if (used <= snddata.fragsize) {
+        /* buffer emptied during vsync? Looks like underrun. */
+        if (used < snddata.fragsize) {
             int j;
             static time_t prev;
             time_t now;
@@ -1024,8 +986,9 @@ double sound_flush(int relative_speed)
                 prev = now;
             }
 
-            /* Calculate unused space in buffer. Leave one fragment. */
-            j = snddata.bufsize - snddata.fragsize;
+            /* Calculate unused space in buffer, accounting for data we are
+             * about to write. */
+            j = snddata.bufsize - nr;
 
             /* Fill up sound hardware buffer. */
             if (j > 0) {
@@ -1038,12 +1001,11 @@ double sound_flush(int relative_speed)
             log_warning(sound_log, "Buffer drained");
 #endif
             vsync_sync_reset();
-            return 0;
         }
         if (cycle_based || speed_adjustment_setting
             != SOUND_ADJUST_ADJUSTING) {
-            if (relative_speed > 0)
-                snddata.clkfactor = SOUNDCLK_CONSTANT(relative_speed) / 100;
+            if (speed_percent > 0)
+                snddata.clkfactor = SOUNDCLK_CONSTANT(speed_percent) / 100;
         } else {
             if (snddata.prevfill)
                 snddata.prevused = used;
@@ -1075,9 +1037,9 @@ double sound_flush(int relative_speed)
             }
             return 0;
         }
-
-        /* Don't block on write unless we're seriously out of sync. */
-        if (nr > space && nr < used)
+        /* Not all sound drivers block during writing. We must avoid
+         * overwriting. */
+        if (nr > space)
             nr = space;
     }
 
@@ -1092,6 +1054,11 @@ double sound_flush(int relative_speed)
             sound_error(translate_text(IDGS_WRITE_TO_SOUND_DEVICE_FAILED));
             return 0;
         }
+    }
+
+    /* "No Limit" speed support: nuke the accumulated buffer. */
+    if (speed_percent == 0) {
+        nr = snddata.bufptr;
     }
 
     snddata.bufptr -= nr;
@@ -1131,7 +1098,7 @@ double sound_flush(int relative_speed)
            of getting interrupted before vsync delay calculation. */
         /* Aim for utilization of bufsize - fragsize. */
         int remspace =
-            snddata.playdev->bufferspace() - snddata.fragsize - snddata.bufptr;
+            snddata.playdev->bufferspace() - snddata.bufptr;
         /* Return delay in seconds. */
         return (double)remspace/sample_rate;
     }
@@ -1206,6 +1173,12 @@ void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame)
 
     devlist = lib_stralloc("");
 
+#ifdef USE_SDL_AUDIO
+    sound_init_sdl_device();
+#endif
+#ifdef USE_PULSE
+    sound_init_pulse_device();
+#endif
 #ifdef USE_ARTS
     sound_init_arts_device();
 #endif
@@ -1240,9 +1213,6 @@ void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame)
 #ifdef USE_AIX_AUDIO
     sound_init_aix_device();
 #endif
-#ifdef USE_SDL_AUDIO
-    sound_init_sdl_device();
-#endif
 
 #ifdef __MSDOS__
 #ifdef USE_MIDAS_SOUND
@@ -1253,8 +1223,12 @@ void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame)
 #endif
 
 #ifdef WIN32
+#ifdef USE_DXSOUND
     sound_init_dx_device();
+#endif
+#ifndef __XBOX__
     sound_init_wmm_device();
+#endif
 #endif
 
 #ifdef WINCE
@@ -1287,7 +1261,6 @@ void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame)
 
     sound_init_dummy_device();
     sound_init_fs_device();
-    sound_init_speed_device();
     sound_init_dump_device();
     sound_init_wav_device();
     sound_init_voc_device();
@@ -1298,9 +1271,7 @@ void sound_init(unsigned int clock_rate, unsigned int ticks_per_frame)
     sound_init_mp3_device();
 #endif
 
-#ifdef HAVE_FFMPEG
-    sound_init_ffmpegaudio_device();
-#endif
+    sound_init_movie_device();
 
 #if 0
     sound_init_test_device();   /* XXX: missing */

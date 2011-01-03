@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _IDE64_H
-#define _IDE64_H
+#ifndef VICE_IDE64_H
+#define VICE_IDE64_H
 
 #include "types.h"
 
@@ -41,5 +41,6 @@ extern int ide64_bin_attach(const char *filename, BYTE *rawcart);
 extern char *ide64_image_file;
 extern void ide64_detach(void);
 
-#endif
+extern BYTE ide64_get_killport(void);
 
+#endif

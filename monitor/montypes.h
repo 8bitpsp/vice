@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _MONTYPES_H
-#define _MONTYPES_H
+#ifndef VICE_MONTYPES_H
+#define VICE_MONTYPES_H
 
 #include "monitor.h"
 #include "types.h"
@@ -75,7 +75,7 @@ enum t_reg_id {
    e_R14,
    e_R15,
    e_ACM,
-   e_XYM
+   e_YXM
 };
 typedef enum t_reg_id REG_ID;
 
@@ -136,6 +136,11 @@ struct cpuhistory_s {
    BYTE op;
    BYTE p1;
    BYTE p2;
+   BYTE reg_a;
+   BYTE reg_x;
+   BYTE reg_y;
+   BYTE reg_sp;
+   WORD reg_st;
 };
 typedef struct cpuhistory_s cpuhistory_t;
 
@@ -218,7 +223,7 @@ extern RADIXTYPE default_radix;
 extern MEMSPACE default_memspace;
 extern bool asm_mode;
 extern MON_ADDR asm_mode_addr;
-extern struct monitor_cpu_type_s monitor_cpu_type;
+extern struct monitor_cpu_type_s *monitor_cpu_for_memspace[NUM_MEMSPACES];
 extern MON_ADDR dot_addr[NUM_MEMSPACES];
 extern const char *mon_memspace_string[];
 extern int mon_stop_output;

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _FINAL_H
-#define _FINAL_H
+#ifndef VICE_FINAL_H
+#define VICE_FINAL_H
 
 #include <stdio.h>
 
@@ -62,4 +62,3 @@ extern void warpspeed_detach(void);
 extern void final_v3_detach(void);
 
 #endif
-

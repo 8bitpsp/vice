@@ -38,6 +38,8 @@
 #define CPU_STR "Main CPU"
 #endif
 
+#include "traps.h"
+
 #ifndef C64DTV
 /* The C64DTV can use different shadow registers for accu read/write. */
 /* For standard 6510, this is not the case. */
@@ -211,10 +213,6 @@
 
 #ifndef DRIVE_CPU
 
-#ifdef DEBUG
-   int debug_perform_break_into_monitor = 0;
-#endif
-
 #ifndef C64DTV
 /* Export the local version of the registers.  */
 #define EXPORT_REGISTERS()      \
@@ -268,7 +266,7 @@
       GLOBAL_REGS.r14 = dtv_registers[14]; \
       GLOBAL_REGS.r15 = dtv_registers[15]; \
       GLOBAL_REGS.acm = (reg_a_write_idx << 4) | (reg_a_read_idx); \
-      GLOBAL_REGS.xym = (reg_y_idx << 4) | (reg_x_idx); \
+      GLOBAL_REGS.yxm = (reg_y_idx << 4) | (reg_x_idx); \
   } while (0)
 
 /* Import the public version of the registers.  */
@@ -296,8 +294,8 @@
       dtv_registers[15] = GLOBAL_REGS.r15; \
       reg_a_write_idx = GLOBAL_REGS.acm >> 4; \
       reg_a_read_idx = GLOBAL_REGS.acm & 0xf; \
-      reg_y_idx = GLOBAL_REGS.xym >> 4; \
-      reg_x_idx = GLOBAL_REGS.xym & 0xf; \
+      reg_y_idx = GLOBAL_REGS.yxm >> 4; \
+      reg_x_idx = GLOBAL_REGS.yxm & 0xf; \
       JUMP(GLOBAL_REGS.pc); \
   } while (0)
 
@@ -711,34 +709,18 @@
   } while (0)
 #endif
 
-/* The BRK opcode is also used to patch the ROM.  The function trap_handler()
-   returns nonzero if this is not a patch, but a `real' BRK instruction. */
-
 #define BRK()                                                    \
   do {                                                           \
-      DWORD trap_result;                                         \
       EXPORT_REGISTERS();                                        \
-      if (!ROM_TRAP_ALLOWED()                                    \
-          || (trap_result = ROM_TRAP_HANDLER()) == (DWORD)-1) {  \
-          CLK_ADD(CLK,CLK_BRK);                                  \
-          TRACE_BRK();                                           \
-          INC_PC(2);                                             \
-          LOCAL_SET_BREAK(1);                                    \
-          PUSH(reg_pc >> 8);                                     \
-          PUSH(reg_pc & 0xff);                                   \
-          PUSH(LOCAL_STATUS());                                  \
-          LOCAL_SET_INTERRUPT(1);                                \
-          JUMP(LOAD_ADDR(0xfffe));                               \
-      } else {                                                   \
-          if (trap_result) {                                     \
-             REWIND_FETCH_OPCODE(CLK);                           \
-             SET_OPCODE(trap_result);                            \
-             IMPORT_REGISTERS();                                 \
-             goto trap_skipped;                                  \
-          } else {                                               \
-             IMPORT_REGISTERS();                                 \
-          }                                                      \
-      }                                                          \
+      CLK_ADD(CLK,CLK_BRK);                                      \
+      TRACE_BRK();                                               \
+      INC_PC(2);                                                 \
+      LOCAL_SET_BREAK(1);                                        \
+      PUSH(reg_pc >> 8);                                         \
+      PUSH(reg_pc & 0xff);                                       \
+      PUSH(LOCAL_STATUS());                                      \
+      LOCAL_SET_INTERRUPT(1);                                    \
+      JUMP(LOAD_ADDR(0xfffe));                                   \
   } while (0)
 
 #define CLC()              \
@@ -931,6 +913,29 @@
       RMW_FLAG = 0;                                           \
   } while (0)
 
+/* The 0x02 JAM opcode is also used to patch the ROM.  The function trap_handler()
+   returns nonzero if this is not a patch, but a `real' JAM instruction. */
+
+#define JAM_02()                                                 \
+  do {                                                           \
+      DWORD trap_result;                                         \
+      EXPORT_REGISTERS();                                        \
+      if (!ROM_TRAP_ALLOWED()                                    \
+          || (trap_result = ROM_TRAP_HANDLER()) == (DWORD)-1) {  \
+          REWIND_FETCH_OPCODE(CLK);                              \
+          JAM();                                                 \
+      } else {                                                   \
+          if (trap_result) {                                     \
+             REWIND_FETCH_OPCODE(CLK);                           \
+             SET_OPCODE(trap_result);                            \
+             IMPORT_REGISTERS();                                 \
+             goto trap_skipped;                                  \
+          } else {                                               \
+             IMPORT_REGISTERS();                                 \
+          }                                                      \
+      }                                                          \
+  } while (0)
+  
 #define JMP(addr)     \
   do {                \
       JUMP(addr);     \
@@ -1861,10 +1866,12 @@ static const BYTE rewind_fetch_tab[] = {
 
     CPU_DELAY_CLK
 
+#ifndef CYCLE_EXACT_ALARM
     while (CLK >= alarm_context_next_pending_clk(ALARM_CONTEXT)) {
         alarm_context_dispatch(ALARM_CONTEXT, CLK);
         CPU_DELAY_CLK
     }
+#endif
 
     {
         enum cpu_int pending_interrupt;
@@ -1876,10 +1883,12 @@ static const BYTE rewind_fetch_tab[] = {
                 && CPU_INT_STATUS->global_pending_int & IK_IRQPEND)
                     CPU_INT_STATUS->global_pending_int &= ~IK_IRQPEND;
             CPU_DELAY_CLK
+#ifndef CYCLE_EXACT_ALARM
             while (CLK >= alarm_context_next_pending_clk(ALARM_CONTEXT)) {
                 alarm_context_dispatch(ALARM_CONTEXT, CLK);
                 CPU_DELAY_CLK
             }
+#endif
         }
     }
 
@@ -1910,10 +1919,10 @@ static const BYTE rewind_fetch_tab[] = {
             memmap_mem_read(reg_pc);
         }
 #endif
-        if(p0 == 0x20) {
-            monitor_cpuhistory_store(reg_pc, (BYTE)(p0), (BYTE)(p1), (BYTE)(LOAD(reg_pc+2)));
+        if (p0 == 0x20) {
+            monitor_cpuhistory_store(reg_pc, p0, p1, LOAD(reg_pc+2), reg_a_read, reg_x, reg_y, reg_sp, LOCAL_STATUS());
         } else {
-            monitor_cpuhistory_store(reg_pc, (BYTE)(p0), (BYTE)(p1), (BYTE)(p2 >> 8));
+            monitor_cpuhistory_store(reg_pc, p0, p1, p2 >> 8, reg_a_read, reg_x, reg_y, reg_sp, LOCAL_STATUS());
         }
         memmap_state &= ~(MEMMAP_STATE_INSTR | MEMMAP_STATE_OPCODE);
 #endif
@@ -1928,9 +1937,9 @@ static const BYTE rewind_fetch_tab[] = {
 
             debug_drive((DWORD)(reg_pc), debug_clk,
                         mon_disassemble_to_string(e_disk8_space,
-                                                  (WORD) reg_pc, op,
+                                                  reg_pc, op,
                                                   lo, hi, 0, 1, "6502"), 
-                        reg_a_read, reg_x, reg_y, reg_sp);
+                        reg_a_read, reg_x, reg_y, reg_sp, drv->mynumber + 8);
         }
 #else
         if (TRACEFLG) {
@@ -1940,14 +1949,14 @@ static const BYTE rewind_fetch_tab[] = {
 
             debug_maincpu((DWORD)(reg_pc), debug_clk,
                           mon_disassemble_to_string(e_comp_space,
-                                                    (WORD) reg_pc, op,
+                                                    reg_pc, op,
                                                     lo, hi, 0, 1, "6502"),
                           reg_a_read, reg_x, reg_y, reg_sp);
         }
-        if (debug_perform_break_into_monitor)
+        if (debug.perform_break_into_monitor)
         {
             monitor_startup_trap();
-            debug_perform_break_into_monitor = 0;
+            debug.perform_break_into_monitor = 0;
         }
 #endif
 #endif
@@ -1965,7 +1974,11 @@ trap_skipped:
             ORA(LOAD_IND_X(p1), 1, 2);
             break;
 
-          case 0x02:            /* JAM */
+          case 0x02:            /* JAM - also used for traps */
+            STATIC_ASSERT(TRAP_OPCODE == 0x02);
+            JAM_02();
+            break;
+
           case 0x22:            /* JAM */
           case 0x52:            /* JAM */
           case 0x62:            /* JAM */

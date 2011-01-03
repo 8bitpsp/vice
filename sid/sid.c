@@ -50,6 +50,7 @@
 
 #ifdef HAVE_MOUSE
 #include "mouse.h"
+#include "lightpen.h"
 #endif
 
 #ifdef HAVE_RESID
@@ -113,11 +114,15 @@ static BYTE REGPARM2 sid_read_chip(WORD addr, int chipno)
     machine_handle_pending_alarms(0);
 
 #ifdef HAVE_MOUSE
-    if (addr == 0x19 && _mouse_enabled && chipno == 0)
+    if (addr == 0x19 && _mouse_enabled && chipno == 0) {
         val = mouse_get_x();
-    else if (addr == 0x1a && _mouse_enabled && chipno == 0)
+    } else if (addr == 0x1a && _mouse_enabled && chipno == 0) {
         val = mouse_get_y();
-    else
+    } else if (addr == 0x19 && lightpen_enabled && chipno == 0) {
+        val = lightpen_read_button_x();
+    } else if (addr == 0x1a && lightpen_enabled && chipno == 0) {
+        val = lightpen_read_button_y();
+    } else
 #endif
     {
         /* Account for that read functions in VICE are called _before_
@@ -215,6 +220,8 @@ sound_t *sid_sound_machine_open(int chipno)
     if (resources_get_int("SidEngine", &sidengine) < 0)
         return NULL;
 
+    sid_engine = fastsid_hooks;
+
 #ifdef HAVE_RESID
     if (sidengine == SID_ENGINE_RESID)
         sid_engine = resid_hooks;
@@ -224,20 +231,6 @@ sound_t *sid_sound_machine_open(int chipno)
     if (sidengine == SID_ENGINE_RESID_FP)
         sid_engine = residfp_hooks;
 #endif
-
-#if defined(HAVE_RESID) && defined(HAVE_RESID_FP)
-    if (sidengine != SID_ENGINE_RESID && sidengine != SID_ENGINE_RESID_FP)
-#endif
-
-#if defined(HAVE_RESID) && !defined(HAVE_RESID_FP)
-    if (sidengine != SID_ENGINE_RESID)
-#endif
-
-#if !defined(HAVE_RESID) && defined(HAVE_RESID_FP)
-    if (sidengine != SID_ENGINE_RESID_FP)
-#endif
-
-    sid_engine = fastsid_hooks;
 
     return sid_engine.open(siddata[chipno]);
 }

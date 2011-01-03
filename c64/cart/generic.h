@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _GENERIC_H
-#define _GENERIC_H
+#ifndef VICE_GENERIC_H
+#define VICE_GENERIC_H
 
 #include <stdio.h>
 
@@ -45,4 +45,3 @@ extern void generic_16kb_detach(void);
 extern void generic_ultimax_detach(void);
 
 #endif
-

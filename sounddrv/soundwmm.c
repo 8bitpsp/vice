@@ -34,7 +34,7 @@
 
 #include <stdio.h>
 
-#if __GNUC__>2 || (__GNUC__==2 && __GNUC_MINOR__>=91)
+#if __GNUC__>2 || (__GNUC__==2 && __GNUC_MINOR__>=91) || defined _MSC_VER
 #include <windows.h>
 #include <ddraw.h>
 #include <mmsystem.h>
@@ -44,7 +44,7 @@
 #include "lib.h"
 #include "sound.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 
 /* ------------------------------------------------------------------------ */
 
@@ -143,8 +143,8 @@ int sound_init_wmm_device(void);
  * The job of the timer callback is only to clear the buffer if enough
  * inactivity from wmm_write()
  */
-static void CALLBACK wmm_timercallback(UINT uTimerID, UINT uMsg, DWORD dwUser,
-                                       DWORD dw1, DWORD dw2)
+static void CALLBACK wmm_timercallback(UINT uTimerID, UINT uMsg, UINT_PTR dwUser,
+                                       UINT_PTR dw1, UINT_PTR dw2)
 {
     if (!sndinitted)
         return;
@@ -411,7 +411,7 @@ static int wmm_write(SWORD *pbuf, size_t nr)
         inactivity_timer = 0; /* Else, just reset inactivity timer */
 
 
-    worktodo = nr * (is16bit ? sizeof(SWORD) : 1);
+    worktodo = (DWORD)nr * (is16bit ? sizeof(SWORD) : 1);
 
     if (worktodo > buffer_size)
         return 0; /* Sanity check */
@@ -484,7 +484,7 @@ static int wmm_suspend(void)
     int c, i;
     SWORD *p;
 
-    p = (SWORD *)lib_malloc(fragment_size * num_of_channels * sizeof(SWORD));
+    p = lib_malloc(fragment_size * num_of_channels * sizeof(SWORD));
 
     if (!p)
         return 0;

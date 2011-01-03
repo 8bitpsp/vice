@@ -27,9 +27,8 @@
 #include "vice.h"
 
 #include "mem.h"
+#include "tedtypes.h"
 #include "types.h"
-
-extern void ted_delay_clk(void);
 
 #define CPU_DELAY_CLK ted_delay_clk();
 

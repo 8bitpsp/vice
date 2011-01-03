@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _MAGICFORMEL_H
-#define _MAGICFORMEL_H
+#ifndef VICE_MAGICFORMEL_H
+#define VICE_MAGICFORMEL_H
 
 #include <stdio.h>
 
@@ -57,4 +57,3 @@ extern int magicformel_crt_attach(FILE *fd, BYTE *rawcart);
 extern void magicformel_detach(void);
 
 #endif
-

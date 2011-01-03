@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -74,7 +74,7 @@ static int fsdevice_open_directory(vdrive_t *vdrive, unsigned int secondary,
         mask = rname;
 
     /* Test on wildcards.  */
-    if (cbmdos_parse_wildcard_check(mask, strlen(mask))) {
+    if (cbmdos_parse_wildcard_check(mask, (unsigned int)strlen(mask))) {
         if (*mask == '/') {
             strcpy(bufinfo[secondary].dirmask, mask + 1);
             *mask++ = 0;
@@ -176,7 +176,7 @@ static int fsdevice_open_file(vdrive_t *vdrive, unsigned int secondary,
 
     /* Test on wildcards.  */
     if (cbmdos_parse_wildcard_check(cmd_parse->parsecmd,
-        strlen(cmd_parse->parsecmd)) > 0) {
+        (unsigned int)strlen(cmd_parse->parsecmd)) > 0) {
         if (bufinfo[secondary].mode == Write
             || bufinfo[secondary].mode == Append) {
             fsdevice_error(vdrive, CBMDOS_IPE_BAD_NAME);
@@ -240,7 +240,7 @@ static int fsdevice_open_file(vdrive_t *vdrive, unsigned int secondary,
         tape_seek_start(tape);
         tape_seek_to_file(tape, 0);
         r = tape_get_current_file_record(tape);
-        if( (r->type==1) || (r->type==3) )
+        if ( (r->type==1) || (r->type==3) )
           {
             startaddr[0] = r->start_addr & 255;
             startaddr[1] = r->start_addr >> 8;
@@ -299,7 +299,7 @@ int fsdevice_open(vdrive_t *vdrive, const BYTE *name, unsigned int length,
 
     bufinfo[secondary].type = cmd_parse.filetype;
 
-    rname = (char *)lib_malloc(ioutil_maxpathlen());
+    rname = lib_malloc(ioutil_maxpathlen());
 
     cmd_parse.parsecmd[cmd_parse.parselength] = 0;
     strncpy(rname, cmd_parse.parsecmd, cmd_parse.parselength + 1);

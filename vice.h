@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _VICE_H
-#define _VICE_H
+#ifndef VICE_VICE_H
+#define VICE_VICE_H
 
 /* We use <config.h> instead of "config.h" so that a compilation using
    -I. -I$srcdir will use ./config.h rather than $srcdir/config.h
@@ -59,6 +59,7 @@
  * ppc            slower           faster        __powerpc__ || __ppc__
  * x86            slower           faster        __i386__
  * m68020+        slower           faster        __m680[2346]0__
+ * x86_64         slower           faster        __x86_64__ || __amd64__
  *
  * arm           untested         untested       __arm__ && !GP2X
  * bfin          untested         untested       BFIN
@@ -71,11 +72,15 @@
  * sparc         untested         untested       sparc
  * sparc64       untested         untested       ???
  * vax           untested         untested       __vax__
- * x86_64        untested         untested       ???
  */
 
 /* Allow unaligned access for i386+ based platforms */
 #ifdef __i386__
+#define ALLOW_UNALIGNED_ACCESS
+#endif
+
+/* Allow unaligned access for amd64/x86_64 based platforms */
+#if defined(__x86_64__) || defined(__amd64__)
 #define ALLOW_UNALIGNED_ACCESS
 #endif
 
@@ -94,9 +99,17 @@
 #include "ROlib.h"
 #endif
 
+/* SunOS 4.x specific stuff */
+#if defined(sun) || defined(__sun)
+#  if !defined(__SVR4) && !defined(__svr4__)
+#    include <unistd.h>
+     typedef int ssize_t;
+#  endif
+#endif
+
 /* ------------------------------------------------------------------------- */
 /* Which OS is using the common keyboard routines?  */
-#if !defined(__riscos) && !defined(__OS2__)
+#if (!defined(__riscos) && !defined(__OS2__)) || defined(USE_SDLUI)
 #define COMMON_KBD
 #endif
 
@@ -135,11 +148,21 @@ int yyparse (void);
 #undef vfork
 #endif
 
-#if defined(__BEOS__) && defined(WORDS_BIGENDIAN)
+#if (defined(__BEOS__) && defined(WORDS_BIGENDIAN)) || defined(__OS2__)
 #ifndef __cplusplus
 #undef inline
 #define inline
 #endif
+#endif
+
+/* interix using c89 doesn't like empty files, this will work around that */
+#if defined(_MSC_VER) && defined(__INTERIX)
+static int noop;
+#endif
+
+#ifdef USE_GCC
+#define int64_t_C(c) (c ## ll)
+#define uint64_t_C(c) (c ## ull)
 #endif
 
 #endif

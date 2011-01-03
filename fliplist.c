@@ -2,7 +2,7 @@
  * fliplist.c
  *
  * Written by
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -124,14 +124,13 @@ int fliplist_cmdline_options_init(void)
 
 void fliplist_shutdown(void)
 {
-    if (current_image != NULL)
-        lib_free(current_image);
+    lib_free(current_image);
+    current_image = NULL;
 }
 
 void fliplist_set_current(unsigned int unit, const char *filename)
 {
-    if (current_image != NULL)
-        lib_free(current_image);
+    lib_free(current_image);
     current_image = lib_stralloc(filename);
     current_drive = unit;
 }
@@ -178,7 +177,7 @@ void fliplist_add_image(unsigned int unit)
     if (strcmp(current_image, "") == 0)
         return;
 
-    n = (fliplist_t)lib_malloc(sizeof(struct fliplist_s));
+    n = lib_malloc(sizeof(struct fliplist_s));
     n->image = lib_stralloc(current_image);
     unit = n->unit = current_drive;
 
@@ -405,7 +404,7 @@ int fliplist_load_list(unsigned int unit, const char *filename, int autoattach)
                 unit = 8;
             }
 
-            tmp = (fliplist_t)lib_malloc(sizeof(struct fliplist_s));
+            tmp = lib_malloc(sizeof(struct fliplist_s));
             tmp->image = lib_stralloc(buffer);
             tmp->unit = unit;
 

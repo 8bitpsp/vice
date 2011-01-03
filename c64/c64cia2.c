@@ -41,6 +41,8 @@
 #include "digimax.h"
 #include "iecbus.h"
 #include "interrupt.h"
+#include "joystick.h"
+#include "keyboard.h"
 #include "lib.h"
 #include "log.h"
 #include "maincpu.h"
@@ -51,7 +53,6 @@
 #ifdef HAVE_RS232
 #include "rsuser.h"
 #endif
-
 
 void REGPARM2 cia2_store(WORD addr, BYTE data)
 {
@@ -88,7 +89,6 @@ static void cia_restore_int(cia_context_t *cia_context, int value)
 /* Current video bank (0, 1, 2 or 3).  */
 static int vbank;
 
-
 static void do_reset_cia(cia_context_t *cia_context)
 {
     printer_userport_write_strobe(1);
@@ -99,12 +99,12 @@ static void do_reset_cia(cia_context_t *cia_context)
 #endif
 
     vbank = 0;
-    if (c64_256k_enabled)
+    if (c64_256k_enabled) {
         c64_256k_cia_set_vbank(vbank);
-    else
+    } else {
         mem_set_vbank(vbank);
+    }
 }
-
 
 static void pre_store(void)
 {
@@ -136,10 +136,11 @@ static void store_ciapa(cia_context_t *cia_context, CLOCK rclk, BYTE byte)
         new_vbank = tmp & 3;
         if (new_vbank != vbank) {
             vbank = new_vbank;
-            if (c64_256k_enabled)
+            if (c64_256k_enabled) {
                 c64_256k_cia_set_vbank(new_vbank);
-            else
+            } else {
                 mem_set_vbank(new_vbank);
+            }
         }
         (*iecbus_callback_write)((BYTE)tmp, maincpu_clk);
         printer_userport_write_strobe(tmp & 0x04);
@@ -154,10 +155,11 @@ static void undump_ciapa(cia_context_t *cia_context, CLOCK rclk, BYTE byte)
     }
 #endif
     vbank = (byte ^ 3) & 3;
-    if (c64_256k_enabled)
+    if (c64_256k_enabled) {
         c64_256k_cia_set_vbank(vbank);
-    else
+    } else {
         mem_set_vbank(vbank);
+    }
     iecbus_cpu_undump((BYTE)(byte ^ 0xff));
 }
 
@@ -168,6 +170,9 @@ static void store_ciapb(cia_context_t *cia_context, CLOCK rclk, BYTE byte)
 #ifdef HAVE_RS232
     rsuser_write_ctrl((BYTE)byte);
 #endif
+    if (extra_joystick_enable && extra_joystick_type == EXTRA_JOYSTICK_CGA) {
+        extra_joystick_cga_store(byte);
+    }
 }
 
 static void pulse_ciapc(cia_context_t *cia_context, CLOCK rclk)
@@ -177,21 +182,30 @@ static void pulse_ciapc(cia_context_t *cia_context, CLOCK rclk)
 }
 
 /* FIXME! */
-static inline void undump_ciapb(cia_context_t *cia_context, CLOCK rclk,
-                                BYTE byte)
+static inline void undump_ciapb(cia_context_t *cia_context, CLOCK rclk, BYTE byte)
 {
     parallel_cable_cpu_undump((BYTE)byte);
     printer_userport_write_data((BYTE)byte);
 #ifdef HAVE_RS232
     rsuser_write_ctrl((BYTE)byte);
 #endif
+    if (extra_joystick_enable && extra_joystick_type == EXTRA_JOYSTICK_CGA) {
+        extra_joystick_cga_store(byte);
+    }
 }
 
 /* read_* functions must return 0xff if nothing to read!!! */
 static BYTE read_ciapa(cia_context_t *cia_context)
 {
-    return ((cia_context->c_cia[CIA_PRA] | ~(cia_context->c_cia[CIA_DDRA]))
-           & 0x3f) | (*iecbus_callback_read)(maincpu_clk);
+    BYTE value;
+
+    value = ((cia_context->c_cia[CIA_PRA] | ~(cia_context->c_cia[CIA_DDRA])) & 0x3f) | (*iecbus_callback_read)(maincpu_clk);
+
+    if (extra_joystick_enable && extra_joystick_type == EXTRA_JOYSTICK_HIT) {
+        value &= 0xfb;
+        value |= extra_joystick_hit_read_button1();
+    }
+    return value;
 }
 
 /* read_* functions must return 0xff if nothing to read!!! */
@@ -199,14 +213,36 @@ static BYTE read_ciapb(cia_context_t *cia_context)
 {
     BYTE byte;
 #ifdef HAVE_RS232
-    if (rsuser_enabled)
+    if (rsuser_enabled) {
         byte = rsuser_read_ctrl();
-    else
+    } else
 #endif
-    byte = parallel_cable_cpu_read();
+    if (extra_joystick_enable) {
+        switch (extra_joystick_type) {
+            case EXTRA_JOYSTICK_HIT:
+                byte = extra_joystick_hit_read();
+                break;
+            case EXTRA_JOYSTICK_CGA:
+                byte = extra_joystick_cga_read();
+                break;
+            case EXTRA_JOYSTICK_PET:
+                byte = extra_joystick_pet_read();
+                break;
+            case EXTRA_JOYSTICK_HUMMER:
+                byte = extra_joystick_hummer_read();
+                break;
+            case EXTRA_JOYSTICK_OEM:
+                byte = extra_joystick_oem_read();
+                break;
+            default:
+                byte = 0xff;
+                break;
+        }
+    } else {
+        byte = parallel_cable_cpu_read();
+    }
 
-    byte = (byte & ~(cia_context->c_cia[CIA_DDRB]))
-           | (cia_context->c_cia[CIA_PRB] & cia_context->c_cia[CIA_DDRB]);
+    byte = (byte & ~(cia_context->c_cia[CIA_DDRB])) | (cia_context->c_cia[CIA_PRB] & cia_context->c_cia[CIA_DDRB]);
     return byte;
 }
 
@@ -217,6 +253,9 @@ static void read_ciaicr(cia_context_t *cia_context)
 
 static void read_sdr(cia_context_t *cia_context)
 {
+    if (extra_joystick_enable && extra_joystick_type == EXTRA_JOYSTICK_HIT) {
+        cia_context->c_cia[CIA_SDR] = extra_joystick_hit_read_button2();
+    }
 }
 
 static void store_sdr(cia_context_t *cia_context, BYTE byte)
@@ -236,8 +275,7 @@ void cia2_set_sdrx(BYTE received_byte)
 
 void cia2_init(cia_context_t *cia_context)
 {
-    ciacore_init(machine_context.cia2, maincpu_alarm_context,
-                 maincpu_int_status, maincpu_clk_guard);
+    ciacore_init(machine_context.cia2, maincpu_alarm_context, maincpu_int_status, maincpu_clk_guard);
 }
 
 void cia2_setup_context(machine_context_t *machine_context)
@@ -278,4 +316,3 @@ void cia2_setup_context(machine_context_t *machine_context)
     cia->pre_read = pre_read;
     cia->pre_peek = pre_peek;
 }
-

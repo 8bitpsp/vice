@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _C64DTVMEM_H
-#define _C64DTVMEM_H
+#ifndef VICE_C64DTVMEM_H
+#define VICE_C64DTVMEM_H
 
 #include "types.h"
 
@@ -45,6 +45,9 @@ extern void REGPARM2 c64dtv_mapper_store(WORD addr, BYTE value);
 
 extern BYTE REGPARM1 c64dtv_palette_read(WORD addr);
 extern void REGPARM2 c64dtv_palette_store(WORD addr, BYTE value);
+
+extern BYTE REGPARM1 c64dtv_dmablit_read(WORD addr);
+extern void REGPARM2 c64dtv_dmablit_store(WORD addr, BYTE value);
 
 extern BYTE REGPARM1 c64io1_read(WORD addr);
 extern void REGPARM2 c64io1_store(WORD addr, BYTE value);

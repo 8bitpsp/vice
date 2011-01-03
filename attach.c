@@ -46,7 +46,7 @@
 #include "snapshot.h"
 #include "translate.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "vdrive-bam.h"
 #include "vdrive-iec.h"
 #include "vdrive.h"
@@ -212,9 +212,12 @@ void file_system_init(void)
 
     attach_log = log_open("Attach");
 
+    for (i = 0; i < 8; i++)
+        serial_device_type_set(SERIAL_DEVICE_VIRT, i);
+    
     for (i = 0; i < 4; i++) {
         file_system[i].serial = serial_device_get(i + 8);;
-        file_system[i].vdrive = (vdrive_t *)lib_calloc(1, sizeof(vdrive_t));
+        file_system[i].vdrive = lib_calloc(1, sizeof(vdrive_t));
         switch (file_system_device_enabled[i]) {
           case ATTACH_DEVICE_NONE:
             vdrive_device_setup(file_system[i].vdrive, i + 8);
@@ -293,7 +296,7 @@ static int set_attach_device_readonly(int val, void *param)
     char *new_filename;
     int rc;
 
-    unit = (unsigned int)param;
+    unit = vice_ptr_to_uint(param);
 
     /* Do nothing if resource is unchanged.  */
     if (attach_device_readonly_enabled[unit - 8] == val)
@@ -328,7 +331,7 @@ static int set_file_system_device(int val, void *param)
     unsigned int unit;
     int old_device_enabled;
 
-    unit = (unsigned int)param;
+    unit = vice_ptr_to_uint(param);
     old_device_enabled = file_system_device_enabled[unit - 8];
 
     vdrive = file_system_get_vdrive(unit);
@@ -575,7 +578,7 @@ static void file_system_detach_disk_single(unsigned int unit)
         ui_display_drive_current_image(unit - 8, "");
     }
 
-    set_file_system_device(file_system_device_enabled[unit - 8], (void *)unit);
+    set_file_system_device(file_system_device_enabled[unit - 8], uint_to_void_ptr(unit));
 }
 
 static void file_system_detach_disk_internal(int unit)
@@ -641,4 +644,3 @@ void file_system_event_playback(unsigned int unit, const char *filename)
     else
         file_system_attach_disk_internal(unit, filename);
 }
-

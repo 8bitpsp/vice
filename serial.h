@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _SERIAL_H
-#define _SERIAL_H
+#ifndef VICE_SERIAL_H
+#define VICE_SERIAL_H
 
 #include "types.h"
 
@@ -98,8 +98,6 @@ extern int serial_iec_lib_read_sector(unsigned int unit, unsigned int track,
 extern int serial_iec_lib_write_sector(unsigned int unit, unsigned int track,
                                        unsigned int sector, BYTE *buf);
 
-extern unsigned int serial_device_fsimage_state_get(unsigned int unit);
-extern unsigned int serial_device_realdevice_state_get(unsigned int unit);
 extern serial_t *serial_device_get(unsigned int unit);
 extern unsigned int serial_device_type_get(unsigned int unit);
 extern void serial_device_type_set(unsigned int type, unsigned int unit);

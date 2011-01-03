@@ -102,6 +102,9 @@ static void mon_register_set_val(int mem, int reg_id, WORD val)
       case e_SP:
         MOS6510_REGS_SET_SP(reg_ptr, (BYTE)val);
         break;
+      case e_FLAGS:
+        MOS6510_REGS_SET_STATUS(reg_ptr, (BYTE)val);
+        break;
       default:
         log_error(LOG_ERR, "Unknown register!");
         return;
@@ -166,7 +169,7 @@ static mon_reg_list_t *mon_register_list_get6502(int mem)
 {
     mon_reg_list_t *mon_reg_list;
 
-    mon_reg_list = (mon_reg_list_t *)lib_malloc(sizeof(mon_reg_list_t) * 9);
+    mon_reg_list = lib_malloc(sizeof(mon_reg_list_t) * 9);
 
     mon_reg_list[0].name = "PC";
     mon_reg_list[0].val = (unsigned int)mon_register_get_val(mem, e_PC);

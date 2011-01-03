@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C128FASTIEC_H
-#define _C128FASTIEC_H
+#ifndef VICE_C128FASTIEC_H
+#define VICE_C128FASTIEC_H
 
 #include "types.h"
 
@@ -35,4 +35,3 @@ extern void c128fastiec_fast_cpu_write(BYTE data);
 extern void c128fastiec_fast_cpu_direction(int direction);
 
 #endif
-

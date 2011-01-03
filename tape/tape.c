@@ -50,7 +50,7 @@
 #include "tapeimage.h"
 #include "traps.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 
 
 /* #define DEBUG_TAPE */
@@ -123,9 +123,8 @@ int tape_init(const tape_init_t *init)
     tape_internal_init();
     tape_image_init();
 
-    if (tape_image_dev1 != NULL)
-        lib_free(tape_image_dev1);
-    tape_image_dev1 = (tape_image_t *)lib_calloc(1, sizeof(tape_image_t));
+    lib_free(tape_image_dev1);
+    tape_image_dev1 = lib_calloc(1, sizeof(tape_image_t));
 
     tap_init(init);
 

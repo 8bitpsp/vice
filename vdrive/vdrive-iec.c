@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * Patches by
  *  Dan Miner <dminer@nyx10.cs.du.edu>
@@ -86,7 +86,7 @@ static int iec_open_read_sequential(vdrive_t *vdrive, unsigned int secondary,
 
     p->mode = BUFFER_SEQUENTIAL;
     p->bufptr = 2;
-    p->buffer = (BYTE *)lib_malloc(256);
+    p->buffer = lib_malloc(256);
 
     status = disk_image_read_sector(vdrive->image, p->buffer, track, sector);
 
@@ -134,7 +134,7 @@ static int iec_open_read_directory(vdrive_t *vdrive, unsigned int secondary,
                                         0);
 
     p->mode = BUFFER_DIRECTORY_READ;
-    p->buffer = (BYTE *)lib_malloc(DIR_MAXBUF);
+    p->buffer = lib_malloc(DIR_MAXBUF);
 
     retlen = vdrive_dir_create_directory(vdrive, cmd_parse->parsecmd,
                                          cmd_parse->parselength,
@@ -176,12 +176,12 @@ static int iec_open_write(vdrive_t *vdrive, unsigned int secondary,
             /* replace mode: we don't want the dirent updated at all until
                 close */
             /* allocate buffers */
-            p->buffer = (BYTE *)lib_calloc(1, 256);
+            p->buffer = lib_calloc(1, 256);
             p->mode = BUFFER_SEQUENTIAL;
             p->bufptr = 2;
 
             /* Create our own slot, since the one passed is static */
-            p->slot = (BYTE *)lib_calloc(1, 32);
+            p->slot = lib_calloc(1, 32);
 
             /* Copy the static on to the new one. */
             memcpy(p->slot, slot, 32);
@@ -197,11 +197,11 @@ static int iec_open_write(vdrive_t *vdrive, unsigned int secondary,
             if (p->readmode == CBMDOS_FAM_APPEND) {
                 /* append mode */
                 /* allocate buffers */
-                p->buffer = (BYTE *)lib_malloc(256);
+                p->buffer = lib_malloc(256);
                 p->mode = BUFFER_SEQUENTIAL;
 
                 /* Create our own slot, since the one passed is static */
-                p->slot = (BYTE *)lib_calloc(1, 32);
+                p->slot = lib_calloc(1, 32);
 
                 /* Copy the static on to the new one. */
                 memcpy(p->slot, slot, 32);
@@ -326,7 +326,7 @@ int vdrive_iec_open(vdrive_t *vdrive, const BYTE *name, unsigned int length,
         memset(name_stat, 0, sizeof(name_stat));
         strncpy((char *)name_stat, cmd_parse->parsecmd, sizeof(name_stat) - 1);
         name = name_stat;
-        length = strlen((char *)name);
+        length = (unsigned int)strlen((char *)name);
         secondary = cmd_parse->secondary;
     } else {
         cmd_parse = &cmd_parse_stat;
@@ -416,7 +416,7 @@ int vdrive_iec_open(vdrive_t *vdrive, const BYTE *name, unsigned int length,
      */
     if (*name == '#') {
         p->mode = BUFFER_MEMORY_BUFFER;
-        p->buffer = (BYTE *)lib_malloc(256);
+        p->buffer = lib_malloc(256);
         /* clear out buffer */
         memset(p->buffer, 0, 256);
         /* the pointer is actually 1 on the real drives. */

@@ -16,9 +16,6 @@
 //  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //  ---------------------------------------------------------------------------
-// C64 DTV modifications written by
-//   Daniel Kahlin <daniel@kahlin.net>
-// Copyright (C) 2007  Daniel Kahlin <daniel@kahlin.net>
 
 #define __WAVE_CC__
 #include "wave.h"
@@ -51,7 +48,7 @@ void WaveformGenerator::set_sync_source(WaveformGenerator* source)
 // ----------------------------------------------------------------------------
 void WaveformGenerator::set_chip_model(chip_model model)
 {
-  if (model == MOS6581 || model == DTVSID) {
+  if (model == MOS6581) {
     wave__ST = wave6581__ST;
     wave_P_T = wave6581_P_T;
     wave_PS_ = wave6581_PS_;
@@ -71,22 +68,22 @@ void WaveformGenerator::set_chip_model(chip_model model)
 // ----------------------------------------------------------------------------
 void WaveformGenerator::writeFREQ_LO(reg8 freq_lo)
 {
-  freq = freq & 0xff00 | freq_lo & 0x00ff;
+  freq = (freq & 0xff00) | (freq_lo & 0x00ff);
 }
 
 void WaveformGenerator::writeFREQ_HI(reg8 freq_hi)
 {
-  freq = (freq_hi << 8) & 0xff00 | freq & 0x00ff;
+  freq = ((freq_hi << 8) & 0xff00) | (freq & 0x00ff);
 }
 
 void WaveformGenerator::writePW_LO(reg8 pw_lo)
 {
-  pw = pw & 0xf00 | pw_lo & 0x0ff;
+  pw = (pw & 0xf00) | (pw_lo & 0x0ff);
 }
 
 void WaveformGenerator::writePW_HI(reg8 pw_hi)
 {
-  pw = (pw_hi << 8) & 0xf00 | pw & 0x0ff;
+  pw = ((pw_hi << 8) & 0xf00) | (pw & 0x0ff);
 }
 
 void WaveformGenerator::writeCONTROL_REG(reg8 control)
@@ -127,11 +124,6 @@ void WaveformGenerator::writeCONTROL_REG(reg8 control)
 reg8 WaveformGenerator::readOSC()
 {
   return output() >> 4;
-}
-
-void WaveformGenerator::writeACC_HI(reg8 value)
-{
-  accumulator = (value << 16) | (accumulator & 0xffff);
 }
 
 // ----------------------------------------------------------------------------

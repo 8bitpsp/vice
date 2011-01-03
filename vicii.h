@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _VICII_H
-#define _VICII_H
+#ifndef VICE_VICII_H
+#define VICE_VICII_H
 
 #include "types.h"
 
@@ -53,6 +53,7 @@ extern struct video_canvas_s *vicii_get_canvas(void);
 
 extern void vicii_reset(void);
 extern void vicii_trigger_light_pen(CLOCK mclk);
+extern CLOCK vicii_lightpen_timing(int x, int y);
 extern void vicii_set_vbank(int new_vbank);
 extern void vicii_set_ram_base(BYTE *base);
 extern void vicii_powerup(void);

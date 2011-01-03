@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _DAA_H
-#define _DAA_H
+#ifndef VICE_DAA_H
+#define VICE_DAA_H
 
 #include "types.h"
 
@@ -33,4 +33,3 @@ extern const BYTE daa_reg_a[];
 extern const BYTE daa_reg_f[];
 
 #endif
-

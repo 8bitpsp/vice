@@ -39,13 +39,7 @@
 #include "log.h"
 #include "machine.h"
 #include "maincpu.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "plus4.h"
 #include "plus4mem.h"
 #include "raster-canvas.h"
@@ -619,11 +613,11 @@ void ted_update_video_mode(unsigned int cycle)
                 if (ted.regs[0x06] & 0x40)
                     raster_changes_foreground_add_int
                         (&ted.raster, pos, (void *)&ted.idle_data,
-                        mem_ram[0x39ff]);
+                        mem_ram[0xffff]);
                 else
                     raster_changes_foreground_add_int
                         (&ted.raster, pos, (void *)&ted.idle_data,
-                        mem_ram[0x3fff]);
+                        mem_ram[0xffff]);
             }
         }
 
@@ -692,8 +686,10 @@ void ted_raster_draw_alarm_handler(CLOCK offset, void *data)
         ted.memptr = 0;
         ted.memptr_col = 0;
         ted.mem_counter = 0;
+		ted.chr_pos_count = 0;
         ted.ted_raster_counter = 0;
         if (!ted.raster.blank) ted.character_fetch_on = 1;
+		ted.raster.ycounter = 0;
     }
     if (ted.ted_raster_counter == 512) ted.ted_raster_counter = 0;
 
@@ -746,7 +742,11 @@ void ted_raster_draw_alarm_handler(CLOCK offset, void *data)
         if (!ted.idle_state) {
             ted.mem_counter = (ted.mem_counter
                               + ted.mem_counter_inc) & 0x3ff;
+			ted.chr_pos_count = (ted.chr_pos_count
+                              + ted.mem_counter_inc) & 0x3ff;				
+
         }
+
         ted.mem_counter_inc = TED_SCREEN_TEXTCOLS;
         /* `ycounter' makes the chip go to idle state when it reaches the
            maximum value.  */
@@ -754,10 +754,10 @@ void ted_raster_draw_alarm_handler(CLOCK offset, void *data)
             ted.memptr_col = ted.mem_counter;
         }
         if (ted.raster.ycounter == 7) {
-            ted.memptr = ted.mem_counter;
+            ted.memptr = ted.chr_pos_count;
 /*            ted.idle_state = 1;*/
         }
-        if (!ted.idle_state || ted.bad_line) {
+        if (!ted.idle_state && ted.allow_bad_lines /*|| ted.bad_line*/ ) {
             ted.raster.ycounter = (ted.raster.ycounter + 1) & 0x7;
             ted.idle_state = 0;
         }
@@ -766,7 +766,7 @@ void ted_raster_draw_alarm_handler(CLOCK offset, void *data)
             ted.force_display_state = 0;
         }
         ted.raster.draw_idle_state = ted.idle_state;
-        ted.bad_line = 0;
+        /*ted.bad_line = 0;*/
     }
 
     ted.ycounter_reset_checked = 0;
@@ -774,15 +774,19 @@ void ted_raster_draw_alarm_handler(CLOCK offset, void *data)
 
     if (ted.ted_raster_counter == ted.first_dma_line)
         ted.allow_bad_lines = !ted.raster.blank;
-
+	if (ted.allow_bad_lines 
+		&& (ted.ted_raster_counter & 7) == (unsigned int)((ted.raster.ysmooth + 1) & 7)) {
+		
+		memcpy(ted.cbuf, ted.cbuf_tmp, ted.mem_counter_inc);
+	}
     /* FIXME */
     if (ted.idle_state) {
         if (ted.regs[0x6] & 0x40) {
             ted.idle_data_location = IDLE_39FF;
-            ted.idle_data = mem_ram[0x39ff];
+            ted.idle_data = mem_ram[0xffff];
         } else {
             ted.idle_data_location = IDLE_3FFF;
-            ted.idle_data = mem_ram[0x3fff];
+            ted.idle_data = mem_ram[0xffff];
         }
     } else {
         ted.idle_data_location = IDLE_NONE;

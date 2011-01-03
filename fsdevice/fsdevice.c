@@ -11,7 +11,7 @@
  *  Olaf Seibert <rhialto@mbfys.kun.nl>
  *  André Fachat <a.fachat@physik.tu-chemnitz.de>
  *  Ettore Perazzoli <ettore@comm2000.it>
- *  Martin Pottendorfer <Martin.Pottendorfer@aut.alcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -186,19 +186,18 @@ void fsdevice_init(void)
     for (i = 0; i < FSDEVICE_DEVICE_MAX; i++) {
         bufinfo_t *bufinfo;
 
-        fsdevice_dev[i].errorl = (char *)lib_calloc(1, maxpathlen);
-        fsdevice_dev[i].cmdbuf = (BYTE *)lib_calloc(1, maxpathlen);
+        fsdevice_dev[i].errorl = lib_calloc(1, maxpathlen);
+        fsdevice_dev[i].cmdbuf = lib_calloc(1, maxpathlen);
 
         fsdevice_dev[i].cptr = 0;
 
         bufinfo = fsdevice_dev[i].bufinfo;
 
         for (j = 0; j < FSDEVICE_BUFFER_MAX; j++) {
-            bufinfo[j].tape
-                = (tape_image_t *)lib_calloc(1, sizeof(tape_image_t));
-            bufinfo[j].dir = (char *)lib_calloc(1, maxpathlen);
-            bufinfo[j].name = (BYTE *)lib_calloc(1, maxpathlen);
-            bufinfo[j].dirmask = (char *)lib_calloc(1, maxpathlen);
+            bufinfo[j].tape = lib_calloc(1, sizeof(tape_image_t));
+            bufinfo[j].dir = lib_calloc(1, maxpathlen);
+            bufinfo[j].name = lib_calloc(1, maxpathlen);
+            bufinfo[j].dirmask = lib_calloc(1, maxpathlen);
         }
     }
 }

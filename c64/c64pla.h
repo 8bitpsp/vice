@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64PLA_H
-#define _C64PLA_H
+#ifndef VICE_C64PLA_H
+#define VICE_C64PLA_H
 
 #include "types.h"
 
@@ -63,4 +63,3 @@ extern void c64pla_config_changed(int tape_sense, int caps_sense, BYTE pullup);
 extern void c64pla_pport_reset(void);
 
 #endif
-

@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _UTIL_H
-#define _UTIL_H
+#ifndef VICE_UTIL_H
+#define VICE_UTIL_H
 
 #include "vice.h"
 
@@ -114,4 +114,3 @@ int strncasecmp(const char *s1, const char *s2, unsigned int n);
 #endif
 
 #endif
-

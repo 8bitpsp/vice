@@ -165,10 +165,8 @@ void t64_destroy(t64_t *t64)
 {
     if (t64->fd != NULL)
         zfile_fclose(t64->fd);
-    if (t64->file_name != NULL)
-        lib_free(t64->file_name);
-    if (t64->file_records != NULL)
-        lib_free(t64->file_records);
+    lib_free(t64->file_name);
+    lib_free(t64->file_records);
     lib_free(t64);
 }
 
@@ -317,7 +315,7 @@ int t64_read(t64_t *t64, BYTE *buf, size_t size)
     if (recsize < (int)(t64->current_file_seek_position + size))
         size = recsize - t64->current_file_seek_position;
 
-    amount = fread(buf, 1, size, t64->fd);
+    amount = (int)fread(buf, 1, size, t64->fd);
 
     t64->current_file_seek_position += amount;
 

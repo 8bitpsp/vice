@@ -29,6 +29,7 @@
 
 #include "vice.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,6 +50,11 @@
 #include "datasette.h"
 #include "drive.h"
 #include "drivecpu.h"
+
+#ifdef HAVE_FULLSCREEN
+#include "fullscreenarch.h"
+#endif
+
 #include "interrupt.h"
 #include "ioutil.h"
 #include "kbdbuf.h"
@@ -56,14 +62,7 @@
 #include "log.h"
 #include "machine.h"
 #include "machine-video.h"
-#include "translate.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
 #include "mon_breakpoint.h"
 #include "mon_disassemble.h"
 #include "mon_memory.h"
@@ -72,14 +71,17 @@
 #include "mon_ui.h"
 #include "mon_util.h"
 #include "monitor.h"
+#include "monitor_network.h"
 #include "montypes.h"
 #include "resources.h"
 #include "screenshot.h"
 #include "signals.h"
 #include "sysfile.h"
+#include "translate.h"
 #include "types.h"
 #include "uiapi.h"
 #include "uimon.h"
+#include "util.h"
 #include "vsync.h"
 
 
@@ -101,18 +103,18 @@ int mon_init_break = -1;
 #define BAD_ADDR (new_addr(e_invalid_space, 0))
 
 #define MONITOR_GET_PC(mem) \
-    ((WORD)((monitor_cpu_type.mon_register_get_val)(mem, e_PC)))
+    ((WORD)((monitor_cpu_for_memspace[mem]->mon_register_get_val)(mem, e_PC)))
 
 #define MONITOR_GET_OPCODE(mem) (mon_get_mem_val(mem, MONITOR_GET_PC(mem)))
 
 console_t *console_log = NULL;
 
+static int monitor_trap_triggered = 0;
+
 /* External functions */
 #ifdef HAVE_READLINE
-extern void add_history(const char *str);
+# include "editline.h"
 #endif
-
-extern void parse_and_execute_line(char *input);
 
 monitor_cartridge_commands_t mon_cart_cmd;
 
@@ -154,7 +156,7 @@ struct break_list_s *watchpoints_store[NUM_MEMSPACES];
 MEMSPACE caller_space;
 
 const char *_mon_space_strings[] = {
-    "Default", "Computer", "Disk8", "Disk9", "<<Invalid>>"
+    "Default", "Computer", "Disk8", "Disk9", "Disk10", "Disk11", "<<Invalid>>"
 };
 
 static WORD watch_load_array[10][NUM_MEMSPACES];
@@ -189,7 +191,18 @@ static int set_playback_name(const char *param, void *extra_param);
 /* Disassemble the current opcode on entry.  Used for single step.  */
 static int disassemble_on_entry = 0;
 
-monitor_cpu_type_t monitor_cpu_type;
+/* We now have an array of pointers to the current monitor_cpu_type for each memspace. */
+/* This gets initialized in monitor_init(). */
+monitor_cpu_type_t *monitor_cpu_for_memspace[NUM_MEMSPACES];
+
+struct supported_cpu_type_list_s {
+    monitor_cpu_type_t *monitor_cpu_type_p;
+    struct supported_cpu_type_list_s *next;
+};
+typedef struct supported_cpu_type_list_s supported_cpu_type_list_t;
+
+/* A linked list of supported monitor_cpu_types for each memspace */
+static supported_cpu_type_list_t *monitor_cpu_type_supported[NUM_MEMSPACES];
 
 struct monitor_cpu_type_list_s {
     monitor_cpu_type_t monitor_cpu_type;
@@ -210,7 +223,7 @@ static const char *cond_op_string[] = { "",
                                         "||"
                                        };
 
-const char *mon_memspace_string[] = {"default", "C", "8", "9" };
+const char *mon_memspace_string[] = {"default", "C", "8", "9", "0", "1" };
 
 static const char *register_string[] = { "A",
                                          "X",
@@ -219,6 +232,62 @@ static const char *register_string[] = { "A",
                                          "SP"
                                         };
 
+/* Some local helper functions */
+int find_cpu_type_from_string(const char *cpu_string)
+{
+    if ((strcasecmp(cpu_string, "6502")==0)||(strcasecmp(cpu_string, "6510")==0)) {
+        return CPU_6502;
+    } else if (strcasecmp(cpu_string, "z80")==0) {
+        return CPU_Z80;
+    } else if ((strcasecmp(cpu_string, "6502dtv")==0)||(strcasecmp(cpu_string, "6510dtv")==0)) {
+        return CPU_6502DTV;
+    } else {
+        return -1;
+    }
+}
+
+monitor_cpu_type_t* monitor_find_cpu_for_memspace(MEMSPACE mem, CPU_TYPE_t cpu)
+{
+    supported_cpu_type_list_t *ptr;
+    if (mem==e_default_space)
+        mem=default_memspace;
+    ptr=monitor_cpu_type_supported[mem];
+    while (ptr) {
+        if (ptr->monitor_cpu_type_p) {
+            if (ptr->monitor_cpu_type_p->cpu_type==cpu) {
+                return ptr->monitor_cpu_type_p;
+            }
+        }
+        ptr=ptr->next;
+    }
+    return NULL;
+}
+
+void monitor_print_cpu_types_supported(MEMSPACE mem)
+{
+    supported_cpu_type_list_t *ptr;
+    ptr=monitor_cpu_type_supported[mem];
+    while (ptr) {
+        if (ptr->monitor_cpu_type_p) {
+            switch (ptr->monitor_cpu_type_p->cpu_type) {
+            case CPU_6502:
+                mon_out(" 6502");
+                break;
+            case CPU_6502DTV:
+                mon_out(" 6502DTV");
+                break;
+            case CPU_Z80:
+                mon_out(" Z80");
+                break;
+            default:
+                mon_out(" unknown(%d)",ptr->monitor_cpu_type_p->cpu_type);
+                break;
+            }
+        }
+        ptr=ptr->next;
+    }
+    mon_out("\n");
+}
 
 /* *** ADDRESS FUNCTIONS *** */
 
@@ -318,7 +387,7 @@ long mon_evaluate_address_range(MON_ADDR *start_addr, MON_ADDR *end_addr,
                 set_addr_memspace(end_addr, default_memspace);
             } else {
                 if (mem2 != e_invalid_space) {
-                set_addr_memspace(start_addr, mem2);
+                    set_addr_memspace(start_addr, mem2);
                 } else {
                     set_addr_memspace(start_addr, default_memspace);
                 }
@@ -363,7 +432,7 @@ long mon_evaluate_address_range(MON_ADDR *start_addr, MON_ADDR *end_addr,
 
 mon_reg_list_t *mon_register_list_get(int mem)
 {
-    return monitor_cpu_type.mon_register_list_get(mem);
+    return monitor_cpu_for_memspace[mem]->mon_register_list_get(mem);
 }
 
 bool check_drive_emu_level_ok(int drive_num)
@@ -381,38 +450,23 @@ bool check_drive_emu_level_ok(int drive_num)
 
 void monitor_cpu_type_set(const char *cpu_type)
 {
-    CPU_TYPE_t serchcpu;
-    monitor_cpu_type_list_t *monitor_cpu_type_list_ptr;
+    int serchcpu;
+    monitor_cpu_type_t *monitor_cpu_type_p=NULL;
 
-    if (!strcasecmp(cpu_type, "6502")) {
-        serchcpu = CPU_6502;
+    serchcpu=find_cpu_type_from_string(cpu_type);
+    if (serchcpu>-1) {
+        monitor_cpu_type_p=monitor_find_cpu_for_memspace(default_memspace, serchcpu);
+    }
+    if (monitor_cpu_type_p) {
+        monitor_cpu_for_memspace[default_memspace]=monitor_cpu_type_p;
+        uimon_notify_change();
     } else {
-        if (!strcasecmp(cpu_type, "z80")) {
-            serchcpu = CPU_Z80;
-        } else {
-            if (!strcasecmp(cpu_type, "6502dtv")) {
-                serchcpu = CPU_6502DTV;
-            } else {
-                mon_out("Unknown CPU type `%s'\n", cpu_type);
-                return;
-            }
-        }
-    }
-
-    monitor_cpu_type_list_ptr = monitor_cpu_type_list;
-    while(monitor_cpu_type_list_ptr->monitor_cpu_type.cpu_type != serchcpu) {
-        monitor_cpu_type_list_ptr
-            = monitor_cpu_type_list_ptr->next_monitor_cpu_type;
-        if (monitor_cpu_type_list_ptr == NULL) {
+        if (strcmp(cpu_type,"")!=0) {
             mon_out("Unknown CPU type `%s'\n", cpu_type);
-            return;
         }
+        mon_out("This device (%s) supports the following CPU types:", _mon_space_strings[default_memspace]);
+        monitor_print_cpu_types_supported(default_memspace);
     }
-
-    memcpy(&monitor_cpu_type, &(monitor_cpu_type_list_ptr->monitor_cpu_type),
-           sizeof(monitor_cpu_type_t));
-
-    uimon_notify_change();
 }
 
 void mon_bank(MEMSPACE mem, const char *bankname)
@@ -479,7 +533,7 @@ void mon_set_mem_val(MEMSPACE mem, WORD mem_addr, BYTE val)
 void mon_jump(MON_ADDR addr)
 {
     mon_evaluate_default_addr(&addr);
-    (monitor_cpu_type.mon_register_set_val)(addr_memspace(addr), e_PC,
+    (monitor_cpu_for_memspace[addr_memspace(addr)]->mon_register_set_val)(addr_memspace(addr), e_PC,
                                             (WORD)(addr_location(addr)));
     exit_mon = 1;
 }
@@ -556,7 +610,7 @@ void mon_add_string_to_buffer(char *str)
 {
     unsigned int i = data_buf_len;
     strcpy((char *) &(data_buf[data_buf_len]), str);
-    data_buf_len += strlen(str);
+    data_buf_len += (unsigned int)strlen(str);
     data_buf[data_buf_len] = '\0';
     lib_free(str);
 
@@ -564,7 +618,7 @@ void mon_add_string_to_buffer(char *str)
       data_mask_buf[i]=0xff;
 }
 
-static monitor_cpu_type_list_t *montor_list_new(void)
+static monitor_cpu_type_list_t *monitor_list_new(void)
 {
     return (monitor_cpu_type_list_t *)lib_malloc(
         sizeof(monitor_cpu_type_list_t));
@@ -575,20 +629,20 @@ static void montor_list_destroy(monitor_cpu_type_list_t *list)
     lib_free(list);
 }
 
-void mon_backtrace()
+void mon_backtrace(void)
 {
     BYTE opc;
     WORD sp, i, addr, n;
 
     /* TODO support DTV stack relocation, check memspace handling, move somewhere else */
     n = 0;
-    sp = (monitor_cpu_type.mon_register_get_val)(default_memspace, e_SP);
-    for(i = sp + 0x100 + 1; i < 0x1ff; i++) {
+    sp = (monitor_cpu_for_memspace[default_memspace]->mon_register_get_val)(default_memspace, e_SP);
+    for (i = sp + 0x100 + 1; i < 0x1ff; i++) {
         addr = mon_get_mem_val(default_memspace, i);
         addr += ((WORD)mon_get_mem_val(default_memspace, (WORD)(i + 1))) << 8;
         addr -= 2;
         opc = mon_get_mem_val(default_memspace, addr);
-        if(opc == 0x20 /* JSR */) {
+        if (opc == 0x20 /* JSR */) {
             mon_out("(%d) %04x\n", n, addr);
         }
         n++;
@@ -599,7 +653,13 @@ void mon_backtrace()
 cpuhistory_t cpuhistory[CPUHISTORY_SIZE];
 int cpuhistory_i;
 
-void monitor_cpuhistory_store(WORD addr, BYTE op, BYTE p1, BYTE p2)
+void monitor_cpuhistory_store(unsigned int addr, unsigned int op,
+                              unsigned int p1, unsigned int p2,
+                              BYTE reg_a,
+                              BYTE reg_x,
+                              BYTE reg_y,
+                              BYTE reg_sp, 
+                              unsigned int reg_st)
 {
     ++cpuhistory_i;
     cpuhistory_i &= (CPUHISTORY_SIZE-1);
@@ -607,7 +667,14 @@ void monitor_cpuhistory_store(WORD addr, BYTE op, BYTE p1, BYTE p2)
     cpuhistory[cpuhistory_i].op = op;
     cpuhistory[cpuhistory_i].p1 = p1;
     cpuhistory[cpuhistory_i].p2 = p2;
+    cpuhistory[cpuhistory_i].reg_a = reg_a;
+    cpuhistory[cpuhistory_i].reg_x = reg_x;
+    cpuhistory[cpuhistory_i].reg_y = reg_y;
+    cpuhistory[cpuhistory_i].reg_sp = reg_sp;
+    cpuhistory[cpuhistory_i].reg_st = reg_st;
 }
+
+/*#define TEST(x) ((x)!=0)*/
 
 void mon_cpuhistory(int count)
 {
@@ -619,14 +686,16 @@ void mon_cpuhistory(int count)
     const char *dis_inst;
     unsigned opc_size;
     int i, pos;
+    static const char padding[] = "                              ";
+    size_t padlen;              /* 0123456789012345678901234567890 */
 
-    if((count<1)||(count>CPUHISTORY_SIZE)) {
+    if ((count<1)||(count>CPUHISTORY_SIZE)) {
         count = CPUHISTORY_SIZE;
     }
 
     pos = (cpuhistory_i + 1 - count) & (CPUHISTORY_SIZE-1);
     
-    for(i=0; i < count; ++i) {
+    for (i=0; i < count; ++i) {
         addr = cpuhistory[pos].addr;
         op = cpuhistory[pos].op;
         p1 = cpuhistory[pos].p1;
@@ -638,8 +707,24 @@ void mon_cpuhistory(int count)
         dis_inst = mon_disassemble_to_string_ex(mem, loc, op, p1, p2, p3, hex_mode,
                                                 &opc_size);
 
+
+        padlen = strlen(dis_inst);
+        if (padlen > 30) {
+            padlen = 30;
+        }
+
         /* Print the disassembled instruction */
-        mon_out(".%s:%04x   %s\n", mon_memspace_string[mem], loc, dis_inst);
+        mon_out("%04x  %s%s :A$%02x X$%02x Y$%02x SP$%02x %c%c-%c%c%c%c%c\n", 
+            loc, dis_inst, &(padding[padlen]),
+            cpuhistory[pos].reg_a, cpuhistory[pos].reg_x, cpuhistory[pos].reg_y, cpuhistory[pos].reg_sp,
+            ((cpuhistory[pos].reg_st & (1<<7))!=0)?'N':' ',
+            ((cpuhistory[pos].reg_st & (1<<6))!=0)?'V':' ',
+            ((cpuhistory[pos].reg_st & (1<<4))!=0)?'B':' ',
+            ((cpuhistory[pos].reg_st & (1<<3))!=0)?'D':' ',
+            ((cpuhistory[pos].reg_st & (1<<2))!=0)?'I':' ',
+            ((cpuhistory[pos].reg_st & (1<<1))!=0)?'Z':' ',
+            ((cpuhistory[pos].reg_st & (1<<0))!=0)?'C':' '
+		);
 
         pos = (pos+1) & (CPUHISTORY_SIZE-1);
     }
@@ -687,23 +772,23 @@ void mon_memmap_zap(void)
 void mon_memmap_show(int mask, MON_ADDR start_addr, MON_ADDR end_addr)
 {
 #ifdef FEATURE_CPUMEMHISTORY
-    int i;
+    unsigned int i;
     BYTE b;
 
-    if(machine_class == VICE_MACHINE_C64DTV) {
+    if (machine_class == VICE_MACHINE_C64DTV) {
        mon_out("  addr: IO ROM RAM\n");
     } else {
        mon_out("addr: IO ROM RAM\n");
     }
 
-    if(start_addr == BAD_ADDR) start_addr = 0;
-    if(end_addr == BAD_ADDR) end_addr = mon_memmap_size-1;
-    if(start_addr>end_addr) start_addr = end_addr;
+    if (start_addr == BAD_ADDR) start_addr = 0;
+    if (end_addr == BAD_ADDR) end_addr = mon_memmap_size-1;
+    if (start_addr>end_addr) start_addr = end_addr;
 
-    for(i = start_addr; i <= end_addr; ++i) {
+    for (i = start_addr; i <= end_addr; ++i) {
         b = mon_memmap[i];
         if ((b & mask)!= 0) {
-            if(machine_class == VICE_MACHINE_C64DTV) {
+            if (machine_class == VICE_MACHINE_C64DTV) {
                 mon_out("%06x: %c%c %c%c%c %c%c%c\n",i,
                     (b&MEMMAP_I_O_R)?'r':'-',
                     (b&MEMMAP_I_O_W)?'w':'-',
@@ -731,7 +816,7 @@ void mon_memmap_show(int mask, MON_ADDR start_addr, MON_ADDR end_addr)
 #endif
 }
 
-void monitor_memmap_store(unsigned int addr, BYTE type)
+void monitor_memmap_store(unsigned int addr, unsigned int type)
 {
     BYTE op = cpuhistory[cpuhistory_i].op;
 
@@ -739,7 +824,7 @@ void monitor_memmap_store(unsigned int addr, BYTE type)
 
     /* Ignore reg_pc+2 reads on branches & JSR 
        and return address read on RTS */
-    if(type & (MEMMAP_ROM_R|MEMMAP_RAM_R)
+    if (type & (MEMMAP_ROM_R|MEMMAP_RAM_R)
       &&(((op & 0x1f) == 0x10)||(op == OP_JSR)
       ||((op == OP_RTS) && ((addr>0x1ff)||(addr<0x100)))))
         return;
@@ -753,7 +838,7 @@ BYTE mon_memmap_palette[256*3];
 void mon_memmap_make_palette(void)
 {
     int i;
-    for(i=0; i<256; ++i) {
+    for (i=0; i<256; ++i) {
         mon_memmap_palette[i*3+0] = (i&(MEMMAP_RAM_W))?0x80:0+(i&(MEMMAP_ROM_W))?0x60:0+(i&(MEMMAP_I_O_W))?0x1f:0;
         mon_memmap_palette[i*3+1] = (i&(MEMMAP_RAM_X))?0x80:0+(i&(MEMMAP_ROM_X))?0x60:0+(i&(MEMMAP_I_O_W|MEMMAP_I_O_R))?0x1f:0;
         mon_memmap_palette[i*3+2] = (i&(MEMMAP_RAM_R))?0x80:0+(i&(MEMMAP_ROM_R))?0x60:0+(i&(MEMMAP_I_O_R))?0x1f:0;
@@ -783,7 +868,7 @@ void mon_memmap_save(const char* filename, int format)
             drvname = "BMP";
             break;
     }
-    if(memmap_screenshot_save(drvname, filename, mon_memmap_picx, mon_memmap_picy, mon_memmap, mon_memmap_palette)) {
+    if (memmap_screenshot_save(drvname, filename, mon_memmap_picx, mon_memmap_picy, mon_memmap, mon_memmap_palette)) {
         mon_out("Failed.\n");
     }
 #else
@@ -812,7 +897,7 @@ void mon_screenshot_save(const char* filename, int format)
             drvname = "BMP";
             break;
     }
-    if(screenshot_save(drvname, filename, machine_video_canvas_get(0))) {
+    if (screenshot_save(drvname, filename, machine_video_canvas_get(0))) {
         mon_out("Failed.\n");
     }
 }
@@ -827,6 +912,7 @@ void mon_show_dir(const char *path)
     struct ioutil_dir_s *dir;
     char *name;
     char *mpath;
+    char *fullname;
 
     if (path) {
         mpath=(char *)path;
@@ -844,7 +930,13 @@ void mon_show_dir(const char *path)
     while ( (name = ioutil_readdir(dir)) ) {
         unsigned int len, isdir;
         int ret;
-        ret = ioutil_stat(name, &len, &isdir);
+        if (path) {
+            fullname = util_concat(path, FSDEV_DIR_SEP_STR, name, NULL);
+            ret = ioutil_stat(fullname, &len, &isdir);
+            lib_free(fullname);
+        } else {
+            ret = ioutil_stat(name, &len, &isdir);
+        }
         if (!ret) {
             if (isdir)
                 mon_out("     <dir> %s\n", name);
@@ -874,7 +966,7 @@ void mon_resource_set(const char *name, const char* value)
     switch(resources_query_type(name)) {
         case RES_INTEGER:
         case RES_STRING:
-            if(resources_set_value_string(name,value)) {
+            if (resources_set_value_string(name,value)) {
                 mon_out("Failed.\n");
             }
             ui_update_menus();
@@ -907,7 +999,7 @@ void mon_reset_machine(int type)
 
 void mon_tape_ctrl(int command)
 {
-    if((command<0)||(command>6)) {
+    if ((command<0)||(command>6)) {
         mon_out("Unknown command.\n");
     } else {
         datasette_control(command);
@@ -916,14 +1008,60 @@ void mon_tape_ctrl(int command)
 
 void mon_cart_freeze(void)
 {
-    if(mon_cart_cmd.cartridge_trigger_freeze != NULL) {
+    if (mon_cart_cmd.cartridge_trigger_freeze != NULL) {
         (mon_cart_cmd.cartridge_trigger_freeze)();
     } else {
         mon_out("Unsupported.\n");
    }
 }
 
+/* Local helper functions for building the lists */
+static monitor_cpu_type_t* find_monitor_cpu_type(CPU_TYPE_t cputype)
+{
+    monitor_cpu_type_list_t *list_ptr=monitor_cpu_type_list;
+    while (list_ptr->monitor_cpu_type.cpu_type != cputype) {
+        list_ptr = list_ptr->next_monitor_cpu_type;
+        if (!list_ptr) {
+            return NULL;
+        }
+    }
+    return &(list_ptr->monitor_cpu_type);
+}
+
+static void add_monitor_cpu_type_supported(supported_cpu_type_list_t **list_ptr, monitor_cpu_type_t *mon_cpu_type)
+{
+    supported_cpu_type_list_t *element_ptr;
+    if (mon_cpu_type) {
+        element_ptr=lib_malloc(sizeof(supported_cpu_type_list_t));
+        element_ptr->next=*list_ptr;
+        element_ptr->monitor_cpu_type_p=mon_cpu_type;
+        *list_ptr=element_ptr;
+    }
+}
+
+static void find_supported_monitor_cpu_types(supported_cpu_type_list_t **list_ptr, monitor_interface_t *mon_interface)
+{
+    if (mon_interface->z80_cpu_regs) {
+        add_monitor_cpu_type_supported(list_ptr, find_monitor_cpu_type(CPU_Z80));
+    }
+    if (mon_interface->dtv_cpu_regs) {
+        add_monitor_cpu_type_supported(list_ptr, find_monitor_cpu_type(CPU_6502DTV));
+    }
+    if (mon_interface->cpu_regs) {
+        add_monitor_cpu_type_supported(list_ptr, find_monitor_cpu_type(CPU_6502));
+    }
+}
+
 /* *** MISC COMMANDS *** */
+
+monitor_cpu_type_t* monitor_find_cpu_type_from_string(const char *cpu_type)
+{
+    int cpu;
+    cpu=find_cpu_type_from_string(cpu_type);
+    if (cpu<0)
+        return NULL;
+    return find_monitor_cpu_type(cpu);
+}
 
 void monitor_init(monitor_interface_t *maincpu_interface_init,
                   monitor_interface_t *drive_interface_init[],
@@ -949,22 +1087,42 @@ void monitor_init(monitor_interface_t *maincpu_interface_init,
 
     mon_ui_init();
 
-    monitor_cpu_type_list = montor_list_new();
+    monitor_cpu_type_list = monitor_list_new();
     monitor_cpu_type_list_ptr = monitor_cpu_type_list;
 
     i = 0;
-    while(asmarray[i] != NULL) {
+    while (asmarray[i] != NULL) {
         memcpy(&(monitor_cpu_type_list_ptr->monitor_cpu_type),
                asmarray[i], sizeof(monitor_cpu_type_t));
-        monitor_cpu_type_list_ptr->next_monitor_cpu_type = montor_list_new();
+        monitor_cpu_type_list_ptr->next_monitor_cpu_type = monitor_list_new();
         monitor_cpu_type_list_ptr
             = monitor_cpu_type_list_ptr->next_monitor_cpu_type;
         monitor_cpu_type_list_ptr->next_monitor_cpu_type = NULL;
         i++;
     }
 
-    memcpy(&monitor_cpu_type, asmarray[0], sizeof(monitor_cpu_type_t));
+    for (i=0;i<NUM_MEMSPACES;i++) {
+        monitor_cpu_type_supported[i]=NULL;
+    }
+    /* We should really be told what CPUs are supported by each memspace, but that will
+     * require a bunch of changes, so for now we detect it based on the available registers. */
+    find_supported_monitor_cpu_types(&monitor_cpu_type_supported[e_comp_space], maincpu_interface_init);
 
+    for (dnr = 0; dnr < DRIVE_NUM; dnr++) {
+        find_supported_monitor_cpu_types(&monitor_cpu_type_supported[monitor_diskspace_mem(dnr)], 
+                                         drive_interface_init[dnr]);
+    }
+
+    /* Build array of pointers to monitor_cpu_type structs */
+    monitor_cpu_for_memspace[e_comp_space]=
+        monitor_cpu_type_supported[e_comp_space]->monitor_cpu_type_p;
+    for (dnr = 0; dnr < DRIVE_NUM; dnr++) {
+        monitor_cpu_for_memspace[monitor_diskspace_mem(dnr)]=
+            monitor_cpu_type_supported[monitor_diskspace_mem(dnr)]->monitor_cpu_type_p;
+    }
+    /* Safety precaution */
+    monitor_cpu_for_memspace[e_default_space]=monitor_cpu_for_memspace[e_comp_space];
+        
     watch_load_occurred = FALSE;
     watch_store_occurred = FALSE;
 
@@ -1004,6 +1162,8 @@ void monitor_init(monitor_interface_t *maincpu_interface_init,
 void monitor_shutdown(void)
 {
     monitor_cpu_type_list_t *list, *list_next;
+    supported_cpu_type_list_t *slist, *slist_next;
+    int i;
 
     list = monitor_cpu_type_list;
 
@@ -1012,6 +1172,15 @@ void monitor_shutdown(void)
         montor_list_destroy(list);
         list = list_next;
     }
+    for (i=0; i < NUM_MEMSPACES; i++) {
+        slist = monitor_cpu_type_supported[i];
+        while (slist != NULL) {
+            slist_next = slist->next;
+            lib_free(slist);
+            slist = slist_next;
+        }
+    }
+
 #ifdef FEATURE_CPUMEMHISTORY                                                                                                                                                                         
    lib_free(mon_memmap);                                                                                                                                                                            
 #endif
@@ -1100,10 +1269,12 @@ void mon_display_io_regs(void)
     mem_ioreg_list_t *mem_ioreg_list_base;
     unsigned int n;
     MON_ADDR start,end;
-    int newbank;
+    int newbank = 0;
     int currbank = mon_interfaces[default_memspace]->current_bank;
 
-    newbank = mon_interfaces[default_memspace]->mem_bank_from_name("io");
+    if (mon_interfaces[default_memspace]->mem_bank_list) {
+        newbank = mon_interfaces[default_memspace]->mem_bank_from_name("io");
+    }
 
     if (newbank >= 0) {
         mon_interfaces[default_memspace]->current_bank = newbank;
@@ -1114,16 +1285,20 @@ void mon_display_io_regs(void)
             mon_interfaces[default_memspace]->context);
     n = 0;
 
-    while (1) {
-        mon_out("%s:\n", mem_ioreg_list_base[n].name);
-        start = new_addr(default_memspace, mem_ioreg_list_base[n].start);
-        end = new_addr(default_memspace, mem_ioreg_list_base[n].end);
-        mon_memory_display(e_hexadecimal, start, end, DF_PETSCII);
+    if (mem_ioreg_list_base) {
+        while (1) {
+            mon_out("%s:\n", mem_ioreg_list_base[n].name);
+            start = new_addr(default_memspace, mem_ioreg_list_base[n].start);
+            end = new_addr(default_memspace, mem_ioreg_list_base[n].end);
+            mon_memory_display(e_hexadecimal, start, end, DF_PETSCII);
 
-        if (mem_ioreg_list_base[n].next == 0)
-            break;
-
-        n++;
+            if (mem_ioreg_list_base[n].next == 0) {
+                break;
+            }
+            n++;
+        }
+    } else {
+        mon_out("No I/O regs available\n");
     }
 
     mon_interfaces[default_memspace]->current_bank = currbank;
@@ -1131,10 +1306,15 @@ void mon_display_io_regs(void)
 }
 
 void mon_ioreg_add_list(mem_ioreg_list_t **list, const char *name,
-                        WORD start, WORD end)
+                        int start_, int end_)
 {
     mem_ioreg_list_t *base;
     unsigned int n;
+    WORD start = start_ & 0xFFFFu;
+    WORD end = end_ & 0xFFFFu;
+
+    assert(start == start_);
+    assert(end == end_);
 
     base = *list;
     n = 0;
@@ -1145,7 +1325,7 @@ void mon_ioreg_add_list(mem_ioreg_list_t **list, const char *name,
             break;
     }
 
-    base = (mem_ioreg_list_t *)lib_realloc(base, sizeof(mem_ioreg_list_t)
+    base = lib_realloc(base, sizeof(mem_ioreg_list_t)
            * (n + 1));
 
     if (n > 0)
@@ -1235,7 +1415,7 @@ void mon_end_recording(void)
 static int set_playback_name(const char *param, void *extra_param)
 {
     if (!playback_name) {
-        playback_name = strdup(param);
+        playback_name = lib_stralloc(param);
         playback = 1;
     }
     return 0;
@@ -1254,13 +1434,13 @@ static void playback_commands(int current_playback)
 
     if (fp == NULL) {
         mon_out("Playback for `%s' failed.\n", filename);
-        free(playback_name);
+        lib_free(playback_name);
         playback_name = NULL;
         --playback;
         return;
     }
 
-    free(playback_name);
+    lib_free(playback_name);
     playback_name = NULL;
 
     while (fgets(string, 255, fp) != NULL) {
@@ -1282,7 +1462,7 @@ static void playback_commands(int current_playback)
 void mon_playback_init(const char *filename)
 {
     if (playback < MAX_PLAYBACK) {
-        playback_name = strdup(filename);
+        playback_name = lib_stralloc(filename);
         ++playback;
     } else {
         mon_out("Playback for `%s' failed (recursion > %i).\n", filename, MAX_PLAYBACK);
@@ -1344,7 +1524,7 @@ int mon_symbol_table_lookup_addr(MEMSPACE mem, char *name)
         mem = default_memspace;
 
     if (strcmp(name, ".PC") == 0) {
-        return (monitor_cpu_type.mon_register_get_val)(mem, e_PC);
+        return (monitor_cpu_for_memspace[mem]->mon_register_get_val)(mem, e_PC);
     }
 
     sym_ptr = monitor_labels[mem].name_list;
@@ -1395,7 +1575,7 @@ void mon_add_name_to_symbol_table(MON_ADDR addr, char *name)
     }
 
     /* Add name to name list */
-    sym_ptr = (symbol_entry_t *)lib_malloc(sizeof(symbol_entry_t));
+    sym_ptr = lib_malloc(sizeof(symbol_entry_t));
     sym_ptr->name = name;
     sym_ptr->addr = loc;
 
@@ -1403,7 +1583,7 @@ void mon_add_name_to_symbol_table(MON_ADDR addr, char *name)
     monitor_labels[mem].name_list = sym_ptr;
 
     /* Add address to hash table */
-    sym_ptr = (symbol_entry_t *)lib_malloc(sizeof(symbol_entry_t));
+    sym_ptr = lib_malloc(sizeof(symbol_entry_t));
     sym_ptr->name = name;
     sym_ptr->addr = addr;
 
@@ -1556,7 +1736,7 @@ void mon_print_conditional(cond_node_t *cnode)
         mon_out("( ");
 
     if (cnode->operation != e_INV) {
-        if(!(cnode->child1 && cnode->child2)) {
+        if (!(cnode->child1 && cnode->child2)) {
             log_error(LOG_ERR, "No conditional!");
             return;
         }
@@ -1618,7 +1798,7 @@ int mon_evaluate_conditional(cond_node_t *cnode)
         }
     } else {
         if (cnode->is_reg)
-            cnode->value = (monitor_cpu_type.mon_register_get_val)
+            cnode->value = (monitor_cpu_for_memspace[reg_memspace(cnode->reg_num)]->mon_register_get_val)
                            (reg_memspace(cnode->reg_num),
                            reg_regid(cnode->reg_num));
     }
@@ -1851,21 +2031,6 @@ void monitor_change_device(MEMSPACE mem)
 {
     mon_out("Setting default device to `%s'\n",_mon_space_strings[(int) mem]);
     default_memspace = mem;
-
-    if(machine_class == VICE_MACHINE_C64DTV) {
-        switch(mem) {
-            case e_comp_space:
-                monitor_cpu_type_set("6502dtv");
-                break;
-            case e_disk8_space:
-            case e_disk9_space:
-            case e_disk10_space:
-            case e_disk11_space:
-            default:
-                monitor_cpu_type_set("6502");
-                break;
-        }
-    }
 }
 
 static void make_prompt(char *str)
@@ -1887,40 +2052,36 @@ static void monitor_open(void)
 {
     unsigned int dnr;
 
-    if (mon_console_close_on_leaving) {
-        console_log = uimon_window_open();
-        uimon_set_interface(mon_interfaces, NUM_MEMSPACES);
-    } else {
-        console_log = uimon_window_resume();
-        mon_console_close_on_leaving = 1;
+    if (monitor_is_remote()) {
+        static console_t console_log_remote = { 80, 25, 0, 0 };
+
+        console_log = & console_log_remote;
+    }
+    else {
+        if (mon_console_close_on_leaving) {
+            console_log = uimon_window_open();
+            uimon_set_interface(mon_interfaces, NUM_MEMSPACES);
+        } else {
+            console_log = uimon_window_resume();
+            mon_console_close_on_leaving = 1;
+        }
     }
 
     signals_abort_set();
 
     inside_monitor = TRUE;
+    monitor_trap_triggered = FALSE;
     vsync_suspend_speed_eval();
 
     uimon_notify_change();
 
-    if (machine_class == VICE_MACHINE_C64DTV) {
-        monitor_cpu_type_set("6502dtv");
-    }
-
     dot_addr[e_comp_space] = new_addr(e_comp_space,
-                                      MONITOR_GET_PC(e_comp_space));
-
-    if (machine_class == VICE_MACHINE_C64DTV) {
-        monitor_cpu_type_set("6502");
-    }
+        ((WORD)((monitor_cpu_for_memspace[e_comp_space]->mon_register_get_val)(e_comp_space, e_PC))));
 
     for (dnr = 0; dnr < DRIVE_NUM; dnr++) {
         int mem = monitor_diskspace_mem(dnr);
-
-        dot_addr[mem] = new_addr(mem, MONITOR_GET_PC(mem));
-    }
-
-    if ((caller_space == e_comp_space) && (machine_class == VICE_MACHINE_C64DTV)) {
-        monitor_cpu_type_set("6502dtv");
+        dot_addr[mem] = new_addr(mem,
+            ((WORD)((monitor_cpu_for_memspace[mem]->mon_register_get_val)(mem, e_PC))));
     }
 
     mon_out("\n** Monitor");
@@ -1943,10 +2104,6 @@ static void monitor_open(void)
     if (disassemble_on_entry) {
         mon_disassemble_instr(dot_addr[caller_space]);
         disassemble_on_entry = 0;
-    }
-
-    if ((default_memspace != e_comp_space) && (machine_class == VICE_MACHINE_C64DTV)) {
-        monitor_cpu_type_set("6502");
     }
 }
 
@@ -1992,8 +2149,7 @@ static int monitor_process(char *cmd)
             }
         }
     }
-    if (last_cmd)
-        lib_free(last_cmd);
+    lib_free(last_cmd);
 
     last_cmd = cmd;
 
@@ -2019,10 +2175,12 @@ static void monitor_close(int check)
     if (console_log->console_can_stay_open == 0)
                 mon_console_close_on_leaving = 1;
 
-    if (mon_console_close_on_leaving) {
-        uimon_window_close();
-    } else {
-        uimon_window_suspend();
+    if ( ! monitor_is_remote() ) {
+        if (mon_console_close_on_leaving) {
+            uimon_window_close();
+        } else {
+            uimon_window_suspend();
+        }
     }
 }
 
@@ -2042,10 +2200,16 @@ void monitor_startup(void)
 static void monitor_trap(WORD addr, void *unused_data)
 {
     monitor_startup();
+#ifdef HAVE_FULLSCREEN
+    fullscreen_resume();
+#endif
+
 }
 
 void monitor_startup_trap(void)
 {
-    interrupt_maincpu_trigger_trap(monitor_trap, (void *)0);
+    if ( ! monitor_trap_triggered && ! inside_monitor ) {
+        monitor_trap_triggered = TRUE;
+        interrupt_maincpu_trigger_trap(monitor_trap, 0);
+    }
 }
-

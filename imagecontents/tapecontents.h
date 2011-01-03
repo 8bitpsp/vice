@@ -24,15 +24,11 @@
  *
  */
 
-#ifndef _TAPECONTENTS_H
-#define _TAPECONTENTS_H
+#ifndef VICE_TAPECONTENTS_H
+#define VICE_TAPECONTENTS_H
 
 struct image_contents_s;
 
-extern struct image_contents_s *tapecontents_read(const char *file_name,
-                                                  unsigned int unit);
-extern char *tapecontents_filename_by_number(const char *filename,
-                                             unsigned int unit,
-                                             unsigned int file_index);
+extern struct image_contents_s *tapecontents_read(const char *file_name);
 #endif
 

@@ -85,6 +85,14 @@ int io_source;
 
 machine_context_t machine_context;
 
+/* beos dummy for the generally used cart function in ui_file.cc */
+#ifdef __BEOS__
+int cartridge_attach_image(int type, const char *filename)
+{
+    return 0;
+}
+#endif
+
 #define NUM_KEYBOARD_MAPPINGS 6
 
 const char *machine_keymap_res_name_list[NUM_KEYBOARD_MAPPINGS] = {
@@ -98,7 +106,7 @@ char *machine_keymap_file_list[NUM_KEYBOARD_MAPPINGS] = {
 };
 
 const char machine_name[] = "CBM-II";
-int machine_class = VICE_MACHINE_CBM2;
+int machine_class = VICE_MACHINE_CBM6x0;
 
 static void machine_vsync_hook(void);
 
@@ -336,17 +344,17 @@ int machine_specific_init(void)
 #if defined (USE_XF86_EXTENSIONS) && \
     (defined(USE_XF86_VIDMODE_EXT) || defined (HAVE_XRANDR))
     {
-	/* set fullscreen if user used `-fullscreen' on cmdline */
-	int fs;
-	resources_get_int("UseFullscreen", &fs);
-	if (fs)
-	{
-	    resources_get_int("UseVicII", &fs);
-	    if (fs)
-		resources_set_int("VICIIFullscreen", 1);
-	    else
-		resources_set_int("CRTCFullscreen", 1);
-	}
+        /* set fullscreen if user used `-fullscreen' on cmdline */
+        int fs;
+        resources_get_int("UseFullscreen", &fs);
+        if (fs) {
+            resources_get_int("UseVicII", &fs);
+            if (fs) {
+                resources_set_int("VICIIFullscreen", 1);
+            } else {
+                resources_set_int("CRTCFullscreen", 1);
+            }
+        }
     }
 #endif
     return 0;

@@ -352,17 +352,14 @@ void keyboard_key_pressed(signed long key)
         return;
     }
 
-    if (joystick_port_map[0] == JOYDEV_NUMPAD
-     || joystick_port_map[0] == JOYDEV_KEYSET1
-     || joystick_port_map[0] == JOYDEV_KEYSET2) {
-        if (joystick_check_set(key, joystick_port_map[0] - JOYDEV_NUMPAD, 1))
-            return;
-    }
-    if (joystick_port_map[1] == JOYDEV_NUMPAD
-     || joystick_port_map[1] == JOYDEV_KEYSET1
-     || joystick_port_map[1] == JOYDEV_KEYSET2) {
-        if (joystick_check_set(key, joystick_port_map[1] - JOYDEV_NUMPAD, 2))
-            return;
+    for (i = 0; i < JOYSTICK_NUM; ++i) {
+        if (joystick_port_map[i] == JOYDEV_NUMPAD
+         || joystick_port_map[i] == JOYDEV_KEYSET1
+         || joystick_port_map[i] == JOYDEV_KEYSET2) {
+            if (joystick_check_set(key, joystick_port_map[i] - JOYDEV_NUMPAD, 1+i)) {
+                return;
+            }
+        }
     }
 
     if (keyconvmap == NULL)
@@ -460,17 +457,14 @@ void keyboard_key_released(signed long key)
         return;
     }
 
-    if (joystick_port_map[0] == JOYDEV_NUMPAD
-     || joystick_port_map[0] == JOYDEV_KEYSET1
-     || joystick_port_map[0] == JOYDEV_KEYSET2) {
-        if (joystick_check_clr(key, joystick_port_map[0] - JOYDEV_NUMPAD, 1))
-            return;
-    }
-    if (joystick_port_map[1] == JOYDEV_NUMPAD
-     || joystick_port_map[1] == JOYDEV_KEYSET1
-     || joystick_port_map[1] == JOYDEV_KEYSET2) {
-        if (joystick_check_clr(key, joystick_port_map[1] - JOYDEV_NUMPAD, 2))
-            return;
+    for (i = 0; i < JOYSTICK_NUM; ++i) {
+        if (joystick_port_map[i] == JOYDEV_NUMPAD
+         || joystick_port_map[i] == JOYDEV_KEYSET1
+         || joystick_port_map[i] == JOYDEV_KEYSET2) {
+            if (joystick_check_clr(key, joystick_port_map[i] - JOYDEV_NUMPAD, 1+i)) {
+                return;
+            }
+        }
     }
 
     if (keyconvmap == NULL)
@@ -532,6 +526,37 @@ void keyboard_key_clear(void)
     keyboard_key_clear_internal();
 }
 
+void keyboard_set_keyarr_any(int row, int col, int value)
+{
+    signed long sym;
+
+    if (row < 0) {
+        if (row == -3 && col == 0) {
+            sym = key_ctrl_restore1;
+        } else
+        if (row == -3 && col == 1) {
+            sym = key_ctrl_restore2;
+        } else
+        if (row == -4 && col == 0) {
+            sym = key_ctrl_column4080;
+        } else
+        if (row == -4 && col == 1) {
+            sym = key_ctrl_caps;
+        } else {
+            return;
+        }
+
+        if (value) {
+            keyboard_key_pressed(sym);
+        } else {
+            keyboard_key_released(sym);
+        }
+
+    } else {
+        keyboard_set_keyarr(row, col, value);
+    }
+}
+
 /*-----------------------------------------------------------------------*/
 
 void keyboard_alternative_set(int alternative)
@@ -560,8 +585,7 @@ static void keyboard_keyconvmap_free(void)
 static void keyboard_keyconvmap_realloc(void)
 {
     keyc_mem += keyc_mem / 2;
-    keyconvmap = (keyboard_conv_t *)lib_realloc(keyconvmap, (keyc_mem + 1)
-                                                * sizeof(keyboard_conv_t));
+    keyconvmap = lib_realloc(keyconvmap, (keyc_mem + 1) * sizeof(keyboard_conv_t));
 }
 
 /*-----------------------------------------------------------------------*/
@@ -626,15 +650,10 @@ static void keyboard_keyword_include(void)
     keyboard_parse_keymap(key);
 }
 
-static void keyboard_keyword_undef(void)
+static void keyboard_keysym_undef(signed long sym)
 {
-    char *key;
-    signed long sym;
     int i;
 
-    /* TODO: this only unsets from the main table, not for joysticks */
-    key = strtok(NULL, " \t");
-    sym = kbd_arch_keyname_to_keynum(key);
     if (sym >= 0) {
         for (i = 0; i < keyc_num; i++) {
             if (keyconvmap[i].sym == sym) {
@@ -646,6 +665,15 @@ static void keyboard_keyword_undef(void)
             }
         }
     }
+}
+
+static void keyboard_keyword_undef(void)
+{
+    char *key;
+
+    /* TODO: this only unsets from the main table, not for joysticks */
+    key = strtok(NULL, " \t");
+    keyboard_keysym_undef(kbd_arch_keyname_to_keynum(key));
 }
 
 static void keyboard_parse_keyword(char *buffer)
@@ -786,7 +814,7 @@ static int keyboard_parse_keymap(const char *filename)
 
             buffer[strlen(buffer) - 1] = 0; /* remove newline */
 	    /* remove comments */
-	    if((p = strchr(buffer, '#')))
+	    if ((p = strchr(buffer, '#')))
 	        *p=0;
 
             switch(*buffer) {
@@ -824,6 +852,20 @@ static int keyboard_keymap_load(const char *filename)
 }
 
 /*-----------------------------------------------------------------------*/
+
+void keyboard_set_map_any(signed long sym, int row, int col, int shift)
+{
+    if (row >= 0) {
+        keyboard_parse_set_pos_row(sym, row, col, shift);
+    } else {
+        keyboard_parse_set_neg_row(sym, row, col);
+    }
+}
+
+void keyboard_set_unmap_any(signed long sym)
+{
+    keyboard_keysym_undef(sym);
+}
 
 int keyboard_keymap_dump(const char *filename)
 {
@@ -956,7 +998,7 @@ int keyboard_set_keymap_file(const char *val, void *param)
 {
     int oldindex, newindex;
 
-    newindex = (int)param;
+    newindex = vice_ptr_to_int(param);
 
     if (newindex >= machine_num_keyboard_mappings())
         return -1;

@@ -1,18 +1,8 @@
 /*
- * joy.c - Linux/BSD joystick support.
+ * joy.c - Joystick support for MS-DOS.
  *
  * Written by
- *  Bernhard Kuhn <kuhn@eikon.e-technik.tu-muenchen.de>
- *  Ulmer Lionel <ulmer@poly.polytechnique.fr>
- *
- * Patches by
- *  Daniel Sladic <sladic@eecg.toronto.edu>
- *
- * NetBSD support by
- *  Krister Walfridsson <cato@df.lth.se>
- *
- * 1.1.xxx Linux API by
- *   Luca Montecchiani  <m.luca@usa.net> (http://i.am/m.luca)
+ *  Ettore Perazzoli <ettore@comm2000.it>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -35,34 +25,56 @@
  */
 
 #include "vice.h"
-#include "joy.h"
 
-/* (Used by `kbd.c').  */
-int joystick_port_map[2];
+#include <stdio.h>
+
+#include "cmdline.h"
+#include "keyboard.h"
+#include "joy.h"
+#include "joystick.h"
+#include "machine.h"
+#include "resources.h"
+#include "translate.h"
+#include "types.h"
+
+static const resource_int_t resources_int[] = {
+    { NULL }
+};
+
+/* ------------------------------------------------------------------------- */
 
 int joystick_arch_init_resources(void)
 {
-  return 0;
+    return resources_register_int(resources_int);
 }
 
-/**********************************************************
- * Generic high level joy routine                         *
- **********************************************************/
+int joystick_init_cmdline_options(void)
+{
+    return 0;
+}
+
+/* ------------------------------------------------------------------------- */
+
+
+/* Initialize joystick support.  */
 int joy_arch_init(void)
 {
     return 0;
 }
 
-int joystick_close()
+/* Update the `joystick_value' variables according to the joystick status.  */
+void joystick_update(void)
 {
-  return 0;
+}
+
+void joystick_close(void)
+{
+    /* Nothing to do on MSDOS.  */
+    return;
 }
 
 void kbd_initialize_numpad_joykeys(int* joykeys)
 {
 }
 
-int joystick_init_cmdline_options()
-{
-  return 0;
-}
+/* ------------------------------------------------------------------------- */

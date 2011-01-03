@@ -494,7 +494,7 @@ static BYTE fdc_do_job_(unsigned int fnum, int buf,
                     base[0], base[1], base[2], base[3]
         );
 #endif
-        if(DOS_IS_40(fdc[fnum].drive_type)
+        if (DOS_IS_40(fdc[fnum].drive_type)
             || DOS_IS_30(fdc[fnum].drive_type)) {
             if (!memcmp(fdc[fnum].iprom + 0x12f8, &fdc[fnum].buffer[0x100],
                 0x100)) {
@@ -502,7 +502,7 @@ static BYTE fdc_do_job_(unsigned int fnum, int buf,
                 return 0;
             }
         }
-        if(DOS_IS_80(fdc[fnum].drive_type)) {
+        if (DOS_IS_80(fdc[fnum].drive_type)) {
             static const BYTE jumpseq[] = { 0x78, 0x6c, 0xfc, 0xff };
             if (!memcmp(jumpseq, &fdc[fnum].buffer[0x100], 4)) {
                 fdc[fnum].fdc_state = FDC_RESET0;
@@ -516,14 +516,14 @@ static BYTE fdc_do_job_(unsigned int fnum, int buf,
                              formatted */
         /* we have to check for standard format code that is copied
            to buffers 0-3 */
-        if(DOS_IS_80(fdc[fnum].drive_type)) {
+        if (DOS_IS_80(fdc[fnum].drive_type)) {
             rc = fdc_do_format_D80(fdc, fnum, dnr, track, sector, buf, header);
         } else
-        if(DOS_IS_40(fdc[fnum].drive_type)
+        if (DOS_IS_40(fdc[fnum].drive_type)
             || DOS_IS_30(fdc[fnum].drive_type)) {
             rc = fdc_do_format_D40(fdc, fnum, dnr, track, sector, buf, header);
         } else
-        if(DOS_IS_20(fdc[fnum].drive_type)) {
+        if (DOS_IS_20(fdc[fnum].drive_type)) {
             rc = fdc_do_format_D20(fdc, fnum, dnr, track, sector, buf, header);
         } else {
             rc = FDC_ERR_DRIVE;
@@ -626,7 +626,7 @@ static void int_fdc(CLOCK offset, void *data)
         if (DOS_IS_40(fdc[fnum].drive_type)
             || DOS_IS_30(fdc[fnum].drive_type)
             ) {
-            if(fdc[fnum].buffer[0] == 0) {
+            if (fdc[fnum].buffer[0] == 0) {
                 fdc[fnum].buffer[0] = 0x0f;
                 fdc[fnum].fdc_state = FDC_RUN;
                 fdc[fnum].alarm_clk = rclk + 10000;
@@ -704,7 +704,7 @@ static void clk_overflow_callback(CLOCK sub, void *data)
 {
     unsigned int fnum;
 
-    fnum = (unsigned int)data;
+    fnum = vice_ptr_to_uint(data);
 
     if (fdc[fnum].fdc_state != FDC_UNUSED) {
         if (fdc[fnum].alarm_clk > sub) {
@@ -741,7 +741,7 @@ void fdc_init(drive_context_t *drv)
     lib_free(buffer);
 
     clk_guard_add_callback(drv->cpu->clk_guard, clk_overflow_callback,
-                           (void *)(drv->mynumber));
+                           uint_to_void_ptr(drv->mynumber));
 }
 
 /************************************************************************/
@@ -778,10 +778,8 @@ int fdc_attach_image(disk_image_t *image, unsigned int unit)
         || fdc[drive_no].drive_type == DRIVE_TYPE_1001) {
         switch(image->type) {
           case DISK_IMAGE_TYPE_D80:
-            disk_image_attach_log(image, fdc_log, unit, "D80");
-            break;
           case DISK_IMAGE_TYPE_D82:
-            disk_image_attach_log(image, fdc_log, unit, "D82");
+            disk_image_attach_log(image, fdc_log, unit);
             break;
           default:
 #ifdef FDC_DEBUG
@@ -793,16 +791,10 @@ int fdc_attach_image(disk_image_t *image, unsigned int unit)
     } else {
         switch(image->type) {
           case DISK_IMAGE_TYPE_D64:
-            disk_image_attach_log(image, fdc_log, unit, "D64");
-            break;
           case DISK_IMAGE_TYPE_D67:
-            disk_image_attach_log(image, fdc_log, unit, "D67");
-            break;
           case DISK_IMAGE_TYPE_G64:
-            disk_image_attach_log(image, fdc_log, unit, "G64");
-            break;
           case DISK_IMAGE_TYPE_X64:
-            disk_image_attach_log(image, fdc_log, unit, "X64");
+            disk_image_attach_log(image, fdc_log, unit);
             break;
           default:
 #ifdef FDC_DEBUG
@@ -845,10 +837,8 @@ int fdc_detach_image(disk_image_t *image, unsigned int unit)
         || fdc[drive_no].drive_type == DRIVE_TYPE_1001) {
         switch(image->type) {
           case DISK_IMAGE_TYPE_D80:
-            disk_image_detach_log(image, fdc_log, unit, "D80");
-            break;
           case DISK_IMAGE_TYPE_D82:
-            disk_image_detach_log(image, fdc_log, unit, "D82");
+            disk_image_detach_log(image, fdc_log, unit);
             break;
           default:
             return -1;
@@ -856,16 +846,10 @@ int fdc_detach_image(disk_image_t *image, unsigned int unit)
     } else {
         switch(image->type) {
           case DISK_IMAGE_TYPE_D64:
-            disk_image_detach_log(image, fdc_log, unit, "D64");
-            break;
           case DISK_IMAGE_TYPE_D67:
-            disk_image_detach_log(image, fdc_log, unit, "D67");
-            break;
           case DISK_IMAGE_TYPE_G64:
-            disk_image_detach_log(image, fdc_log, unit, "G64");
-            break;
           case DISK_IMAGE_TYPE_X64:
-            disk_image_detach_log(image, fdc_log, unit, "X64");
+            disk_image_detach_log(image, fdc_log, unit);
             break;
           default:
             return -1;

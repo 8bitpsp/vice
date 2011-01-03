@@ -34,6 +34,7 @@
 
 #include "c64dtvmem.h"
 #include "c64dtvblitter.h"
+#include "c64dtvcpu.h"
 #include "c64dtvdma.h"
 #include "c64dtvflash.h"
 #include "cmdline.h"
@@ -96,7 +97,12 @@ unsigned int mem_old_reg_pc;
 
 /* The C64 memory, see ../mem.h.  */
 BYTE mem_ram[C64_RAM_SIZE];
+
+#ifdef USE_EMBEDDED
+#include "c64chargen.h"
+#else
 BYTE mem_chargen_rom[C64_CHARGEN_ROM_SIZE];
+#endif
 
 /* Internal color memory.  */
 BYTE *mem_color_ram_cpu;
@@ -565,8 +571,6 @@ static log_t c64dtvmem_log = LOG_ERR;
 /* I/O of the memory mapper ($D100/$D101) */
 BYTE c64dtvmem_memmapper[0x2];
 
-extern BYTE dtv_registers[]; /* TODO */
-
 /* The memory banking mechanism/virtual memory is visible to the CPU only. */
 /* VICII, DMA Engine, Blitter have access to physical memory. */
 /* Kernal/Basic ROM is visible in physical memory only since DTV address */
@@ -598,8 +602,8 @@ void REGPARM2 mem_store(WORD addr, BYTE value)
 #endif
 
     int paddr = addr_to_paddr(addr);
-/* if(addr != paddr) printf("Store to adress %x mapped to %x - %d %d %d %d\n", addr, paddr, dtv_registers[12], dtv_registers[13], dtv_registers[14], dtv_registers[15]); */ /* DEBUG */
-    if(access_rom(addr))
+/* if (addr != paddr) printf("Store to adress %x mapped to %x - %d %d %d %d\n", addr, paddr, dtv_registers[12], dtv_registers[13], dtv_registers[14], dtv_registers[15]); */ /* DEBUG */
+    if (access_rom(addr))
     {
 #ifdef FEATURE_CPUMEMHISTORY
         monitor_memmap_store(paddr, MEMMAP_ROM_W);
@@ -607,7 +611,7 @@ void REGPARM2 mem_store(WORD addr, BYTE value)
         c64dtvflash_store(paddr, value);
         return;
     }
-    if(paddr <= 0xffff) {
+    if (paddr <= 0xffff) {
 #ifdef FEATURE_CPUMEMHISTORY
         rptr = _mem_write_tab_ptr[paddr >> 8];
         if ((rptr == ram_store)
@@ -620,7 +624,7 @@ void REGPARM2 mem_store(WORD addr, BYTE value)
         }
 #endif
         /* disable dummy write if skip cycle */
-        if(dtv_registers[9] & 1) maincpu_rmw_flag = 0;
+        if (dtv_registers[9] & 1) maincpu_rmw_flag = 0;
         _mem_write_tab_ptr[paddr >> 8]((WORD)paddr, value);
     } else {
 #ifdef FEATURE_CPUMEMHISTORY
@@ -637,21 +641,21 @@ BYTE REGPARM1 mem_read(WORD addr)
 #endif
 
     int paddr = addr_to_paddr(addr);
-/* if(addr != paddr) printf("Read from adress %x mapped to %x - %d %d %d %d\n", addr, paddr, dtv_registers[12], dtv_registers[13], dtv_registers[14], dtv_registers[15]); */ /* DEBUG */
-    if(access_rom(addr)) {
+/* if (addr != paddr) printf("Read from adress %x mapped to %x - %d %d %d %d\n", addr, paddr, dtv_registers[12], dtv_registers[13], dtv_registers[14], dtv_registers[15]); */ /* DEBUG */
+    if (access_rom(addr)) {
 #ifdef FEATURE_CPUMEMHISTORY
         monitor_memmap_store(paddr, (memmap_state&MEMMAP_STATE_OPCODE)?MEMMAP_ROM_X:(memmap_state&MEMMAP_STATE_INSTR)?0:MEMMAP_ROM_R);
         memmap_state &= ~(MEMMAP_STATE_OPCODE);
 #endif
         return c64dtvflash_read(paddr);
     }
-    if(paddr <= 0xffff) {
+    if (paddr <= 0xffff) {
 #ifdef FEATURE_CPUMEMHISTORY
         rptr = _mem_read_tab_ptr[paddr >> 8];
         if ((rptr == ram_read)
           ||(rptr == zero_read)) {
             monitor_memmap_store(paddr, (memmap_state&MEMMAP_STATE_OPCODE)?MEMMAP_RAM_X:(memmap_state&MEMMAP_STATE_INSTR)?0:MEMMAP_RAM_R);
-        } else if((rptr == c64memrom_basic64_read)
+        } else if ((rptr == c64memrom_basic64_read)
           ||(rptr == c64memrom_kernal64_read)) {
             monitor_memmap_store(paddr, (memmap_state&MEMMAP_STATE_OPCODE)?MEMMAP_ROM_X:(memmap_state&MEMMAP_STATE_INSTR)?0:MEMMAP_ROM_R);
         } else {
@@ -685,7 +689,7 @@ BYTE REGPARM1 colorram_read(WORD addr)
 void c64dtv_init(void)
 {
   int trapfl;
-  if(c64dtvmem_log == LOG_ERR)
+  if (c64dtvmem_log == LOG_ERR)
     c64dtvmem_log = log_open("C64DTVMEM");
 
   hummeradc_init();
@@ -829,7 +833,7 @@ void REGPARM2 c64dtv_mapper_store(WORD addr, BYTE value)
     resources_set_int("VirtualDevices", 0);
     c64dtvmem_memmapper[0]=value;
     resources_set_int("VirtualDevices", trapfl);
-    if(trapfl)
+    if (trapfl)
       log_message(c64dtvmem_log, "Changed KERNAL segment - disable VirtualDevices if you encounter problems");
     break;
   case 0x01:
@@ -881,6 +885,44 @@ void REGPARM2 c64dtv_palette_store(WORD addr, BYTE value)
   vicii_palette_store(addr, value);
   return;
 }
+
+
+/* ------------------------------------------------------------------------- */
+
+/* These are the $D300 DMA and blitter register handlers */
+
+BYTE REGPARM1 c64dtv_dmablit_read(WORD addr)
+{
+    if (!vicii_extended_regs())
+        return vicii_read(addr);
+
+    addr &= 0x3f;
+
+    if (addr & 0x20) {
+        return c64dtv_blitter_read((WORD)(addr & 0x1f));
+    } else {
+        return c64dtv_dma_read(addr);
+    }
+}
+
+
+void REGPARM2 c64dtv_dmablit_store(WORD addr, BYTE value)
+{
+    if (!vicii_extended_regs()) {
+        vicii_store(addr, value);
+        return;
+    }
+
+    addr &= 0x3f;
+  
+    if (addr & 0x20) {
+        c64dtv_blitter_store((WORD)(addr & 0x1f), value);
+    } else {
+        c64dtv_dma_store(addr, value);
+    }
+}
+
+
 
 /* ------------------------------------------------------------------------- */
 

@@ -26,8 +26,8 @@
 
 /* Do not include this header file, include `archdep.h' instead.  */
 
-#ifndef _ARCHAPI
-#define _ARCHAPI
+#ifndef VICE_ARCHAPI
+#define VICE_ARCHAPI
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -54,6 +54,9 @@ extern char *archdep_default_save_resource_file_name(void);
 
 /* Fliplist.  */
 extern char *archdep_default_fliplist_file_name(void);
+
+/* Autostart-PRG */
+extern char *archdep_default_autostart_disk_image_file_name(void);
 
 /* Logfile stuff.  */
 extern FILE *archdep_open_default_log_file(void);
@@ -87,8 +90,11 @@ extern int archdep_file_set_gzip(const char *name);
 extern int archdep_file_is_blockdev(const char *name);
 extern int archdep_file_is_chardev(const char *name);
 
+/* Networking. */
+extern int archdep_network_init(void);
+extern void archdep_network_shutdown(void);
+
 /* Free everything on exit.  */
 extern void archdep_shutdown(void);
 
 #endif
-

@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _VDCTYPES_H
-#define _VDCTYPES_H
+#ifndef VICE_VDCTYPES_H
+#define VICE_VDCTYPES_H
 
 #include "raster.h"
 #include "types.h"
@@ -40,16 +40,17 @@
 
 #define VDC_DOT_CLOCK 16000000.0
 
-#define VDC_SCREEN_WIDTH              832
+#define VDC_SCREEN_WIDTH              848 /* Approx resolution based on experiment - real vdc has ~106 columns * 8 = 848 */
+#define VDC_SCREEN_HEIGHT             312 /* Vertical resolution (PAL) based on default kernal settings */
 
 #define VDC_SCREEN_XPIX               800
 #define VDC_SCREEN_YPIX               200
 #define VDC_SCREEN_MAX_TEXTCOLS       100
 #define VDC_SCREEN_BORDERWIDTH        8
-#define VDC_SCREEN_BORDERHEIGHT       32
+#define VDC_SCREEN_BORDERHEIGHT       0
 
-#define VDC_FIRST_DISPLAYED_LINE      (16+16)
-#define VDC_LAST_DISPLAYED_LINE       (247+32)
+#define VDC_FIRST_DISPLAYED_LINE      21
+#define VDC_LAST_DISPLAYED_LINE       308
 #define VDC_80COL_START_PIXEL         16
 
 #define VDC_NUM_SPRITES               0
@@ -92,7 +93,7 @@ struct vdc_s {
     int initialized;            /* = 0; */
 
     /* VDC registers.  */
-    int regs[64];
+    unsigned int regs[64];
 
     /* VDC geometry constants that differ in doulbe size mode.  */
     unsigned int screen_height;
@@ -169,7 +170,7 @@ struct vdc_s {
     int update_geometry;
 
     /* 0..7 pixel x shift.  */
-    int xsmooth;
+    unsigned int xsmooth;
 
     /* VDC Revision.  */
     unsigned int revision;
@@ -182,6 +183,27 @@ struct vdc_s {
 
     /* Internal VDC video memory */
     BYTE ram[0x10000];
+
+    /* used to record the value of the cpu clock at the start of a raster line */
+    CLOCK vdc_line_start;
+    /* based on blacky_stardust calculations, calculating current_x_pixel should be like:
+    current_x_pixel = pixels_per_line / (vdc.xsync_increment >> 16) * (current_cycle - vdc_line_start) */
+
+    /* record register 27 in case of a change between raster updates */
+    int old_reg27;
+
+    /* Row counter (required for comparison with reg[6] - number of visible screen rows - to know if we are at the end of the visible data) */
+	unsigned int row_counter;
+
+    /* Row counter_y counts individual raster lines of the current row to know if we are at the end of the current row. */
+    int row_counter_y;
+
+    /* offset into the attribute memory - used for emulating the 8x1 attribute VDC quirk */
+    unsigned int attribute_offset;
+
+    /* Light pen. */
+    vdc_light_pen_t light_pen;
+
 };
 typedef struct vdc_s vdc_t;
 

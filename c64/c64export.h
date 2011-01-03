@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64EXPORT_H
-#define _C64EXPORT_H
+#ifndef VICE_C64EXPORT_H
+#define VICE_C64EXPORT_H
 
 struct c64export_resource_s {
     const char *name;
@@ -34,11 +34,9 @@ struct c64export_resource_s {
 };
 typedef struct c64export_resource_s c64export_resource_t;
 
-
 extern int c64export_query(const c64export_resource_t *export_res);
 extern int c64export_add(const c64export_resource_t *export_res);
 extern int c64export_remove(const c64export_resource_t *export_res);
 extern int c64export_resources_init(void);
 
 #endif
-

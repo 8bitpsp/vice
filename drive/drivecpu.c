@@ -147,18 +147,6 @@ void drivecpu_setup_context(struct drive_context_s *drv)
 
 /* ------------------------------------------------------------------------- */
 
-/* This is the external interface for memory access.  */
-
-BYTE REGPARM2 drive_read(drive_context_t *drv, WORD address)
-{
-    return drv->cpud->read_func[address >> 8](drv, address);
-}
-
-void REGPARM3 drive_store(drive_context_t *drv, WORD address, BYTE value)
-{
-    drv->cpud->store_func[address >> 8](drv, address, value);
-}
-
 /* This is the external interface for banked memory access.  */
 
 static BYTE drive_bank_read(int bank, WORD addr, void *context)
@@ -381,7 +369,6 @@ inline static DWORD drive_trap_handler(drive_context_t *drv)
         MOS6510_REGS_SET_PC(&(drv->cpu->cpu_regs), 0xdaf6);
         return 0;
     }
-
     return (DWORD)-1;
 }
 
@@ -458,6 +445,7 @@ void drivecpu_execute(drive_context_t *drv, CLOCK clk_value)
 
     drivecpu_wake_up(drv);
 
+    /* Calculate number of main CPU clocks to emulate */
     if (clk_value > cpu->last_clk)
         cycles = clk_value - cpu->last_clk;
     else
@@ -478,11 +466,13 @@ void drivecpu_execute(drive_context_t *drv, CLOCK clk_value)
             cycles = 0;
         }
 
+        /* Add one clock if enough fractions have accumulated */
         if (cpu->cycle_accum >= 0x10000) {
             cpu->cycle_accum -= 0x10000;
             (cpu->stop_clk)++;
         }
 
+        /* Run drive CPU emulation until the stop_clk clock has been reached */
         while (*(drv->clk_ptr) < cpu->stop_clk) {
 
 /* Include the 6502/6510 CPU emulation core.  */

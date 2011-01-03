@@ -45,6 +45,8 @@ static FILE *log_file = NULL;
 static char **logs = NULL;
 static log_t num_logs = 0;
 
+static int log_enabled = 1; /* cv: this flag allows to temporarly disable all logging */
+
 /* ------------------------------------------------------------------------- */
 
 static char *log_file_name = NULL;
@@ -126,8 +128,17 @@ int log_init_with_fd(FILE *f)
 
 int log_init(void)
 {
+#if 0
+    /*
+     * The current calling order in main.c (log_init() after processing
+     * resources) makes this break if anything in the resource set_*
+     * functions does a log_open().  On platforms that have no regular
+     * stdout (e.g win32) no logging will be seen.  On win32 startup will
+     * also be preceeded by a modal error requester.  / tlr
+     */
     if (logs != NULL)
         return -1;
+#endif
 
     log_file_open();
 
@@ -147,7 +158,7 @@ log_t log_open(const char *id)
     }
     if (i == num_logs) {
         new_log = num_logs++;
-        logs = (char **)lib_realloc(logs, sizeof(*logs) * num_logs);
+        logs = lib_realloc(logs, sizeof(*logs) * num_logs);
     }
 
     logs[new_log] = lib_stralloc(id);
@@ -223,6 +234,9 @@ static int log_helper(log_t log, unsigned int level, const char *format,
     int rc = 0;
     char *logtxt = NULL;
 
+    if (!log_enabled)
+        return 0;
+
     if (logi == LOG_ERR
         || (logi != LOG_DEFAULT && (logs == NULL || logs[logi] == NULL)))
         return -1;
@@ -279,5 +293,10 @@ int log_debug(const char *format, ...)
 
     va_start(ap, format);
     return log_helper(LOG_DEFAULT, 0, format, ap);
+}
+
+void log_enable(int on)
+{
+    log_enabled = on;
 }
 

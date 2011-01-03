@@ -95,7 +95,7 @@ fileio_info_t *cbmfile_open(const char *file_name, const char *path,
     if (!(command & FILEIO_COMMAND_FSNAME))
         charset_petconvstring((BYTE *)fsname, 1);
 
-    if (cbmdos_parse_wildcard_check(fsname, strlen(fsname))) {
+    if (cbmdos_parse_wildcard_check(fsname, (unsigned int)strlen(fsname))) {
         rname = cbmfile_find_file(fsname, path);
         lib_free(fsname);
         if (rname == NULL)
@@ -116,7 +116,7 @@ fileio_info_t *cbmfile_open(const char *file_name, const char *path,
     if (command & FILEIO_COMMAND_FSNAME)
         charset_petconvstring(cbm_name, 0);
 
-    info = (fileio_info_t *)lib_malloc(sizeof(fileio_info_t));
+    info = lib_malloc(sizeof(fileio_info_t));
     info->name = cbm_name;
     info->length = (unsigned int)strlen((char *)cbm_name);
     info->type = type;
@@ -181,3 +181,7 @@ unsigned int cbmfile_scratch(const char *file_name, const char *path)
     return rc;
 }
 
+unsigned int cbmfile_get_bytes_left(struct fileio_info_s *info)
+{
+    return rawfile_get_bytes_left(info->rawfile);
+}

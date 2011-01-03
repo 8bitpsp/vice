@@ -32,33 +32,24 @@
 #include "serial.h"
 #include "types.h"
 
-
-int machine_bus_lib_directory(unsigned int unit, const char *pattern,
-                              BYTE **buf)
+int machine_bus_lib_directory(unsigned int unit, const char *pattern, BYTE **buf)
 {
     return serial_iec_lib_directory(unit, pattern, buf);
 }
 
-int machine_bus_lib_read_sector(unsigned int unit, unsigned int track,
-                                unsigned int sector, BYTE *buf)
+int machine_bus_lib_read_sector(unsigned int unit, unsigned int track, unsigned int sector, BYTE *buf)
 {
     return serial_iec_lib_read_sector(unit, track, sector, buf);
 }
 
-int machine_bus_lib_write_sector(unsigned int unit, unsigned int track,
-                                 unsigned int sector, BYTE *buf)
+int machine_bus_lib_write_sector(unsigned int unit, unsigned int track, unsigned int sector, BYTE *buf)
 {
     return serial_iec_lib_write_sector(unit, track, sector, buf);
 }
 
-unsigned int machine_bus_device_fsimage_state_get(unsigned int unit)
+unsigned int machine_bus_device_type_get(unsigned int unit)
 {
-    return serial_device_fsimage_state_get(unit);
-}
-
-unsigned int machine_bus_device_realdevice_state_get(unsigned int unit)
-{
-    return serial_device_realdevice_state_get(unit);
+    return serial_device_type_get(unit);
 }
 
 void machine_bus_status_truedrive_set(unsigned int enable)
@@ -94,4 +85,3 @@ void machine_bus_init_machine(void)
 {
     iecbus_init();
 }
-

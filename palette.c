@@ -33,6 +33,7 @@
 #include <string.h>
 
 #include "archdep.h"
+#include "embedded.h"
 #include "lib.h"
 #include "log.h"
 #include "palette.h"
@@ -49,7 +50,7 @@ palette_t *palette_create(unsigned int num_entries, const char *entry_names[])
     palette_t *p;
     unsigned int i;
 
-    p = (palette_t *)lib_malloc(sizeof(palette_t));
+    p = lib_malloc(sizeof(palette_t));
 
     p->num_entries = num_entries;
     p->entries = lib_calloc(num_entries, sizeof(palette_entry_t));
@@ -68,10 +69,9 @@ void palette_free(palette_t *p)
     if (p == NULL)
         return;
 
-    for (i = 0; i < p->num_entries; i++)
-        if (p->entries[i].name != NULL)
-            lib_free(p->entries[i].name);
-
+    for (i = 0; i < p->num_entries; i++) {
+        lib_free(p->entries[i].name);
+    }
     lib_free(p->entries);
     lib_free(p);
 }
@@ -211,6 +211,10 @@ int palette_load(const char *file_name, palette_t *palette_return)
     char *complete_path;
     FILE *f;
     int rc;
+
+    if (embedded_palette_load(file_name, palette_return) == 0) {
+        return 0;
+    }
 
     f = sysfile_open(file_name, &complete_path, MODE_READ_TEXT);
 

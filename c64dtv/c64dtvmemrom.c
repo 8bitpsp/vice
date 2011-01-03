@@ -35,15 +35,21 @@
 #include "c64dtvflash.h"
 
 /* These are read directly from flash in the DTV emulation and not used. */
+#ifdef USE_EMBEDDED
+#include "c64basic.h"
+#include "c64kernal.h"
+#else
 BYTE c64memrom_basic64_rom[C64_BASIC_ROM_SIZE];
 BYTE c64memrom_kernal64_rom[C64_KERNAL_ROM_SIZE];
+#endif
+
 BYTE c64memrom_kernal64_trap_rom[C64_KERNAL_ROM_SIZE];
 
 BYTE REGPARM1 c64memrom_kernal64_read(WORD addr)
 {
     int mapping = c64dtvmem_memmapper[0];
     int paddr = ((mapping & 0x1f) << 16) + addr;
-    if((mapping >> 6)==0)
+    if ((mapping >> 6)==0)
         return c64dtvflash_read(paddr);
     else
         return mem_ram[paddr];
@@ -53,7 +59,7 @@ static void REGPARM2 c64memrom_kernal64_store(WORD addr, BYTE value)
 {
     int mapping = c64dtvmem_memmapper[0];
     int paddr = ((mapping & 0x1f) << 16) + addr;
-    if((mapping >> 6)==0)
+    if ((mapping >> 6)==0)
         c64dtvflash_store_direct(paddr, value);
     else
         mem_ram[paddr] = value;
@@ -63,7 +69,7 @@ BYTE REGPARM1 c64memrom_basic64_read(WORD addr)
 {
     int mapping = c64dtvmem_memmapper[1];
     int paddr = ((mapping & 0x1f) << 16) + addr;
-    if((mapping >> 6)==0)
+    if ((mapping >> 6)==0)
         return c64dtvflash_read(paddr);
     else
         return mem_ram[paddr];

@@ -128,8 +128,8 @@ static BYTE store_pcr(via_context_t *via_context, BYTE byte, WORD addr)
     if (byte != via_context->via[VIA_PCR]) {
         register BYTE tmp = byte;
         /* first set bit 1 and 5 to the real output values */
-        if((tmp & 0x0c) != 0x0c) tmp |= 0x02;
-        if((tmp & 0xc0) != 0xc0) tmp |= 0x20;
+        if ((tmp & 0x0c) != 0x0c) tmp |= 0x02;
+        if ((tmp & 0xc0) != 0xc0) tmp |= 0x20;
         parallel_cpu_set_atn((byte & 2) ? 0 : 1);
         parallel_cpu_set_eoi((byte & 0x20) ? 0 : 1);
     }
@@ -176,6 +176,8 @@ void vic20ieeevia2_setup_context(machine_context_t *machine_context)
     via->my_module_name = lib_msprintf("IeeeVia2");
 
     viacore_setup_context(via);
+
+    via->write_offset = 0;
 
     via->irq_line = IK_IRQ;
 

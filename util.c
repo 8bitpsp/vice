@@ -71,7 +71,7 @@ char *util_concat(const char *s, ...)
     }
     num_args = i;
 
-    newp = (char *)lib_malloc(tot_len + 1);
+    newp = lib_malloc(tot_len + 1);
 
     if (arg_len[0] > 0)
         memcpy(newp, s, arg_len[0]);
@@ -135,7 +135,7 @@ BYTE *util_bufcat(BYTE *buf, int *buf_size, size_t *max_buf_size,
 
         *max_buf_size = (((*buf_size + src_size) / BUFCAT_GRANULARITY + 1)
                         * BUFCAT_GRANULARITY);
-        new_buf = (BYTE *)lib_realloc(buf, *max_buf_size);
+        new_buf = lib_realloc(buf, *max_buf_size);
         buf = new_buf;
     }
 
@@ -180,7 +180,7 @@ int util_string_set(char **str, const char *new_value)
             if (strcmp(*str, new_value) == 0)
                 return -1;
 
-            *str = (char *)lib_realloc(*str, strlen(new_value) + 1);
+            *str = lib_realloc(*str, strlen(new_value) + 1);
             strcpy(*str, new_value);
         }
     }
@@ -295,9 +295,9 @@ char *util_subst(const char *s, const char *string, const char *replacement)
          num_occurrences++, sp += string_len)
         ;
 
-    total_size = s_len - (string_len - replacement_len) * num_occurrences + 1;
+    total_size = (int)(s_len - (string_len - replacement_len) * num_occurrences + 1);
 
-    result = (char *)lib_malloc(total_size);
+    result = lib_malloc(total_size);
 
     sp = s;
     dp = result;
@@ -330,7 +330,7 @@ size_t util_file_length(FILE *fd)
     off = ftell(fd);
     fseek(fd, 0, SEEK_END);
     filesize = ftell(fd);
-    fseek(fd, off, SEEK_SET);
+    fseek(fd, (long)off, SEEK_SET);
     return filesize;
 }
 
@@ -448,7 +448,7 @@ int util_get_line(char *buf, int bufsize, FILE *f)
         *(buf + len) = '\0';
     }
 
-    return len;
+    return (int)len;
 }
 
 /* Split `path' into a file name and a directory component.  Unlike
@@ -485,7 +485,7 @@ void util_fname_split(const char *path, char **directory_return,
     }
 
     if (directory_return != NULL) {
-        *directory_return = (char *)lib_malloc((size_t)(p - path + 1));
+        *directory_return = lib_malloc((size_t)(p - path + 1));
         memcpy(*directory_return, path, p - path);
         (*directory_return)[p - path] = '\0';
     }

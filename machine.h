@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _MACHINE_H
-#define _MACHINE_H
+#ifndef VICE_MACHINE_H
+#define VICE_MACHINE_H
 
 #include "types.h"
 
@@ -41,9 +41,10 @@ extern const char machine_name[];
 #define VICE_MACHINE_C128      2
 #define VICE_MACHINE_VIC20     3
 #define VICE_MACHINE_PET       4
-#define VICE_MACHINE_CBM2      5
-#define VICE_MACHINE_PLUS4     6
-#define VICE_MACHINE_C64DTV    7
+#define VICE_MACHINE_CBM5x0    5
+#define VICE_MACHINE_CBM6x0    6
+#define VICE_MACHINE_PLUS4     7
+#define VICE_MACHINE_C64DTV    8
 
 /* Sync factors.  */
 #define MACHINE_SYNC_PAL     -1
@@ -66,6 +67,7 @@ extern
     const
 #endif
 int console_mode;
+extern int video_disabled_mode;
 
 /* Initialize the machine's resources.  */
 extern int machine_resources_init(void);

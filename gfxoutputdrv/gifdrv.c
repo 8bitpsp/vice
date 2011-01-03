@@ -32,7 +32,6 @@
 #include <gif_lib.h>
 
 #include "archdep.h"
-#include "gifdrv.h"
 #include "lib.h"
 #include "log.h"
 #include "gfxoutput.h"
@@ -70,7 +69,7 @@ static int gifdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata = (gfxoutputdrv_data_t *)lib_malloc(sizeof(gfxoutputdrv_data_t));
+  sdata = lib_malloc(sizeof(gfxoutputdrv_data_t));
 
   screenshot->gfxoutputdrv_data = sdata;
 
@@ -87,7 +86,7 @@ static int gifdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata->data = (BYTE *)lib_malloc(screenshot->width);
+  sdata->data = lib_malloc(screenshot->width);
 
   gif_colors=MakeMapObject(screenshot->palette->num_entries, ColorMap256);
 
@@ -244,15 +243,17 @@ static gfxoutputdrv_t gif_drv =
     "GIF",
     "GIF screenshot",
     "gif",
+    NULL, /* formatlist */
     gifdrv_open,
     gifdrv_close,
     gifdrv_write,
     gifdrv_save,
-#ifdef FEATURE_CPUMEMHISTORY
     NULL,
-    gifdrv_save_memmap
-#else
+    NULL,
+    NULL,
     NULL
+#ifdef FEATURE_CPUMEMHISTORY
+    ,gifdrv_save_memmap
 #endif
 };
 

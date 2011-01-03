@@ -24,21 +24,21 @@
  *
  */
 
-#ifndef _C64CARTMEM_H
-#define _C64CARTMEM_H
+#ifndef VICE_C64CARTMEM_H
+#define VICE_C64CARTMEM_H
 
 #include "types.h"
 
 #define CMODE_READ  0
 #define CMODE_WRITE 1
 
-extern void cartridge_config_changed(BYTE mode_phi1, BYTE mode_phi2,
-                                     unsigned int wflag);
+extern void cartridge_config_changed(BYTE mode_phi1, BYTE mode_phi2, unsigned int wflag);
 
-void cartridge_romhbank_set(unsigned int bank);
-void cartridge_romlbank_set(unsigned int bank);
+extern void cartridge_romhbank_set(unsigned int bank);
+extern void cartridge_romlbank_set(unsigned int bank);
 
 extern BYTE export_ram0[];
 
-#endif
+extern int cartmode;
 
+#endif

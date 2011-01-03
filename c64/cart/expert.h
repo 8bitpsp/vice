@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _EXPERT_H
-#define _EXPERT_H
+#ifndef VICE_EXPERT_H
+#define VICE_EXPERT_H
 
 #include <stdio.h>
 
@@ -51,4 +51,3 @@ extern void expert_detach(void);
 extern void expert_mode_changed(int mode);
 
 #endif
-

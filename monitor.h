@@ -26,8 +26,8 @@
  *
  */
 
-#ifndef _MONITOR_H
-#define _MONITOR_H
+#ifndef VICE_MONITOR_H
+#define VICE_MONITOR_H
 
 #include "types.h"
 
@@ -66,10 +66,10 @@ struct interrupt_cpu_status_s;
 
 struct monitor_cpu_type_s {
     CPU_TYPE_t cpu_type;
-    unsigned int (*asm_addr_mode_get_size)(unsigned int mode, BYTE p0,
-                                           BYTE p1);
-    const struct asm_opcode_info_s *(*asm_opcode_info_get)(BYTE p0, BYTE p1,
-                                                           BYTE p2);
+    unsigned int (*asm_addr_mode_get_size)(unsigned int mode, unsigned int p0,
+                                           unsigned int p1);
+    const struct asm_opcode_info_s *(*asm_opcode_info_get)(unsigned int p0, unsigned int p1,
+                                                           unsigned int p2);
     int (*mon_assemble_instr)(const char *opcode_name, unsigned int operand);
     unsigned int (*mon_register_get_val)(int mem, int reg_id);
     void (*mon_register_set_val)(int mem, int reg_id, WORD val);
@@ -130,6 +130,8 @@ extern unsigned monitor_mask[NUM_MEMSPACES];
 
 
 /* Prototypes */
+extern monitor_cpu_type_t* monitor_find_cpu_type_from_string(const char *cpu_type);
+
 extern void monitor_init(monitor_interface_t *maincpu_interface,
                          monitor_interface_t *drive_interface_init[],
                          struct monitor_cpu_type_s **asmarray);
@@ -167,15 +169,15 @@ extern int monitor_breakpoint_check_checkpoint(MEMSPACE mem, WORD addr,
 
 /** Disassemble interace */
 /* Prototypes */
-extern const char *mon_disassemble_to_string(MEMSPACE, WORD addr, BYTE x,
-                                             BYTE p1, BYTE p2, BYTE p3,
+extern const char *mon_disassemble_to_string(MEMSPACE, unsigned int addr, unsigned int x,
+                                             unsigned int p1, unsigned int p2, unsigned int p3,
                                              int hex_mode,
                                              const char *cpu_type);
 
 /** Register interface.  */
 extern struct mon_reg_list_s *mon_register_list_get(int mem);
 extern void mon_ioreg_add_list(struct mem_ioreg_list_s **list, const char *name,
-                               WORD start, WORD end);
+                               int start, int end);
 
 /* Assembler initialization.  */
 extern void asm6502_init(struct monitor_cpu_type_s *monitor_cpu_type);
@@ -193,8 +195,10 @@ typedef struct monitor_cartridge_commands_s monitor_cartridge_commands_t;
 extern monitor_cartridge_commands_t mon_cart_cmd;
 
 /* CPU history/memmap prototypes */
-extern void monitor_cpuhistory_store(WORD addr, BYTE op, BYTE p1, BYTE p2);
-extern void monitor_memmap_store(unsigned int addr, BYTE type);
+extern void monitor_cpuhistory_store(unsigned int addr, unsigned int op, unsigned int p1, unsigned int p2,
+                                     BYTE reg_a, BYTE reg_x, BYTE reg_y, 
+                                     BYTE reg_sp, unsigned int reg_st);
+extern void monitor_memmap_store(unsigned int addr, unsigned int type);
 
 /* memmap defines */
 #define MEMMAP_I_O_R 0x80
@@ -212,5 +216,11 @@ extern BYTE memmap_state;
 #define MEMMAP_STATE_INSTR  0x02
 #define MEMMAP_STATE_OPCODE 0x01
 
+/* strtoul replacement for sunos4 */
+#if defined(sun) || defined(__sun)
+#  if !defined(__SVR4) && !defined(__svr4__)
+#    define strtoul(a, b, c) (unsigned long)strtol(a, b, c)
+#  endif
 #endif
 
+#endif

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64_RESOURCES_H
-#define _C64_RESOURCES_H
+#ifndef VICE_C64_RESOURCES_H
+#define VICE_C64_RESOURCES_H
 
 extern int c64_resources_init(void);
 extern void c64_resources_shutdown(void);
@@ -35,4 +35,3 @@ extern int acia_de_enabled;
 extern char *kernal_revision;
 
 #endif
-

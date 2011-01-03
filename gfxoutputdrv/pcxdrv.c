@@ -92,7 +92,7 @@ static int pcxdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata = (gfxoutputdrv_data_t *)lib_malloc(sizeof(gfxoutputdrv_data_t));
+  sdata = lib_malloc(sizeof(gfxoutputdrv_data_t));
   screenshot->gfxoutputdrv_data = sdata;
   sdata->line = 0;
   sdata->ext_filename=util_add_extension_const(filename, pcx_drv.default_extension);
@@ -113,8 +113,8 @@ static int pcxdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata->data = (BYTE *)lib_malloc(screenshot->width);
-  sdata->pcx_data = (BYTE *)lib_malloc(screenshot->width*2);
+  sdata->data = lib_malloc(screenshot->width);
+  sdata->pcx_data = lib_malloc(screenshot->width*2);
 
   return 0;
 }
@@ -279,7 +279,7 @@ static int pcxdrv_close_memmap(BYTE *palette)
 static int pcxdrv_write_memmap(int line, int x_size, BYTE *gfx)
 {
   BYTE color,amount;
-  unsigned int i,j=0;
+  int i,j=0;
 
   color=gfx[(line*x_size)];
   amount=1;
@@ -406,7 +406,7 @@ static int pcxdrv_open_memmap(const char *filename, int x_size, int y_size)
     return -1;
   }
 
-  pcxdrv_memmap_pcx_data = (BYTE *)lib_malloc(x_size*2);
+  pcxdrv_memmap_pcx_data = lib_malloc(x_size*2);
 
   return 0;
 }
@@ -435,15 +435,17 @@ static gfxoutputdrv_t pcx_drv =
     "PCX",
     "PCX screenshot",
     "pcx",
+    NULL, /* formatlist */
     pcxdrv_open,
     pcxdrv_close,
     pcxdrv_write,
     pcxdrv_save,
-#ifdef FEATURE_CPUMEMHISTORY
     NULL,
-    pcxdrv_save_memmap
-#else
+    NULL,
+    NULL,
     NULL
+#ifdef FEATURE_CPUMEMHISTORY
+    ,pcxdrv_save_memmap
 #endif
 };
 

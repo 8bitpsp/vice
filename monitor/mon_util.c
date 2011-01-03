@@ -27,6 +27,7 @@
 #include "vice.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -37,6 +38,7 @@
 #include "mon_disassemble.h"
 #include "mon_util.h"
 #include "monitor.h"
+#include "monitor_network.h"
 #include "types.h"
 #include "uimon.h"
 
@@ -99,7 +101,7 @@ static int mon_out_buffered(const char *buffer)
 
     if (!console_log || console_log->console_cannot_output) {
         mon_buffer_alloc();
-        mon_buffer_add(buffer, strlen(buffer));
+        mon_buffer_add(buffer, (unsigned int)strlen(buffer));
     }
     else {
         rv = mon_buffer_flush();
@@ -118,7 +120,17 @@ int mon_out(const char *format, ...)
     va_start(ap, format);
     buffer = lib_mvsprintf(format, ap);
 
-    rc = mon_out_buffered(buffer);
+#ifdef HAVE_NETWORK
+    if (monitor_is_remote()) {
+        rc = monitor_network_transmit(buffer, strlen(buffer));
+    }
+    else {
+#endif
+        rc = mon_out_buffered(buffer);
+#ifdef HAVE_NETWORK
+    }
+#endif
+
     lib_free(buffer);
 
     if (rc < 0)
@@ -159,6 +171,26 @@ char *mon_disassemble_with_label(MEMSPACE memspace, WORD loc, int hex,
     return lib_msprintf((hex ? "%04X: %s%10s" : "05u: %s%10s"), loc, p, "");
 }
 
+char *mon_dump_with_label(MEMSPACE memspace, WORD loc, int hex, unsigned *label_p)
+{
+    const char *p;
+    BYTE val;
+
+    if (*label_p == 0) {
+        /* process a label, if available */
+        p = mon_symbol_table_lookup_name(memspace, loc);
+        if (p) {
+            *label_p = 1;
+            return lib_msprintf("%s:",p);
+        }
+    } else {
+        *label_p = 0;
+    }
+
+    val = mon_get_mem_val(memspace, loc);
+    return lib_msprintf((hex ? "%04X: $%02X   %03u   '%c'" : "%05u: $%02X   %03u   '%c'"), loc, val, val, isprint(val)?val:' ');
+}
+
 #ifndef __OS2__
 static char *pchCommandLine = NULL;
 
@@ -181,19 +213,31 @@ char *uimon_in(const char *prompt)
     while (!p && !pchCommandLine) {
         /* as long as we don't have any return value... */
 
-        /* make sure to flush the output buffer */
-        mon_buffer_flush();
+#ifdef HAVE_NETWORK
+        if (monitor_is_remote()) {
+            monitor_network_transmit(prompt, strlen(prompt));
 
-        /* get input from the user */
-        p = uimon_get_in(&pchCommandLine, prompt);
+            p = monitor_network_get_command_line();
+            if (p == NULL) {
+                mon_set_command(NULL, "x", NULL);
+            }
+        }
+        else {
+#endif
+            /* make sure to flush the output buffer */
+            mon_buffer_flush();
+
+            /* get input from the user */
+            p = uimon_get_in(&pchCommandLine, prompt);
+#ifdef HAVE_NETWORK
+        }
+#endif
     }
 
     if (pchCommandLine) {
         /* we have an "artificially" generated command line */
 
-        if (p)
-            lib_free(p);
-
+        lib_free(p);
         p = lib_stralloc(pchCommandLine);
         pchCommandLine = NULL;
     }

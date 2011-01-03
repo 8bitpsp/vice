@@ -93,7 +93,7 @@ static void clk_overflow_callback(CLOCK sub, void *data)
 {
     unsigned int dnr;
 
-    dnr = (unsigned int)data;
+    dnr = vice_ptr_to_uint(data);
 
     if (wd1770[dnr].busy_clk > (CLOCK) 0)
         wd1770[dnr].busy_clk -= sub;
@@ -114,7 +114,7 @@ void wd1770d_init(drive_context_t *drv)
         wd1770_log = log_open("WD1770");
 
     clk_guard_add_callback(drv->cpu->clk_guard, clk_overflow_callback,
-                           (void *)(drv->mynumber));
+                           uint_to_void_ptr(drv->mynumber));
 }
 
 void REGPARM3 wd1770d_store(drive_context_t *drv, WORD addr, BYTE byte)
@@ -883,7 +883,7 @@ int wd1770_attach_image(disk_image_t *image, unsigned int unit)
 
     switch(image->type) {
       case DISK_IMAGE_TYPE_D81:
-        disk_image_attach_log(image, wd1770_log, unit, "D81");
+        disk_image_attach_log(image, wd1770_log, unit);
         break;
       default:
         return -1;
@@ -901,7 +901,7 @@ int wd1770_detach_image(disk_image_t *image, unsigned int unit)
 
     switch(image->type) {
       case DISK_IMAGE_TYPE_D81:
-        disk_image_detach_log(image, wd1770_log, unit, "D81");
+        disk_image_detach_log(image, wd1770_log, unit);
         break;
       default:
         return -1;

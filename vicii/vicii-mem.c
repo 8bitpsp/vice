@@ -39,6 +39,7 @@
 #include "c64cia.h"
 #include "debug.h"
 #include "maincpu.h"
+#include "mem.h"
 #include "raster-sprite-status.h"
 #include "raster-sprite.h"
 #include "types.h"
@@ -445,7 +446,10 @@ inline static void check_lateral_border(const BYTE value, int cycle,
             /* If CSEL changes from 1 to 0 at cycle 56, the lateral
                border is open.  */
             if (cycle == 56 && (vicii.regs[0x16] & 0x8)
-                && (!raster->blank_enabled || raster->open_left_border)) {
+                && (raster->open_left_border 
+                    || (!raster->blank_enabled 
+                        && raster->current_line != raster->display_ystop)))
+            {
                 raster->open_right_border = 1;
                 switch (vicii.get_background_from_vbuf) {
                   case VICII_HIRES_BITMAP_MODE:
@@ -499,6 +503,10 @@ inline static void d016_store(const BYTE value)
                                                 + (vicii.regs[0x16] & 7),
                                            &raster->sprite_xsmooth_shift_right,
                                            1);
+            raster_changes_sprites_add_int(raster,
+                                           VICII_RASTER_X(cycle) + 8 + xsmooth,
+                                           &raster->sprite_xsmooth_shift_right,
+                                           0);
         }
         raster_changes_foreground_add_int(raster,
                                           VICII_RASTER_CHAR(cycle) - 1,
@@ -920,8 +928,6 @@ inline static void d030_store(BYTE value)
         VICII_DEBUG_REGISTER(("(unused)"));
     }
 }
-
-extern BYTE mem_ram[];
 
 void viciidtv_update_colorram()
 {

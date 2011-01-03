@@ -42,6 +42,7 @@
 
 #include "autostart.h"
 #include "vice.h"
+#include "lib.h"
 #include "machine.h"
 #include "ui.h"
 #include "attach.h"
@@ -52,6 +53,8 @@
 #include "tape.h"
 #include "cartridge.h"
 #include "imagecontents.h"
+#include "tapecontents.h"
+#include "diskcontents.h"
 #include "videoarch.h"
 
 #define TAB_QUICKLOAD 0
@@ -621,7 +624,6 @@ static void psp_refresh_devices()
   int unit;
   pl_menu_item *item;
   const char *name;
-  char *contents, *line;
 
   /* Refresh tape contents */
   do /* For flow control - not a loop */
@@ -632,23 +634,19 @@ static void psp_refresh_devices()
 
     if (!name) break;
 
-    /* Read contents into a string (\n delimited) */
-    contents = image_contents_read_string(IMAGE_CONTENTS_TAPE, name, 0,
-                                          IMAGE_CONTENTS_STRING_ASCII);
+    image_contents_t *listing = tapecontents_read(name);
 
-    if (!contents) break;
+    if (listing == NULL)
+      break;
 
-    /* Add an entry for each line */
-    line = strtok(contents, "\n");
-    while (line)
+    image_contents_file_list_t *element = listing->file_list;
+
+    do 
     {
-      pl_menu_append_option(item, line, NULL, 0);
-      line = strtok(NULL, "\n");
-    }
-
-    /* Free TOC */
-    if (contents)
-      free(contents);
+      char *string = image_contents_file_to_string(element, 1);
+      pl_menu_append_option(item, string, NULL, 0);
+      lib_free(string);
+    } while ( (element = element->next) != NULL);
 
     /* Select first option */
     pl_menu_select_option_by_index(item, 0);
@@ -663,23 +661,19 @@ static void psp_refresh_devices()
 
     if (!name) continue;
 
-    /* Read contents into a string (\n delimited) */
-    contents = image_contents_read_string(IMAGE_CONTENTS_DISK, name, unit,
-                                          IMAGE_CONTENTS_STRING_ASCII);
+    image_contents_t *listing = diskcontents_read(name, unit);
 
-    if (!contents) continue;
+    if (listing == NULL)
+      continue;
 
-    /* Add an entry for each line */
-    line = strtok(contents, "\n");
-    while (line)
+    image_contents_file_list_t *element = listing->file_list;
+
+    do 
     {
-      pl_menu_append_option(item, line, NULL, 0);
-      line = strtok(NULL, "\n");
-    }
-
-    /* Free TOC */
-    if (contents)
-      free(contents);
+      char *string = image_contents_file_to_string(element, 1);
+      pl_menu_append_option(item, string, NULL, 0);
+      lib_free(string);
+    } while ( (element = element->next) != NULL);
 
     /* Select first option */
     pl_menu_select_option_by_index(item, 0);

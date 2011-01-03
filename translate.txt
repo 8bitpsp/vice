@@ -160,6 +160,12 @@ IDGS_ALL_DEVICES_DETACHED
 /* c64/digimax.c */
 IDGS_DIGIMAX_NOT_WITH_RESID
 
+/* c64/sfx_soundexpander.c */
+IDGS_SFX_SE_NOT_WITH_RESID
+
+/* c64/sfx_soundsampler.c */
+IDGS_SFX_SS_NOT_WITH_RESID
+
 /* c64dtv/c64dtvflash.c */
 IDGS_NO_FILENAME
 
@@ -189,6 +195,24 @@ IDCLS_ENABLE_AUTOSTARTWITHCOLON
 
 /* autostart.c */
 IDCLS_DISABLE_AUTOSTARTWITHCOLON
+
+/* autostart.c */
+IDCLS_ENABLE_AUTOSTART_HANDLE_TDE
+
+/* autostart.c */
+IDCLS_DISABLE_AUTOSTART_HANDLE_TDE
+
+/* autostart.c */
+IDCLS_ENABLE_WARP_MODE_AUTOSTART
+
+/* autostart.c */
+IDCLS_DISABLE_WARP_MODE_AUTOSTART
+
+/* autostart.c */
+IDCLS_SET_AUTOSTART_MODE_FOR_PRG
+
+/* autostart.c */
+IDCLS_SET_DISK_IMAGE_FOR_AUTOSTART_PRG
 
 /* c128/c128-cmdline-options.c, c64/c64-cmdline-options.c,
    c64/psid.c, plus4/plus4-cmdline-options.c,
@@ -270,6 +294,12 @@ IDCLS_ENABLE_EMULATOR_ID
    cbm2/cbm2-cmdline-options.c, pet/pet-cmdline-options.c,
    vic20/vic20-cmdline-options.c */
 IDCLS_DISABLE_EMULATOR_ID
+
+/* vic20/vic20-cmdline-options.c */
+IDCLS_ENABLE_OEM_JOY
+
+/* vic20/vic20-cmdline-options.c */
+IDCLS_DISABLE_OEM_JOY
 
 /* c128/c128-cmdline-options.c */
 IDCLS_ENABLE_IEE488
@@ -977,13 +1007,16 @@ IDCLS_ENABLE_IEC_11
 IDCLS_DISABLE_IEC_11
 
 /* sid/sid-cmdline-options.c */
-IDCLS_P_ENGINE
+IDCLS_P_ENGINE_MODEL
 
 /* sid/sid-cmdline-options.c */
-IDCLS_SPECIFY_SID_ENGINE
+IDCLS_SPECIFY_SID_ENGINE_MODEL
 
 /* sid/sid-cmdline-options.c */
-IDCLS_SPECIFY_SIDCART_ENGINE
+IDCLS_SPECIFY_SIDDTV_ENGINE_MODEL
+
+/* sid/sid-cmdline-options.c */
+IDCLS_SPECIFY_SIDCART_ENGINE_MODEL
 
 /* sid/sid-cmdline-options.c */
 IDCLS_ENABLE_SECOND_SID
@@ -999,12 +1032,6 @@ IDCLS_P_BASE_ADDRESS
 
 /* sid/sid-cmdline-options.c */
 IDCLS_SPECIFY_SID_2_ADDRESS
-
-/* sid/sid-cmdline-options.c */
-IDCLS_P_MODEL
-
-/* sid/sid-cmdline-options.c */
-IDCLS_SPECIFY_SID_MODEL
 
 /* sid/sid-cmdline-options.c */
 IDCLS_ENABLE_SID_FILTERS
@@ -1046,20 +1073,35 @@ IDCLS_ENABLE_VIC1112_IEEE488
 /* vic20/vic20-cmdline-options.c */
 IDCLS_DISABLE_VIC1112_IEEE488
 
-/* vic20/vic20cartridge.c */
+/* vic20/cart/vic20cart.c */
 IDCLS_SPECIFY_EXT_ROM_2000_NAME
 
-/* vic20/vic20cartridge.c */
+/* vic20/cart/vic20cart.c */
 IDCLS_SPECIFY_EXT_ROM_4000_NAME
 
-/* vic20/vic20cartridge.c */
+/* vic20/cart/vic20cart.c */
 IDCLS_SPECIFY_EXT_ROM_6000_NAME
 
-/* vic20/vic20cartridge.c */
+/* vic20/cart/vic20cart.c */
 IDCLS_SPECIFY_EXT_ROM_A000_NAME
 
-/* vic20/vic20cartridge.c */
+/* vic20/cart/vic20cart.c */
 IDCLS_SPECIFY_EXT_ROM_B000_NAME
+
+/* vic20/cart/vic20cart.c */
+IDCLS_SPECIFY_GENERIC_ROM_NAME
+
+/* vic20/cart/vic20cart.c */
+IDCLS_SPECIFY_MEGA_CART_ROM_NAME
+
+/* vic20/cart/vic20cart.c */
+IDCLS_SPECIFY_FINAL_EXPANSION_ROM_NAME
+
+/* vic20/cart/finalexpansion.c */
+IDCLS_ENABLE_FINALEXPANSION_WRITEBACK
+
+/* vic20/cart/finalexpansion.c */
+IDCLS_DISABLE_FINALEXPANSION_WRITEBACK
 
 /* vicii/vicii-cmdline-options.c */
 IDCLS_SET_BORDER_MODE
@@ -1243,6 +1285,15 @@ IDCLS_EXECUTE_MONITOR_FROM_FILE
 
 /* monitor.c */
 IDCLS_SET_INITIAL_BREAKPOINT
+
+/* monitor_network.c */
+IDCLS_ENABLE_REMOTE_MONITOR
+
+/* monitor_network.c */
+IDCLS_DISABLE_REMOTE_MONITOR
+
+/* monitor_network.c */
+IDCLS_REMOTE_MONITOR_ADDRESS
 
 /* fliplist.c */
 IDCLS_SPECIFY_FLIP_LIST_NAME
@@ -1465,6 +1516,18 @@ IDCLS_ENABLE_H1024K_EXPANSION
 /* plus4/plus4memhannes256k.c */
 IDCLS_ENABLE_H4096K_EXPANSION
 
+/* plus4/digiblaster.c */
+IDCLS_ENABLE_DIGIBLASTER
+
+/* plus4/digiblaster.c */
+IDCLS_DISABLE_DIGIBLASTER
+
+/* plus4/sidcartjoy.c */
+IDCLS_ENABLE_SIDCARTJOY
+
+/* plus4/sidcartjoy.c */
+IDCLS_DISABLE_SIDCARTJOY
+
 /* c64/digimax.c */
 IDCLS_ENABLE_DIGIMAX
 
@@ -1473,6 +1536,21 @@ IDCLS_DISABLE_DIGIMAX
 
 /* c64/digimax.c */
 IDCLS_DIGIMAX_BASE
+
+/* c64/sfx_soundexpander.c */
+IDCLS_ENABLE_SFX_SE
+
+/* c64/sfx_soundexpander.c */
+IDCLS_DISABLE_SFX_SE
+
+/* c64/sfx_soundexpander.c */
+IDCLS_SET_YM_CHIP_TYPE
+
+/* c64/sfx_soundsampler.c */
+IDCLS_ENABLE_SFX_SS
+
+/* c64/sfx_soundsampler.c */
+IDCLS_DISABLE_SFX_SS
 
 /* c64dtv/c64dtv-cmdline-options.c */
 IDCLS_SELECT_HUMMER_USERPORT_DEVICE
@@ -1910,3 +1988,24 @@ IDGS_P_COMMAND
 
 /* monitor/mon_command.c */
 IDGS_MON_TAPECTRL_DESCRIPTION
+
+/* lightpen.c */
+IDCLS_ENABLE_LIGHTPEN_EMULATION
+
+/* lightpen.c */
+IDCLS_DISABLE_LIGHTPEN_EMULATION
+
+/* lightpen.c */
+IDCLS_SET_LIGHTPEN_TYPE
+
+/* c64/cart/easyflash.c */
+IDCLS_ENABLE_EASYFLASH_JUMPER
+
+/* c64/cart/easyflash.c */
+IDCLS_DISABLE_EASYFLASH_JUMPER
+
+/* c64/cart/easyflash.c */
+IDCLS_ENABLE_EASYFLASH_CRT_WRITING
+
+/* c64/cart/lash.c */
+IDCLS_DISABLE_EASYFLASH_CRT_WRITING

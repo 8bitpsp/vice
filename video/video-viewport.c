@@ -32,6 +32,9 @@
 #include "videoarch.h"
 #include "viewport.h"
 
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 void video_viewport_get(video_canvas_t *canvas, viewport_t **viewport,
                         geometry_t **geometry)
@@ -112,10 +115,12 @@ void video_viewport_resize(video_canvas_t *canvas)
         || (viewport->first_line > geometry->first_displayed_line
         && viewport->last_line > geometry->last_displayed_line)) {
         viewport->first_line = geometry->first_displayed_line;
-        viewport->last_line = (geometry->first_displayed_line + height - 1);
+        viewport->last_line = MIN(viewport->first_line + height - 1, geometry->last_displayed_line);
     }
-    if (!vsid_mode && !console_mode)
+
+    if (!video_disabled_mode) {
         video_canvas_resize(canvas, width, height);
+    }
 
     video_canvas_refresh_all(canvas);
 }

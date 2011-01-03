@@ -93,9 +93,9 @@
 
 /* HACK this is C64 specific */
 
-void REGPARM2 memmap_mem_store(WORD addr, BYTE value)
+void REGPARM2 memmap_mem_store(unsigned int addr, unsigned int value)
 {
-    if((addr >= 0xd000)&&(addr <= 0xdfff)) {
+    if ((addr >= 0xd000)&&(addr <= 0xdfff)) {
         monitor_memmap_store(addr, MEMMAP_I_O_W);
     } else {
         monitor_memmap_store(addr, MEMMAP_RAM_W);
@@ -103,7 +103,7 @@ void REGPARM2 memmap_mem_store(WORD addr, BYTE value)
     (*_mem_write_tab_ptr[(addr) >> 8])((WORD)(addr), (BYTE)(value));
 }
 
-BYTE REGPARM1 memmap_mem_read(WORD addr)
+BYTE REGPARM1 memmap_mem_read(unsigned int addr)
 {
     switch(addr >> 12) {
         case 0xa:
@@ -111,7 +111,7 @@ BYTE REGPARM1 memmap_mem_read(WORD addr)
         case 0xe:
         case 0xf:
             memmap_state |= MEMMAP_STATE_IGNORE;
-            if(LOAD_ZERO(1) & (1 << ((addr>>14) & 1))) {
+            if (LOAD_ZERO(1) & (1 << ((addr>>14) & 1))) {
                 monitor_memmap_store(addr, (memmap_state&MEMMAP_STATE_OPCODE)?MEMMAP_ROM_X:(memmap_state&MEMMAP_STATE_INSTR)?0:MEMMAP_ROM_R);
             } else {
                 monitor_memmap_store(addr, (memmap_state&MEMMAP_STATE_OPCODE)?MEMMAP_RAM_X:(memmap_state&MEMMAP_STATE_INSTR)?0:MEMMAP_RAM_R);
@@ -216,7 +216,9 @@ static void maincpu_generic_dma(void)
 /* ------------------------------------------------------------------------- */
 
 struct interrupt_cpu_status_s *maincpu_int_status = NULL;
+#ifndef CYCLE_EXACT_ALARM
 alarm_context_t *maincpu_alarm_context = NULL;
+#endif
 clk_guard_t *maincpu_clk_guard = NULL;
 monitor_interface_t *maincpu_monitor_interface = NULL;
 
@@ -416,10 +418,10 @@ void maincpu_mainloop(void)
     int reg_a_write_idx = 0;
     int reg_x_idx = 2;
     int reg_y_idx = 1;
-    #define reg_a_write dtv_registers[reg_a_write_idx]
-    #define reg_a_read dtv_registers[reg_a_read_idx]
-    #define reg_x dtv_registers[reg_x_idx]
-    #define reg_y dtv_registers[reg_y_idx]
+#define reg_a_write dtv_registers[reg_a_write_idx]
+#define reg_a_read dtv_registers[reg_a_read_idx]
+#define reg_x dtv_registers[reg_x_idx]
+#define reg_y dtv_registers[reg_y_idx]
 #endif
     BYTE reg_p = 0;
     BYTE reg_sp = 0;
@@ -542,7 +544,7 @@ int maincpu_snapshot_write_module(snapshot_t *s)
         || SMW_B(m, MOS6510DTV_REGS_GET_R14(&maincpu_regs)) < 0
         || SMW_B(m, MOS6510DTV_REGS_GET_R15(&maincpu_regs)) < 0
         || SMW_B(m, MOS6510DTV_REGS_GET_ACM(&maincpu_regs)) < 0
-        || SMW_B(m, MOS6510DTV_REGS_GET_XYM(&maincpu_regs)) < 0
+        || SMW_B(m, MOS6510DTV_REGS_GET_YXM(&maincpu_regs)) < 0
         || SMW_BA(m, burst_cache, 4) < 0
         || SMW_W(m, burst_addr) < 0
         || SMW_DW(m, dtvclockneg) < 0
@@ -579,7 +581,7 @@ int maincpu_snapshot_read_module(snapshot_t *s)
 {
     BYTE a, x, y, sp, status;
 #ifdef C64DTV
-    BYTE r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, acm, xym;
+    BYTE r3, r4, r5, r6, r7, r8, r9, r10, r11, r12, r13, r14, r15, acm, yxm;
 #endif
     WORD pc;
     BYTE major, minor;
@@ -617,7 +619,7 @@ int maincpu_snapshot_read_module(snapshot_t *s)
         || SMR_B(m, &r14) < 0
         || SMR_B(m, &r15) < 0
         || SMR_B(m, &acm) < 0
-        || SMR_B(m, &xym) < 0
+        || SMR_B(m, &yxm) < 0
         || SMR_BA(m, burst_cache, 4) < 0
         || SMR_W(m, &burst_addr) < 0
         || SMR_DW_INT(m, &dtvclockneg) < 0
@@ -646,7 +648,7 @@ int maincpu_snapshot_read_module(snapshot_t *s)
     MOS6510DTV_REGS_SET_R14(&maincpu_regs, r14);
     MOS6510DTV_REGS_SET_R15(&maincpu_regs, r15);
     MOS6510DTV_REGS_SET_ACM(&maincpu_regs, acm);
-    MOS6510DTV_REGS_SET_XYM(&maincpu_regs, xym);
+    MOS6510DTV_REGS_SET_YXM(&maincpu_regs, yxm);
 #else
     MOS6510_REGS_SET_A(&maincpu_regs, a);
     MOS6510_REGS_SET_X(&maincpu_regs, x);

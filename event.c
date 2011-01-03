@@ -53,7 +53,7 @@
 #include "tape.h"
 #include "translate.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "util.h"
 #include "version.h"
 
@@ -97,9 +97,7 @@ static int event_image_include;
 
 static char *event_snapshot_path(const char *snapshot_file)
 {
-    if (event_snapshot_path_str != NULL)
-        lib_free(event_snapshot_path_str);
-
+    lib_free(event_snapshot_path_str);
     event_snapshot_path_str = 
         util_concat(event_snapshot_dir, snapshot_file, NULL);
 
@@ -133,8 +131,7 @@ static int event_image_append(const char *filename,
         event_image_list_ptr = event_image_list_ptr->next;
     }
 
-    event_image_list_ptr->next = (
-        event_image_list_t *) lib_calloc(1, sizeof(event_image_list_t));
+    event_image_list_ptr->next = lib_calloc(1, sizeof(event_image_list_t));
 
     event_image_list_ptr = event_image_list_ptr->next;
     event_image_list_ptr->next = NULL;
@@ -156,15 +153,14 @@ void event_record_attach_in_list(event_list_state_t *list, unsigned int unit,
 
     list->current->type = EVENT_ATTACHIMAGE;
     list->current->clk = maincpu_clk;
-    list->current->next
-        = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+    list->current->next = lib_calloc(1, sizeof(event_list_t));
 
     util_fname_split(filename, &strdir, &strfile);
 
     if (event_image_include)
-        size = strlen(filename) + 3;
+        size = (unsigned int)strlen(filename) + 3;
     else
-        size = strlen(strfile) + sizeof(long) + 4;
+        size = (unsigned int)strlen(strfile) + sizeof(long) + 4;
 
     event_data = lib_malloc(size);
     event_data[0] = unit;
@@ -189,7 +185,7 @@ void event_record_attach_in_list(event_list_state_t *list, unsigned int unit,
             } else {
                 log_error(event_log, "Cannot open image file %s", filename);
             }
-            size += file_len;
+            size += (unsigned int)file_len;
         }
     } else {
         strcpy(&event_data[2], "");
@@ -320,8 +316,7 @@ void event_record_in_list(event_list_state_t *list, unsigned int type,
     list->current->clk = maincpu_clk;
     list->current->size = size;
     list->current->data = event_data;
-    list->current->next
-        = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+    list->current->next = lib_calloc(1, sizeof(event_list_t));
     list->current = list->current->next;
     list->current->type = EVENT_LIST_END;
 }
@@ -484,20 +479,19 @@ void event_playback_event_list(event_list_state_t *list)
 
 void event_register_event_list(event_list_state_t *list)
 {
-    list->base = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+    list->base = lib_calloc(1, sizeof(event_list_t));
     list->current = list->base;
 }
 
 void event_init_image_list(void)
 {
-    event_image_list_base = 
-        (event_image_list_t *)lib_calloc(1, sizeof(event_image_list_t));
+    event_image_list_base = lib_calloc(1, sizeof(event_image_list_t));
     image_number = 0;
 }
 
 static void create_list(void)
 {
-    event_list = (event_list_state_t *)lib_malloc(sizeof(event_list_state_t));
+    event_list = lib_malloc(sizeof(event_list_state_t));
     event_register_event_list(event_list);
     event_init_image_list();
 }
@@ -526,8 +520,7 @@ void event_destroy_image_list(void)
     while (d1 != NULL) {
         d2 = d1->next;
         lib_free(d1->orig_filename);
-        if (d1->mapped_filename != NULL)
-            lib_free(d1->mapped_filename);
+        lib_free(d1->mapped_filename);
         lib_free(d1);
         d1 = d2;
     }
@@ -577,9 +570,9 @@ static void event_write_version(void)
         /* EVENT_INITIAL is missing (bug in 1.14.xx); fix it */
         event_list_t *new_event;
 
-        new_event = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+        new_event = lib_calloc(1, sizeof(event_list_t));
         new_event->clk = event_list->base->clk;
-        new_event->size = strlen(event_start_snapshot) + 2;
+        new_event->size = (unsigned int)strlen(event_start_snapshot) + 2;
         new_event->type = EVENT_INITIAL;
         data = lib_malloc(new_event->size);
         data[0] = EVENT_START_MODE_FILE_SAVE;
@@ -593,9 +586,9 @@ static void event_write_version(void)
 
     ver_idx = 1;
     if (data[0] == EVENT_START_MODE_FILE_SAVE)
-        ver_idx += strlen((char *)&data[1]) + 1;
+        ver_idx += (unsigned int)strlen((char *)&data[1]) + 1;
 
-    event_list->base->size = ver_idx + strlen(VERSION) + 1;
+    event_list->base->size = ver_idx + (unsigned int)strlen(VERSION) + 1;
     new_data = lib_malloc(event_list->base->size);
 
     memcpy(new_data, data, ver_idx);
@@ -1049,7 +1042,7 @@ int event_snapshot_read_module(struct snapshot_s *s, int event_mode)
                 curr->type = EVENT_TIMESTAMP;
                 curr->clk = next_timestamp_clk;
                 curr->size = 0;
-                curr->next = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+                curr->next = lib_calloc(1, sizeof(event_list_t));
                 curr = curr->next;
                 next_timestamp_clk += machine_get_cycles_per_second();
                 num_of_timestamps++;
@@ -1070,7 +1063,7 @@ int event_snapshot_read_module(struct snapshot_s *s, int event_mode)
         if (type == EVENT_RESETCPU)
             next_timestamp_clk -= clk;
 
-        curr->next = (event_list_t *)lib_calloc(1, sizeof(event_list_t));
+        curr->next = lib_calloc(1, sizeof(event_list_t));
         curr = curr->next;
     }
 
@@ -1126,8 +1119,7 @@ static int set_event_snapshot_dir(const char *val, void *param)
     if (s[strlen(s) - 1] == FSDEV_DIR_SEP_CHR) {
         util_string_set(&event_snapshot_dir, s);
     } else {
-        if (event_snapshot_dir != NULL)
-            lib_free(event_snapshot_dir);
+        lib_free(event_snapshot_dir);
         event_snapshot_dir = util_concat(s, FSDEV_DIR_SEP_STR, NULL);
     }
 
@@ -1201,8 +1193,8 @@ void event_shutdown(void)
     lib_free(event_start_snapshot);
     lib_free(event_end_snapshot);
     lib_free(event_snapshot_dir);
-    if (event_snapshot_path_str != NULL)
-        lib_free(event_snapshot_path_str);
+    lib_free(event_snapshot_path_str);
+    event_snapshot_path_str = NULL;
     destroy_list();
 }
 

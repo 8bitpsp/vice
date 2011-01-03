@@ -27,12 +27,8 @@
 
 #include "vice.h"
 
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
+#include "cbm2.h"
 #include "mem.h"
-#endif
-
 #include "types.h"
 
 /* MACHINE_STUFF should define/undef
@@ -51,9 +47,6 @@
 */
 
 /* ------------------------------------------------------------------------- */
-
-extern read_func_ptr_t *_mem_read_ind_tab_ptr;
-extern store_func_ptr_t *_mem_write_ind_tab_ptr;
 
 #define PAGE_ZERO mem_page_zero
 #define PAGE_ONE  mem_page_one

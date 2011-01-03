@@ -25,15 +25,15 @@
  *
  */
 
-#ifndef _RASTER_CHANGES_H
-#define _RASTER_CHANGES_H
+#ifndef VICE_RASTER_CHANGES_H
+#define VICE_RASTER_CHANGES_H
 
 #include "types.h"
 
 struct raster_s;
 
 /* This should be a lot more than what is actually needed.  */
-#define RASTER_CHANGES_MAX 512
+#define RASTER_CHANGES_MAX 1024
 
 enum raster_changes_type_s
 {

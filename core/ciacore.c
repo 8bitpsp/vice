@@ -28,6 +28,8 @@
  *
  */
 
+#include "vice.h"
+
 #include <stdio.h>
 #include <string.h>
 
@@ -557,8 +559,8 @@ BYTE REGPARM2 ciacore_read(cia_context_t *cia_context, WORD addr)
 {
 #if defined(CIA_TIMER_DEBUG)
 
-    BYTE cia_read_(cia_context, WORD addr);
-    BYTE tmp = cia_read_(addr);
+    BYTE cia_read_(cia_context_t *, WORD addr);
+    BYTE tmp = cia_read_(cia_context, addr);
 
     if (cia_context->debugFlag)
         log_message(cia_context->log, "read cia[%x] returns %02x @ clk=%d.",
@@ -874,7 +876,7 @@ static void ciacore_intta(CLOCK offset, void *data)
                 *(cia_context->clk_ptr), rclk));
 
 #if 0
-    if((n = ciat_update(cia_context->ta, rclk))
+    if ((n = ciat_update(cia_context->ta, rclk))
         && (cia_context->rdi != rclk - 1)) {
         cia_context->irqflags |= CIA_IM_TA;
         cia_context->tat = (cia_context->tat + n) & 1;
@@ -1071,8 +1073,8 @@ void ciacore_init(cia_context_t *cia_context, alarm_context_t *alarm_context,
 {
     char *buffer;
 
-    cia_context->ta = (ciat_t *)lib_malloc(sizeof(ciat_t));
-    cia_context->tb = (ciat_t *)lib_malloc(sizeof(ciat_t));
+    cia_context->ta = lib_malloc(sizeof(ciat_t));
+    cia_context->tb = lib_malloc(sizeof(ciat_t));
 
     ciat_init_table();
 

@@ -4,6 +4,7 @@
  * Written by
  *  Ettore Perazzoli <ettore@comm2000.it>
  *  André Fachat <fachat@physik.tu-chemnitz.de>
+ *  Daniel Kahlin <daniel@kahlin.net>
  *
  * Multiple memory configuration support originally by
  *  Alexander Lehmann <alex@mathematik.th-darmstadt.de>
@@ -35,34 +36,26 @@
 #include <string.h>
 
 #include "cartridge.h"
+#include "cart/vic20cartmem.h"
 #include "emuid.h"
 #include "log.h"
 #include "machine.h"
 #include "maincpu.h"
-#include "midi.h"
-
-#ifdef WATCOM_COMPILE
-#include "../mem.h"
-#else
 #include "mem.h"
-#endif
-
+#include "midi.h"
 #include "monitor.h"
 #include "ram.h"
 #include "resources.h"
 #include "sid-resources.h"
 #include "sid.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "vic-mem.h"
 #include "vic20-resources.h"
 #include "vic20ieeevia.h"
 #include "vic20mem.h"
 #include "vic20memrom.h"
 #include "vic20via.h"
-
-
-static log_t vic20_mem_log = LOG_ERR;
 
 /*----------------------------------------------------------------------*/
 
@@ -74,17 +67,15 @@ unsigned int mem_old_reg_pc;
 /* The VIC20 memory. */
 BYTE mem_ram[VIC20_RAM_SIZE];
 
-BYTE mem_cartrom[0x10000];
-
 /* Last data read/write by the cpu, this value lingers on the C(PU)-bus and
    gets used when the CPU reads from unconnected space on the C(PU)-bus */
 BYTE vic20_cpu_last_data;
+/* Last read data on V-bus (VD0-VD7) */
+BYTE vic20_v_bus_last_data;
+/* Last read data on V-bus (VD8-VD11) */
+BYTE vic20_v_bus_last_high;
 
 /* Memory read and write tables.  */
-/*
-static read_func_ptr_t _mem_read_tab[0x101];
-static store_func_ptr_t _mem_write_tab[0x101];
-*/
 static BYTE *_mem_read_base_tab[0x101];
 static int mem_read_limit_tab[0x101];
 
@@ -101,24 +92,17 @@ int *mem_read_limit_tab_ptr;
 
 /* ------------------------------------------------------------------------- */
 
-static void REGPARM2 store_wrap(WORD addr, BYTE value)
-{
-    vic20_cpu_last_data = value;
-    mem_ram[addr & (VIC20_RAM_SIZE - 1)] = value;
-    vic20memrom_chargen_rom[addr & 0x3ff] = value;
-}
-
-/* ------------------------------------------------------------------------- */
-
 BYTE REGPARM1 zero_read(WORD addr)
 {
     vic20_cpu_last_data = mem_ram[addr & 0xff];
+    vic20_mem_v_bus_read(addr);
     return vic20_cpu_last_data;
 }
 
 void REGPARM2 zero_store(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
+    vic20_mem_v_bus_store(addr);
     mem_ram[addr & 0xff] = value;
 }
 
@@ -128,49 +112,69 @@ static BYTE REGPARM1 ram_read(WORD addr)
     return vic20_cpu_last_data;
 }
 
+static BYTE REGPARM1 ram_read_v_bus(WORD addr)
+{
+    vic20_cpu_last_data = mem_ram[addr];
+    vic20_mem_v_bus_read(addr);
+    return vic20_cpu_last_data;
+}
+
 static void REGPARM2 ram_store(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
     mem_ram[addr & (VIC20_RAM_SIZE - 1)] = value;
 }
 
-static BYTE REGPARM1 read_cartrom(WORD addr)
+static void REGPARM2 ram_store_v_bus(WORD addr, BYTE value)
 {
-    vic20_cpu_last_data = mem_cartrom[addr & 0xffff];
-    return vic20_cpu_last_data;
+    vic20_cpu_last_data = value;
+    vic20_mem_v_bus_store(addr);
+    mem_ram[addr & (VIC20_RAM_SIZE - 1)] = value;
 }
 
-/* FIXME: Using random values for high nibble instead of VIC fetches */
 static BYTE REGPARM1 colorram_read(WORD addr)
 {
-    vic20_cpu_last_data = mem_ram[addr] | (rand() & 0xf0);
+    vic20_cpu_last_data = mem_ram[addr] | (vic20_v_bus_last_data & 0xf0);
+    vic20_v_bus_last_data = vic20_cpu_last_data; /* TODO verify this */
     return vic20_cpu_last_data;
 }
 
 static void REGPARM2 colorram_store(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
+    vic20_v_bus_last_data = vic20_cpu_last_data; /* TODO verify this */
     mem_ram[addr & (VIC20_RAM_SIZE - 1)] = value & 0xf;
 }
 
 static void REGPARM2 via_store(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
-    if (addr & 0x10)            /* $911x (VIA2) */
+
+    if (addr & 0x10) {          /* $911x (VIA2) */
         via2_store(addr, value);
-    if (addr & 0x20)            /* $912x (VIA1) */
+    }
+    if (addr & 0x20) {          /* $912x (VIA1) */
         via1_store(addr, value);
+    }
+    vic20_mem_v_bus_store(addr);
 }
 
 static BYTE REGPARM1 via_read(WORD addr)
 {
-    vic20_cpu_last_data = 0xff;
+    if ( (addr & 0x30) == 0x00 ) {  /* $910x (unconnected V-bus) */
+        vic20_cpu_last_data = vic20_v_bus_last_data;
+    } else {
+        BYTE temp_bus = 0xff;
 
-    if (addr & 0x10)            /* $911x (VIA2) */
-        vic20_cpu_last_data &= via2_read(addr);
-    if (addr & 0x20)            /* $912x (VIA1) */
-        vic20_cpu_last_data &= via1_read(addr);
-
+        if (addr & 0x10) {          /* $911x (VIA2) */
+            temp_bus &= via2_read(addr);
+        }
+        if (addr & 0x20) {          /* $912x (VIA1) */
+            temp_bus &= via1_read(addr);
+        }
+        vic20_cpu_last_data = temp_bus;
+    }
+    vic20_mem_v_bus_read(addr);
     return vic20_cpu_last_data;
 }
 
@@ -192,37 +196,42 @@ static void REGPARM2 store_emuid(WORD addr, BYTE value)
         emulator_id[addr - 0xa0] ^= 0xff;
     }
 #endif
-    return;
 }
 
 /*-------------------------------------------------------------------*/
 
 static BYTE REGPARM1 io3_read(WORD addr)
 {
-    if (sidcart_enabled && sidcart_address==1 && addr>=0x9c00 && addr<=0x9c1f)
-    {
+    if (sidcart_enabled && sidcart_address==1 && addr>=0x9c00 && addr<=0x9c1f) {
         vic20_cpu_last_data = sid_read(addr);
+        vic20_mem_v_bus_read(addr);
         return vic20_cpu_last_data;
     }
 
-    if (emu_id_enabled && (addr & 0xff00) == 0x9f00)
-    {
+    if (emu_id_enabled && (addr & 0xff00) == 0x9f00) {
         vic20_cpu_last_data = read_emuid(addr);
+        vic20_mem_v_bus_read(addr);
         return vic20_cpu_last_data;
     }
 
 #ifdef HAVE_MIDI
-    if (midi_enabled && (addr & 0xff00) == 0x9c00)
-    {
-        if(midi_test_read((WORD)(addr & 0xff))) {
+    if (midi_enabled && (addr & 0xff00) == 0x9c00) {
+        if (midi_test_read((WORD)(addr & 0xff))) {
             vic20_cpu_last_data = midi_read((WORD)(addr & 0xff));
+            vic20_mem_v_bus_read(addr);
             return vic20_cpu_last_data;
         }
     }
 #endif
 
-    vic20_cpu_last_data = 0xff;
-    return 0xff;
+    if (mem_cart_blocks & VIC_CART_IO3) {
+        vic20_cpu_last_data = cartridge_read_io3(addr);
+        vic20_mem_v_bus_read(addr);
+        return vic20_cpu_last_data;
+    }
+
+    vic20_mem_v_bus_read(addr);
+    return vic20_cpu_last_data;
 }
 
 static void REGPARM2 io3_store(WORD addr, BYTE value)
@@ -231,51 +240,62 @@ static void REGPARM2 io3_store(WORD addr, BYTE value)
 
     if (sidcart_enabled && sidcart_address==1 && addr>=0x9c00 && addr<=0x9c1f) {
         sid_store(addr,value);
-        return;
     }
 
-    if (emu_id_enabled && (addr & 0xff00) == 0x9f00)
+    if (emu_id_enabled && (addr & 0xff00) == 0x9f00) {
         store_emuid(addr, value);
+    }
 
 #ifdef HAVE_MIDI
-    if (midi_enabled && (addr & 0xff00) == 0x9c00)
+    if (midi_enabled && (addr & 0xff00) == 0x9c00) {
         midi_store((WORD)(addr & 0xff), value);
+    }
 #endif
 
+    if (mem_cart_blocks & VIC_CART_IO3) {
+        cartridge_store_io3(addr, value);
+    }
+
+    vic20_mem_v_bus_store(addr);
     return;
 }
 
 static BYTE REGPARM1 io2_read(WORD addr)
 {
-    if (sidcart_enabled && sidcart_address==0 && addr>=0x9800 && addr<=0x981f)
-    {
+    if (sidcart_enabled && sidcart_address==0 && addr>=0x9800 && addr<=0x981f) {
         vic20_cpu_last_data = sid_read(addr);
+        vic20_mem_v_bus_read(addr);
         return vic20_cpu_last_data;
     }
 
-    if (ieee488_enabled)
-    {
-        if (addr & 0x10)
-        {
+    if (ieee488_enabled) {
+        if (addr & 0x10) {
             vic20_cpu_last_data = ieeevia2_read(addr);
+            vic20_mem_v_bus_read(addr);
             return vic20_cpu_last_data;
-        }
-        else
-        {
+        } else {
             vic20_cpu_last_data = ieeevia1_read(addr);
+            vic20_mem_v_bus_read(addr);
             return vic20_cpu_last_data;
         }
     }
-    vic20_cpu_last_data = 0xff;
-    return 0xff;
+
+    if (mem_cart_blocks & VIC_CART_IO2) {
+        vic20_cpu_last_data = cartridge_read_io2(addr);
+        vic20_mem_v_bus_read(addr);
+        return vic20_cpu_last_data;
+    }
+
+    vic20_mem_v_bus_read(addr);
+    return vic20_cpu_last_data;
 }
 
 static void REGPARM2 io2_store(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
+
     if (sidcart_enabled && sidcart_address==0 && addr>=0x9800 && addr<=0x981f) {
         sid_store(addr,value);
-        return;
     }
 
     if (ieee488_enabled) {
@@ -285,26 +305,46 @@ static void REGPARM2 io2_store(WORD addr, BYTE value)
             ieeevia1_store(addr, value);
         }
     }
+
+    if (mem_cart_blocks & VIC_CART_IO2) {
+        cartridge_store_io2(addr, value);
+    }
+
+    vic20_mem_v_bus_store(addr);
     return;
 }
 
+static BYTE REGPARM1 chargen_read(WORD addr)
+{
+    vic20_cpu_last_data = vic20memrom_chargen_read(addr);
+    vic20_mem_v_bus_read(addr);
+    return vic20_cpu_last_data;
+}
+
 /*-------------------------------------------------------------------*/
+
+static BYTE REGPARM1 read_unconnected_v_bus(WORD addr)
+{
+    vic20_cpu_last_data = vic20_v_bus_last_data;
+    vic20_mem_v_bus_read(addr);
+    return vic20_cpu_last_data;
+}
 
 static BYTE REGPARM1 read_unconnected_c_bus(WORD addr)
 {
     return vic20_cpu_last_data;
 }
 
-static BYTE REGPARM1 read_dummy(WORD addr)
+static void REGPARM2 store_dummy_v_bus(WORD addr, BYTE value)
 {
-    return (addr >> 8);
+    vic20_cpu_last_data = value;
+    vic20_mem_v_bus_store(addr);
 }
 
-static void REGPARM2 store_dummy(WORD addr, BYTE value)
+static void REGPARM2 store_dummy_c_bus(WORD addr, BYTE value)
 {
     vic20_cpu_last_data = value;
 }
-
 
 /* Watchpoint functions */
 
@@ -366,159 +406,134 @@ void mem_set_bank_pointer(BYTE **base, int *limit)
     /* We do not need MMU support.  */
 }
 
-static int vic20_mem_enable_rom_block(int num)
-{
-    if (num == 1 || num == 2 || num == 3 || num == 5) {
-#if 0  /* changed to have the vic20 cpu always use the function */
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                read_cartrom, store_dummy,
-                mem_cartrom, 0xffff);
-#endif
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                read_cartrom, store_dummy,
-                NULL, 0);
-
-        return 0;
-    } else
-        return -1;
-}
-
 int vic20_mem_enable_ram_block(int num)
 {
     if (num == 0) {
-#if 0  /* changed to have the vic20 cpu always use the function */
         set_mem(0x04, 0x0f,
-                ram_read, ram_store,
-                mem_ram, 0xffff);
-#endif
-        set_mem(0x04, 0x0f,
-                ram_read, ram_store,
+                ram_read_v_bus, ram_store_v_bus,
                 NULL, 0);
         return 0;
-    } else if (num > 0 && num != 4 && num <= 5) {
-#if 0  /* changed to have the vic20 cpu always use the function */
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                ram_read, ram_store,
-                mem_ram, 0xffff);
-#endif
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                ram_read, ram_store,
-                NULL, 0);
-        return 0;
-    } else
-        return -1;
+    } else {
+        if (num > 0 && num != 4 && num <= 5) {
+            set_mem(num * 0x20, num * 0x20 + 0x1f,
+                    ram_read, ram_store,
+                    NULL, 0);
+            return 0;
+        }
+    }
+    return -1;
 }
 
 int vic20_mem_disable_ram_block(int num)
 {
     if (num == 0) {
-#if 0  /* changed to have the vic20 cpu always use the function */
         set_mem(0x04, 0x0f,
-                read_dummy, store_dummy,
-                mem_ram, 0xffff);
-#endif
-        set_mem(0x04, 0x0f,
-                read_dummy, store_dummy,
+                read_unconnected_v_bus, store_dummy_v_bus,
                 NULL, 0);
         return 0;
-    } else if (num > 0 && num != 4 && num <= 5) {
-#if 0  /* changed to have the vic20 cpu always use the function */
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                read_dummy, store_dummy,
-                mem_ram, 0xffff);
-#endif
-        set_mem(num * 0x20, num * 0x20 + 0x1f,
-                read_unconnected_c_bus, store_dummy,
-                NULL, 0);
-        return 0;
-    } else
-        return -1;
+    } else {
+        if (num > 0 && num != 4 && num <= 5) {
+            set_mem(num * 0x20, num * 0x20 + 0x1f,
+                    read_unconnected_c_bus, store_dummy_c_bus,
+                    NULL, 0);
+            return 0;
+        }
+    }
+    return -1;
 }
 
 void mem_initialize_memory(void)
 {
     int i;
 
-    /* Setup low standard RAM at $0000-$03FF. */
-#if 0  /* changed to have the vic20 cpu always use the function */
-    set_mem(0x00, 0x03,
-            ram_read, ram_store,
-            mem_ram, 0xffff);
-#endif
-    set_mem(0x00, 0x03,
-            ram_read, ram_store,
+    /* Setup zero page at $0000-$00FF. */
+    set_mem(0x00, 0x00,
+            zero_read, zero_store,
+            NULL, 0);
+
+    /* Setup low standard RAM at $0100-$03FF. */
+    set_mem(0x01, 0x03,
+            ram_read_v_bus, ram_store_v_bus,
             NULL, 0);
 
     /* Setup more low RAM at $1000-$1FFF.  */
-#if 0  /* changed to have the vic20 cpu always use the function */
-    set_mem(0x10, 0x1b,
-            ram_read, ram_store,
-            mem_ram, 0xffff);
-    set_mem(0x1c, 0x1f,
-            ram_read, store_wrap,
-            mem_ram, 0xffff);
-#endif
-    set_mem(0x10, 0x1b,
-            ram_read, ram_store,
-            NULL, 0);
-    set_mem(0x1c, 0x1f,
-            ram_read, store_wrap,
+    set_mem(0x10, 0x1f,
+            ram_read_v_bus, ram_store_v_bus,
             NULL, 0);
 
-    /* Setup RAM at $0400-$0FFF.  */
-    if (ram_block_0_enabled)
-        vic20_mem_enable_ram_block(0);
-    else
-        vic20_mem_disable_ram_block(0);
-
-    /* Setup RAM or cartridge ROM at $2000-$3FFF.  */
-    if (mem_rom_blocks & (VIC_ROM_BLK1A | VIC_ROM_BLK1B)) {
-        vic20_mem_enable_rom_block(1);
-    } else
-    if (ram_block_1_enabled) {
-        vic20_mem_enable_ram_block(1);
+    if (mem_cart_blocks & VIC_CART_RAM123) {
+        /* a cartridge is selected, map everything to cart/vic20cartmem.c */
+        set_mem(0x04, 0x0f,
+                cartridge_read_ram123, cartridge_store_ram123,
+                NULL, 0);
     } else {
-        vic20_mem_disable_ram_block(1);
+        /* Setup RAM at $0400-$0FFF.  */
+        if (ram_block_0_enabled) {
+            vic20_mem_enable_ram_block(0);
+        } else {
+            vic20_mem_disable_ram_block(0);
+        }
     }
 
-    /* Setup RAM or cartridge ROM at $4000-$5FFF.  */
-    if (mem_rom_blocks & (VIC_ROM_BLK2A | VIC_ROM_BLK2B)) {
-        vic20_mem_enable_rom_block(2);
-    } else
-    if (ram_block_2_enabled) {
-        vic20_mem_enable_ram_block(2);
+    if (mem_cart_blocks & VIC_CART_BLK1) {
+        /* a cartridge is selected, map everything to cart/vic20cartmem.c */
+        set_mem(0x20, 0x3f,
+                cartridge_read_blk1, cartridge_store_blk1,
+                NULL, 0);
     } else {
-        vic20_mem_disable_ram_block(2);
+        /* Setup RAM at $2000-$3FFF.  */
+        if (ram_block_1_enabled) {
+            vic20_mem_enable_ram_block(1);
+        } else {
+            vic20_mem_disable_ram_block(1);
+        }
     }
 
-    /* Setup RAM or cartridge ROM at $6000-$7FFF.  */
-    if (mem_rom_blocks & (VIC_ROM_BLK3A | VIC_ROM_BLK3B)) {
-        vic20_mem_enable_rom_block(3);
-    } else
-    if (ram_block_3_enabled) {
-        vic20_mem_enable_ram_block(3);
+    if (mem_cart_blocks & VIC_CART_BLK2) {
+        /* a cartridge is selected, map everything to cart/vic20cartmem.c */
+        set_mem(0x40, 0x5f,
+                cartridge_read_blk2, cartridge_store_blk2,
+                NULL, 0);
     } else {
-        vic20_mem_disable_ram_block(3);
+        /* Setup RAM at $4000-$5FFF.  */
+        if (ram_block_2_enabled) {
+            vic20_mem_enable_ram_block(2);
+        } else {
+            vic20_mem_disable_ram_block(2);
+        }
     }
 
-    /* Setup RAM or cartridge ROM at $A000-$BFFF.  */
-    if (mem_rom_blocks & (VIC_ROM_BLK5A | VIC_ROM_BLK5B)) {
-        vic20_mem_enable_rom_block(5);
-    } else
-    if (ram_block_5_enabled) {
-        vic20_mem_enable_ram_block(5);
+    if (mem_cart_blocks & VIC_CART_BLK3) {
+        /* a cartridge is selected, map everything to cart/vic20cartmem.c */
+        set_mem(0x60, 0x7f,
+                cartridge_read_blk3, cartridge_store_blk3,
+                NULL, 0);
     } else {
-        vic20_mem_disable_ram_block(5);
+        /* Setup RAM at $6000-$7FFF.  */
+        if (ram_block_3_enabled) {
+            vic20_mem_enable_ram_block(3);
+        } else {
+            vic20_mem_disable_ram_block(3);
+        }
+    }
+
+    if (mem_cart_blocks & VIC_CART_BLK5) {
+        /* a cartridge is selected, map everything to cart/vic20cartmem.c */
+        set_mem(0xa0, 0xbf,
+                cartridge_read_blk5, cartridge_store_blk5,
+                NULL, 0);
+    } else {
+        /* Setup RAM at $A000-$BFFF.  */
+        if (ram_block_5_enabled) {
+            vic20_mem_enable_ram_block(5);
+        } else {
+            vic20_mem_disable_ram_block(5);
+        }
     }
 
     /* Setup character generator ROM at $8000-$8FFF. */
-#if 0  /* changed to have the vic20 cpu always use the function */
     set_mem(0x80, 0x8f,
-            vic20memrom_chargen_read, store_dummy,
-            vic20memrom_chargen_rom + 0x400, 0x0fff);
-#endif
-    set_mem(0x80, 0x8f,
-            vic20memrom_chargen_read, store_dummy,
+            chargen_read, store_dummy_v_bus,
             NULL, 0);
 
     /* Setup VIC-I at $9000-$90FF. */
@@ -535,11 +550,6 @@ void mem_initialize_memory(void)
        Warning: we use a kludge here.  Instead of mapping the color memory
        separately, we map it directly in the corresponding RAM address
        space. */
-#if 0  /* changed to have the vic20 cpu always use the function */
-    set_mem(0x94, 0x97,
-            colorram_read, colorram_store,
-            mem_ram, 0xffff);
-#endif
     set_mem(0x94, 0x97,
             colorram_read, colorram_store,
             NULL, 0);
@@ -555,18 +565,13 @@ void mem_initialize_memory(void)
             NULL, 0);
 
     /* Setup BASIC ROM at $C000-$DFFF. */
-#if 0  /* changed to have the vic20 cpu always use the function */
     set_mem(0xc0, 0xdf,
-            vic20memrom_basic_read, store_dummy,
-            vic20memrom_basic_rom, 0x1fff);
-#endif
-    set_mem(0xc0, 0xdf,
-            vic20memrom_basic_read, store_dummy,
+            vic20memrom_basic_read, store_dummy_c_bus,
             NULL, 0);
 
     /* Setup Kernal ROM at $E000-$FFFF. */
     set_mem(0xe0, 0xff,
-            vic20memrom_kernal_read, store_dummy,
+            vic20memrom_kernal_read, store_dummy_c_bus,
             vic20memrom_kernal_trap_rom, 0x1fff);
 
     _mem_read_tab_nowatch[0x100] = _mem_read_tab_nowatch[0];
@@ -607,147 +612,16 @@ void mem_powerup(void)
 
 /* ------------------------------------------------------------------------- */
 
-void mem_attach_cartridge(int type, BYTE * rawcart)
-{
-    switch(type) {
-      case CARTRIDGE_VIC20_4KB_2000:
-        log_message(vic20_mem_log, "CART: attaching 4KB cartridge at $2000.");
-        memcpy(mem_cartrom + 0x2000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK1A;
-        resources_set_int("RAMBlock1", 0);
-        break;
-      case CARTRIDGE_VIC20_8KB_2000:
-        log_message(vic20_mem_log, "CART: attaching 8KB cartridge at $2000.");
-        memcpy(mem_cartrom + 0x2000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK1A | VIC_ROM_BLK1B;
-        resources_set_int("RAMBlock1", 0);
-        break;
-      case CARTRIDGE_VIC20_16KB_2000:
-        log_message(vic20_mem_log, "CART: attaching 16KB cartridge at $2000.");
-        memcpy(mem_cartrom + 0x2000, rawcart, 0x2000);
-        memcpy(mem_cartrom + 0xA000, rawcart + 0x2000, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK1A | VIC_ROM_BLK1B
-                        | VIC_ROM_BLK5A | VIC_ROM_BLK5B;
-        resources_set_int("RAMBlock1", 0);
-        resources_set_int("RAMBlock5", 0);
-        break;
-
-      case CARTRIDGE_VIC20_4KB_4000:
-        log_message(vic20_mem_log, "CART: attaching 4KB cartridge at $4000.");
-        memcpy(mem_cartrom + 0x4000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK2A;
-        resources_set_int("RAMBlock2", 0);
-        break;
-      case CARTRIDGE_VIC20_8KB_4000:
-        log_message(vic20_mem_log, "CART: attaching 8KB cartridge at $4000.");
-        memcpy(mem_cartrom + 0x4000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK2A | VIC_ROM_BLK2B;
-        resources_set_int("RAMBlock2", 0);
-        break;
-      case CARTRIDGE_VIC20_16KB_4000:
-        log_message(vic20_mem_log, "CART: attaching 16KB cartridge at $4000.");
-        memcpy(mem_cartrom + 0x4000, rawcart, 0x2000);
-        memcpy(mem_cartrom + 0xA000, rawcart + 0x2000, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK2A | VIC_ROM_BLK2B
-                        | VIC_ROM_BLK5A | VIC_ROM_BLK5B;
-        resources_set_int("RAMBlock2", 0);
-        resources_set_int("RAMBlock5", 0);
-        break;
-
-      case CARTRIDGE_VIC20_4KB_6000:
-        log_message(vic20_mem_log, "CART: attaching 4KB cartridge at $6000.");
-        memcpy(mem_cartrom + 0x6000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK3A;
-        resources_set_int("RAMBlock3", 0);
-        break;
-      case CARTRIDGE_VIC20_8KB_6000:
-        log_message(vic20_mem_log, "CART: attaching 8KB cartridge at $6000.");
-        memcpy(mem_cartrom + 0x6000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK3A | VIC_ROM_BLK3B;
-        resources_set_int("RAMBlock3", 0);
-        break;
-      case CARTRIDGE_VIC20_16KB_6000:
-        log_message(vic20_mem_log, "CART: attaching 16KB cartridge at $6000.");
-        memcpy(mem_cartrom + 0x6000, rawcart, 0x2000);
-        memcpy(mem_cartrom + 0xA000, rawcart + 0x2000, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK3A | VIC_ROM_BLK3B
-                        | VIC_ROM_BLK5A | VIC_ROM_BLK5B;
-        resources_set_int("RAMBlock3", 0);
-        resources_set_int("RAMBlock5", 0);
-        break;
-
-      case CARTRIDGE_VIC20_4KB_A000:
-        log_message(vic20_mem_log, "CART: attaching 4KB cartridge at $A000.");
-        memcpy(mem_cartrom + 0xa000, rawcart, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK5A;
-        resources_set_int("RAMBlock5", 0);
-        break;
-      case CARTRIDGE_VIC20_8KB_A000:
-        log_message(vic20_mem_log, "CART: attaching 8KB cartridge at $A000.");
-        memcpy(mem_cartrom + 0xA000, rawcart, 0x2000);
-        mem_rom_blocks |= VIC_ROM_BLK5A | VIC_ROM_BLK5B;
-        resources_set_int("RAMBlock5", 0);
-        break;
-
-      case CARTRIDGE_VIC20_4KB_B000:
-        log_message(vic20_mem_log, "CART: attaching 4KB cartridge at $B000.");
-        memcpy(mem_cartrom + 0xB000, rawcart, 0x1000);
-        mem_rom_blocks |= VIC_ROM_BLK5B;
-        resources_set_int("RAMBlock5", 0);
-        break;
-      default:
-        log_error(vic20_mem_log, "Unknown Cartridge Type!");
-        return;
-    }
-
-    mem_initialize_memory();
-    return;
-}
-
-void mem_detach_cartridge(int type)
-{
-    switch(type) {
-      case CARTRIDGE_VIC20_16KB_2000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK5A | VIC_ROM_BLK5B);
-      case CARTRIDGE_VIC20_8KB_2000:
-      case CARTRIDGE_VIC20_4KB_2000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK1A | VIC_ROM_BLK1B);
-        break;
-      case CARTRIDGE_VIC20_16KB_4000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK5A | VIC_ROM_BLK5B);
-      case CARTRIDGE_VIC20_8KB_4000:
-      case CARTRIDGE_VIC20_4KB_4000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK2A | VIC_ROM_BLK2B);
-        break;
-      case CARTRIDGE_VIC20_16KB_6000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK5A | VIC_ROM_BLK5B);
-      case CARTRIDGE_VIC20_8KB_6000:
-      case CARTRIDGE_VIC20_4KB_6000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK3A | VIC_ROM_BLK3B);
-        break;
-      case CARTRIDGE_VIC20_8KB_A000:
-      case CARTRIDGE_VIC20_4KB_A000:
-      case CARTRIDGE_VIC20_4KB_B000:
-        mem_rom_blocks &= ~(VIC_ROM_BLK5A | VIC_ROM_BLK5B);
-        break;
-      default:
-        return;
-    }
-
-    mem_initialize_memory();
-    return;
-}
-
-/* ------------------------------------------------------------------------- */
-
 /* FIXME: this part needs to be checked. */
 
 void mem_get_basic_text(WORD *start, WORD *end)
 {
-    if (start != NULL)
+    if (start != NULL) {
         *start = mem_ram[0x2b] | (mem_ram[0x2c] << 8);
-    if (end != NULL)
+    }
+    if (end != NULL) {
         *end = mem_ram[0x2d] | (mem_ram[0x2e] << 8);
+    }
 }
 
 void mem_set_basic_text(WORD start, WORD end)
@@ -885,10 +759,10 @@ int mem_patch_kernal(void)
     resources_get_int("MachineVideoStandard", &video_mode);
 
     switch (video_mode) {
-      case MACHINE_SYNC_PAL:    
+      case MACHINE_SYNC_PAL:
         rev = 0;    /* use kernal 901486-07 */
         break;
-      case MACHINE_SYNC_NTSC:    
+      case MACHINE_SYNC_NTSC:
         rev = 1;    /* use kernal 901486-06 */
         break;
       default:
@@ -899,13 +773,13 @@ int mem_patch_kernal(void)
     while ((bytes = patch_bytes[i++]) > 0) {
         a = (WORD)patch_bytes[i++];
 
-        i += (bytes * rev);	/* select patch */
-        for(n = bytes; n--;) {
-	        vic20memrom_trap_store(a, (BYTE)patch_bytes[i]);
-	        rom_store(a++, (BYTE)patch_bytes[i++]);
+        i += (bytes * rev); /* select patch */
+        for (n = bytes; n--;) {
+            vic20memrom_trap_store(a, (BYTE)patch_bytes[i]);
+            rom_store(a++, (BYTE)patch_bytes[i++]);
         }
 
-	    i += (bytes * (PATCH_VERSIONS - rev));	/* skip patch */
+        i += (bytes * (PATCH_VERSIONS - rev));  /* skip patch */
     }
 
     log_message(LOG_DEFAULT, "VIC20 kernal patched to 901486-0%d.",7-rev);

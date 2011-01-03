@@ -29,8 +29,8 @@
 
 #include <stdio.h>
 
-#include "resources.h"
 #include "lib.h"
+#include "resources.h"
 #include "video-resources.h"
 #include "video-color.h"
 #include "video.h"
@@ -49,7 +49,6 @@ video_resources_t video_resources =
     0,    /* delayloop_emulation */
     667,  /* pal_scanlineshade */
     500,  /* pal_blur */
-    1,    /* pal_mode */
     1250, /* pal_oddlines_phase */
     750   /* pal_oddlines_offset */
 };
@@ -252,20 +251,19 @@ static int set_fullscreen_enabled(int val, void *param)
     
     canvas->videoconfig->fullscreen_enabled = val;
     
+#ifndef USE_SDLUI
     if (canvas->initialized)
+#endif
     {
-	if (val)
-	{
-	    r = (video_chip_cap->fullscreen.enable)(canvas, val);
-	    (void) (video_chip_cap->fullscreen.statusbar)
-		(canvas, canvas->videoconfig->fullscreen_statusbar_enabled); 
-	}
-	else
-	{
-	    /* always show statusbar when coming back to window mode */
-	    (void) (video_chip_cap->fullscreen.statusbar) (canvas, 1); 
-	    r = (video_chip_cap->fullscreen.enable)(canvas, val);
-	}
+        if (val) {
+            r = (video_chip_cap->fullscreen.enable)(canvas, val);
+            (void) (video_chip_cap->fullscreen.statusbar)
+            (canvas, canvas->videoconfig->fullscreen_statusbar_enabled); 
+        } else {
+            /* always show statusbar when coming back to window mode */
+            (void) (video_chip_cap->fullscreen.statusbar) (canvas, 1); 
+            r = (video_chip_cap->fullscreen.enable)(canvas, val);
+        }
     }
     return r;
 }
@@ -524,8 +522,7 @@ int video_resources_chip_init(const char *chipname,
         lib_free((char *)(resources_chip_fullscreen_string[0].name));
 
         for (i = 0; i < video_chip_cap->fullscreen.device_num; i++) {
-            resource_chip_mode = (video_resource_chip_mode_t *)lib_malloc(
-                                 sizeof(video_resource_chip_mode_t));
+            resource_chip_mode = lib_malloc(sizeof(video_resource_chip_mode_t));
             resource_chip_mode->resource_chip = *canvas;
             resource_chip_mode->device = i;
 

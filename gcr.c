@@ -55,7 +55,7 @@ void gcr_convert_4bytes_to_GCR(BYTE *source, BYTE *dest)
     int i;
     register unsigned int tdest = 0;    /* at least 16 bits for overflow shifting */
 
-    for(i = 2; i < 10; i += 2, source++, dest++)
+    for (i = 2; i < 10; i += 2, source++, dest++)
     {
         tdest <<= 5;  /* make room for the upper nybble */
         tdest  |= GCR_conv_data[(*source) >> 4];
@@ -77,7 +77,7 @@ void gcr_convert_GCR_to_4bytes(BYTE *source, BYTE *dest)
 
     tdest <<= 13;
 
-    for(i = 5; i < 13; i += 2, dest++)
+    for (i = 5; i < 13; i += 2, dest++)
     {
         source++;
         tdest  |= ((DWORD)(*source)) << i;
@@ -187,7 +187,7 @@ BYTE *gcr_find_sector_header(unsigned int track, unsigned int sector,
                 wrap_over = 1;
             }
             /* Check for killer tracks.  */
-            if((++sync_count) >= gcr_current_track_size)
+            if ((++sync_count) >= gcr_current_track_size)
                 return NULL;
         }
 

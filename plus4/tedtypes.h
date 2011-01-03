@@ -242,6 +242,10 @@ struct ted_s {
 
     /* Internal memory counter (VC).  */
     int mem_counter;
+	/* For bitmap fetch */
+	int chr_pos_reload;
+	int chr_pos_count;
+	int chr_pos_inc_enable;
 
     /* Value to add to `mem_counter' after the graphics has been painted.  */
     int mem_counter_inc;

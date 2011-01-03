@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _VIDEO_RESOURCES_H
-#define _VIDEO_RESOURCES_H
+#ifndef VICE_VIDEO_RESOURCES_H
+#define VICE_VIDEO_RESOURCES_H
 
 #define VIDEO_RESOURCE_PAL_MODE_FAST	0
 #define VIDEO_RESOURCE_PAL_MODE_TRUE	1
@@ -41,7 +41,6 @@ struct video_resources_s
     int delayloop_emulation;	/* flag for fake PAL emu */
     int pal_scanlineshade;	/* amount of scanline shade */
     int pal_blur;		/* exact pal emu, luma blur */
-    int pal_mode;
     int pal_oddlines_phase;	/* exact pal emu, oddlines UV phase offset */
     int pal_oddlines_offset;	/* exact pal emu, oddlines UV multiplier */
 };

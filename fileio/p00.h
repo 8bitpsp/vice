@@ -7,7 +7,7 @@
  * Based on older code by
  *  Dan Fandrich         <dan@fch.wimsey.bc.ca>
  *  Jouko Valta          <jopi@stekt.oulu.fi>
- *  Martin Pottendorfer  <Martin.Pottendorfer@autalcatel.at>
+ *  pottendo <pottendo@gmx.net>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -49,6 +49,7 @@ extern unsigned int p00_ferror(struct fileio_info_s *info);
 extern unsigned int p00_rename(const char *src_name, const char *dest_name,
                                const char *path);
 extern unsigned int p00_scratch(const char *file_name, const char *path);
+extern unsigned int p00_get_bytes_left(struct fileio_info_s *info);
 
 #endif
 

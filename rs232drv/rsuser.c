@@ -64,6 +64,7 @@ static long cycles_per_sec = 1000000;
 static CLOCK clk_start_rx = 0;
 static CLOCK clk_start_tx = 0;
 static CLOCK clk_start_bit = 0;
+static CLOCK clk_end_tx = 0;
 
 static void (*start_bit_trigger)(void);
 static void (*byte_rx_func)(BYTE);
@@ -75,6 +76,28 @@ static void int_rsuser(CLOCK offset, void *data);
 #undef DEBUG
 
 #define RSUSER_TICKS    21111
+
+#undef DEBUG_TIMING_SEND
+#undef DEBUG_TIMING_RECV
+
+
+#ifdef DEBUG
+# define LOG_DEBUG(_xxx) log_debug _xxx
+#else
+# define LOG_DEBUG(_xxx)
+#endif
+
+#ifdef DEBUG_TIMING_SEND
+# define LOG_DEBUG_TIMING_TX(_xxx) log_debug _xxx
+#else
+# define LOG_DEBUG_TIMING_TX(_xxx)
+#endif
+
+#ifdef DEBUG_TIMING_RECV
+# define LOG_DEBUG_TIMING_RX(_xxx) log_debug _xxx
+#else
+# define LOG_DEBUG_TIMING_RX(_xxx)
+#endif
 
 /***********************************************************************
  * resource handling
@@ -97,10 +120,8 @@ static void calculate_baudrate(void)
     }
     bit_clk_ticks = (int)((double)(char_clk_ticks) / 10.0);
 
-#ifdef DEBUG
-    log_debug("RS232: %d cycles per char (cycles_per_sec=%ld).",
-              char_clk_ticks, cycles_per_sec);
-#endif
+    LOG_DEBUG(("RS232: %d cycles per char (cycles_per_sec=%ld).",
+              char_clk_ticks, cycles_per_sec));
 }
 
 static int set_enable(int newval, void *param)
@@ -112,7 +133,7 @@ static int set_enable(int newval, void *param)
     }
     if (rsuser_enabled && !newval) {
         if (fd != -1) {
-            /* if(clk_start_tx) rs232drv_putc(fd, rxdata); */
+            /* if (clk_start_tx) rs232drv_putc(fd, rxdata); */
             rs232drv_close(fd);
         }
         if (rsuser_alarm)
@@ -239,6 +260,7 @@ void rsuser_reset(void)
     clk_start_rx = 0;
     clk_start_tx = 0;
     clk_start_bit = 0;
+    clk_end_tx = 0;
     if (fd != -1) {
         rs232drv_close(fd);
     }
@@ -253,7 +275,9 @@ static void rsuser_setup(void)
     clk_start_rx = 0;
     clk_start_tx = 0;
     clk_start_bit = 0;
-    fd = rs232drv_open(rsuser_device);
+    if (fd < 0) {
+        fd = rs232drv_open(rsuser_device);
+    }
     alarm_set(rsuser_alarm, maincpu_clk + char_clk_ticks / 8);
 }
 
@@ -268,9 +292,7 @@ void rsuser_write_ctrl(BYTE b)
         }
         if (new_dtr && !dtr && fd != -1) {
 #if 0   /* This is a bug in the X-line handshake of the C64... */
-#ifdef DEBUG
-            log_message(LOG_DEBUG, "switch rs232 off.");
-#endif
+            LOG_DEBUG(("switch rs232 off."));
             alarm_unset(rsuser_alarm);
             rs232drv_close(fd);
             fd = -1;
@@ -295,9 +317,7 @@ static void check_tx_buffer(void)
         } else {
             c = (buf >> (valid - 9)) & 0xff;
             if (fd != -1) {
-#ifdef DEBUG
-                log_debug("\"%c\" (%02x).", code[c], code[c]);
-#endif
+                LOG_DEBUG(("\"%c\" (%02x).", code[c], code[c]));
                 rs232drv_putc(fd, ((BYTE)(code[c])));
             }
         }
@@ -311,12 +331,10 @@ static void keepup_tx_buffer(void)
     if ((!clk_start_bit) || maincpu_clk < clk_start_bit)
         return;
 
-    while(clk_start_bit < (clk_start_tx + char_clk_ticks)) {
-#ifdef DEBUG
-        log_debug("keepup: clk=%d, _bit=%d (%d), _tx=%d.",
+    while (clk_start_bit < clk_end_tx) {
+        LOG_DEBUG(("keepup: clk=%d, _bit=%d (%d), _tx=%d.",
                   maincpu_clk, clk_start_bit-clk_start_tx, clk_start_bit,
-                  clk_start_tx);
-#endif
+                  clk_start_tx));
         buf= buf << 1;
         if (txbit)
             buf |= 1;
@@ -329,18 +347,20 @@ static void keepup_tx_buffer(void)
         if (clk_start_bit >= maincpu_clk)
            break;
     }
-    if (clk_start_bit >= clk_start_tx + char_clk_ticks) {
+    if (clk_start_bit >= clk_end_tx) {
         clk_start_tx = 0;
         clk_start_bit = 0;
+        clk_end_tx = 0;
     }
 }
 
 void rsuser_set_tx_bit(int b)
 {
-#ifdef DEBUG
-    log_debug("rsuser_set_tx(clk=%d, clk_start_tx=%d, b=%d).",
-              maincpu_clk, clk_start_tx, b);
-#endif
+    LOG_DEBUG(("rsuser_set_tx(clk=%d, clk_start_tx=%d, b=%d).",
+              maincpu_clk, clk_start_tx, b));
+
+    LOG_DEBUG_TIMING_TX(("rsuser_set_tx(clk=%d, clk_start_tx=%d, b=%d).",
+              maincpu_clk, clk_start_tx, b));
 
     if (fd == -1 || rsuser_baudrate > 2400) {
         clk_start_tx = 0;
@@ -355,6 +375,10 @@ void rsuser_set_tx_bit(int b)
         /* the clock where we start sampling - in the middle of the bit */
         clk_start_tx = maincpu_clk + (bit_clk_ticks / 2) ;
         clk_start_bit = clk_start_tx;
+        /* note: bit_clk_ticks * 10 may not be the same as char_clk_ticks
+         *       because of integer division.  So always compute it
+         */
+        clk_end_tx = clk_start_tx + (bit_clk_ticks * 10);
         txdata = 0;
     }
 }
@@ -362,13 +386,14 @@ void rsuser_set_tx_bit(int b)
 BYTE rsuser_get_rx_bit(void)
 {
     int bit = 0, byte = 1;
+    LOG_DEBUG_TIMING_RX(("rsuser_get_rx_bit(clk=%d, clk_start_rx=%d).",
+              maincpu_clk, clk_start_rx));
+
     if (clk_start_rx) {
         byte = 0;
         bit = (maincpu_clk - clk_start_rx) / (bit_clk_ticks);
-#ifdef DEBUG
-        log_debug("read ctrl(_rx=%d, clk-start_rx=%d -> bit=%d)",
-                  clk_start_rx, maincpu_clk - clk_start_rx, bit);
-#endif
+        LOG_DEBUG(("read ctrl(_rx=%d, clk-start_rx=%d -> bit=%d)",
+                  clk_start_rx, maincpu_clk - clk_start_rx, bit));
         if (!bit) {
             byte = 0;   /* start bit */
         } else

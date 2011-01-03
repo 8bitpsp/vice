@@ -34,8 +34,8 @@
  * simulated) serial bus, as it's parallel. So we need no traps.
  */
 
-#ifndef _PARALLEL_H
-#define _PARALLEL_H
+#ifndef VICE_PARALLEL_H
+#define VICE_PARALLEL_H
 
 #include "types.h"
 
@@ -48,7 +48,7 @@ extern void parallel_bus_enable(int enable);
 extern void parallel_trap_eof_callback_set(void (*func)(void));
 extern void parallel_trap_attention_callback_set(void (*func)(void));
 
-/* state of the bus lines -> "if(parallel_eoi) { eoi is active }" */
+/* state of the bus lines -> "if (parallel_eoi) { eoi is active }" */
 extern BYTE parallel_eoi;
 extern BYTE parallel_ndac;
 extern BYTE parallel_nrfd;

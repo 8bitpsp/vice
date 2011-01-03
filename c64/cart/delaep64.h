@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _DELAEP64_H
-#define _DELAEP64_H
+#ifndef VICE_DELAEP64_H
+#define VICE_DELAEP64_H
 
 #include <stdio.h>
 
@@ -40,4 +40,3 @@ extern int delaep64_crt_attach(FILE *fd, BYTE *rawcart);
 extern void delaep64_detach(void);
 
 #endif
-

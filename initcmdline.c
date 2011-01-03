@@ -55,8 +55,7 @@ static unsigned int autostart_mode;
 
 static void cmdline_free_autostart_string(void)
 {
-    if (autostart_string != NULL)
-        lib_free(autostart_string);
+    lib_free(autostart_string);
     autostart_string = NULL;
 }
 
@@ -108,20 +107,18 @@ static int cmdline_console(const char *param, void *extra_param)
 
 static int cmdline_attach(const char *param, void *extra_param)
 {
-    int unit = (int)extra_param;
+    int unit = vice_ptr_to_int(extra_param);
 
     switch (unit) {
       case 1:
-        if (startup_tape_image != NULL)
-            lib_free(startup_tape_image);
+        lib_free(startup_tape_image);
         startup_tape_image = lib_stralloc(param);
         break;
       case 8:
       case 9:
       case 10:
       case 11:
-        if (startup_disk_images[unit - 8] != NULL)
-            lib_free(startup_disk_images[unit - 8]);
+        lib_free(startup_disk_images[unit - 8]);
         startup_disk_images[unit - 8] = lib_stralloc(param);
         break;
       default:
@@ -281,7 +278,7 @@ int initcmdline_check_args(int argc, char **argv)
         int len = 0, j;
 
         for (j = 1; j < argc; j++)
-            len += strlen(argv[j]);
+            len += (int)strlen(argv[j]);
 
         {
             char *txt = lib_calloc(1, len + argc + 1);
@@ -299,61 +296,60 @@ int initcmdline_check_args(int argc, char **argv)
 
 /* These are a helper function for the `-autostart' command-line option.  It
    replaces all the $[0-9A-Z][0-9A-Z] patterns in `string' and returns it.  */
-static char *hexstring_to_byte(const char *s, BYTE *value_return)
+static char * hexstring_to_byte( char * source, char * destination )
 {
-    int count;
+    char * next = source + 1;
     char c;
+    BYTE value = 0;
+    int digit = 0;
+    
+    while ( *next && digit++ < 2) {
 
-    for (*value_return = 0, count = 0; count < 2 && *s != 0; s++) {
-        c = toupper(*s);
-        if (c >= 'A' && c <= 'F') {
-            *value_return <<= 4;
-            *value_return += c - 'A' + 10;
-        } else if (isdigit (c)) {
-            *value_return <<= 4;
-            *value_return += c - '0';
-        } else {
-            return (char *) s;
+        value <<= 4;
+
+        c = toupper( *next++ );
+
+        if (c >= 'A' && c <= 'F' ) {
+            value += c - 'A';
         }
-    }
-
-    return (char *)s;
-}
-
-static char *replace_hexcodes(char *s)
-{
-    unsigned int len, dest_len;
-    char *p;
-    char *new_s;
-
-    len = strlen(s);
-    new_s = (char*)lib_malloc(len + 1);
-
-    p = s;
-    dest_len = 0;
-    while (1) {
-        char *p1;
-
-        p1 = strchr (p, '$');
-        if (p1 != NULL) {
-            char *new_p;
-
-            new_p = hexstring_to_byte(p1 + 1,
-                                      (BYTE *)(new_s + dest_len + (p1 - p)));
-            if (p1 != p) {
-                memcpy(new_s + dest_len, p, (size_t)(p1 - p));
-                dest_len += p1 - p;
-                dest_len++;
-            }
-
-            p = new_p;
-        } else {
+        else if ( isdigit(c) ) {
+            value += c - '0';
+        }
+        else {
             break;
         }
     }
 
-    strcpy((char *)(new_s + dest_len), p);
-    return new_s;
+    if (digit < 2) {
+        value = *source;
+        next = source + 1;
+    }
+
+    *destination = value;
+
+    return next;
+}
+
+static char *replace_hexcodes(char * source)
+{
+    char * destination = lib_stralloc(source ? source : "");
+
+    if ( destination ) {
+        char * pread = destination;
+        char * pwrite = destination;
+
+        while ( *pread != 0 ) {
+            if ( *pread == '$' ) {
+                pread = hexstring_to_byte( pread, pwrite++ );
+            }
+            else {
+                *pwrite ++ = *pread ++;
+            }
+        }
+        *pwrite = 0;
+    }
+
+    return destination;
 }
 
 void initcmdline_check_attach(void)

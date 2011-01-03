@@ -26,8 +26,10 @@
  *
  */
 
-#ifndef _VDC_H
-#define _VDC_H
+#ifndef VICE_VDC_H
+#define VICE_VDC_H
+
+#include "types.h"
 
 struct snapshot_s;
 struct screenshot_s;
@@ -39,6 +41,8 @@ extern struct raster_s *vdc_init(void);
 extern struct video_canvas_s *vdc_get_canvas(void);
 
 extern void vdc_reset(void);
+extern void vdc_trigger_light_pen(CLOCK mclk);
+extern CLOCK vdc_lightpen_timing(int x, int y);
 extern void vdc_prepare_for_snapshot(void);
 extern void vdc_powerup(void);
 extern void vdc_resize(void);

@@ -49,6 +49,15 @@ extern char *alloca();
 #endif /* GCC.  */
 #endif /* MINIXVMD */
 
+/* SunOS 4.x specific stuff */
+#if defined(sun) || defined(__sun)
+#  if !defined(__SVR4) && !defined(__svr4__)
+#    ifdef __sparc__
+#      define YYFREE
+#    endif
+#  endif
+#endif
+
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
@@ -139,20 +148,21 @@ extern int cur_len, last_len;
 %token CMD_ASSEMBLE CMD_DISASSEMBLE CMD_NEXT CMD_STEP CMD_PRINT CMD_DEVICE
 %token CMD_HELP CMD_WATCH CMD_DISK CMD_SYSTEM CMD_QUIT CMD_CHDIR CMD_BANK
 %token CMD_LOAD_LABELS CMD_SAVE_LABELS CMD_ADD_LABEL CMD_DEL_LABEL CMD_SHOW_LABELS
-%token CMD_RECORD CMD_STOP CMD_PLAYBACK CMD_CHAR_DISPLAY CMD_SPRITE_DISPLAY
+%token CMD_RECORD CMD_MON_STOP CMD_PLAYBACK CMD_CHAR_DISPLAY CMD_SPRITE_DISPLAY
 %token CMD_TEXT_DISPLAY CMD_SCREENCODE_DISPLAY CMD_ENTER_DATA CMD_ENTER_BIN_DATA CMD_KEYBUF
 %token CMD_BLOAD CMD_BSAVE CMD_SCREEN CMD_UNTIL CMD_CPU CMD_YYDEBUG
 %token CMD_BACKTRACE CMD_SCREENSHOT CMD_PWD CMD_DIR
 %token CMD_RESOURCE_GET CMD_RESOURCE_SET
-%token CMD_ATTACH CMD_DETACH CMD_RESET CMD_TAPECTRL CMD_CARTFREEZE
+%token CMD_ATTACH CMD_DETACH CMD_MON_RESET CMD_TAPECTRL CMD_CARTFREEZE
 %token CMD_CPUHISTORY CMD_MEMMAPZAP CMD_MEMMAPSHOW CMD_MEMMAPSAVE
+%token CMD_COMMENT
 %token<str> CMD_LABEL_ASGN
 %token<i> L_PAREN R_PAREN ARG_IMMEDIATE REG_A REG_X REG_Y COMMA INST_SEP
 %token<i> REG_B REG_C REG_D REG_E REG_H REG_L
 %token<i> REG_AF REG_BC REG_DE REG_HL REG_IX REG_IY REG_SP
 %token<i> REG_IXH REG_IXL REG_IYH REG_IYL
 %token<str> STRING FILENAME R_O_L OPCODE LABEL BANKNAME CPUTYPE
-%token<reg> REGISTER
+%token<reg> MON_REGISTER
 %left<cond_op> COMPARE_OP
 %token<rt> RADIX_TYPE INPUT_SPEC
 %token<action> CMD_CHECKPT_ON CMD_CHECKPT_OFF TOGGLE
@@ -213,6 +223,8 @@ machine_state_rules: CMD_BANK end_cmd
                      { mon_jump($2); }
                    | CMD_IO end_cmd
                      { mon_display_io_regs(); }
+                   | CMD_CPU end_cmd
+                     { monitor_cpu_type_set(""); }
                    | CMD_CPU CPUTYPE end_cmd
                      { monitor_cpu_type_set($2); }
                    | CMD_CPUHISTORY end_cmd
@@ -247,9 +259,9 @@ machine_state_rules: CMD_BANK end_cmd
                    ;
 
 register_mod: CMD_REGISTERS end_cmd
-              { (monitor_cpu_type.mon_register_print)(default_memspace); }
+              { (monitor_cpu_for_memspace[default_memspace]->mon_register_print)(default_memspace); }
             | CMD_REGISTERS memspace end_cmd
-              { (monitor_cpu_type.mon_register_print)($2); }
+              { (monitor_cpu_for_memspace[$2]->mon_register_print)($2); }
             | CMD_REGISTERS reg_list end_cmd
             ;
 
@@ -463,15 +475,16 @@ monitor_misc_rules: CMD_DISK rest_of_line end_cmd
                     { mon_resource_get($2); }
                   | CMD_RESOURCE_SET STRING STRING end_cmd
                     { mon_resource_set($2,$3); }
-                  | CMD_RESET end_cmd
+                  | CMD_MON_RESET end_cmd
                     { mon_reset_machine(-1); }
-                  | CMD_RESET opt_sep expression end_cmd
+                  | CMD_MON_RESET opt_sep expression end_cmd
                     { mon_reset_machine($3); }
                   | CMD_TAPECTRL opt_sep expression end_cmd
                     { mon_tape_ctrl($3); }
                   | CMD_CARTFREEZE end_cmd
                     { mon_cart_freeze(); }
-
+                  | CMD_COMMENT opt_rest_of_line end_cmd
+                     { }
                   ;
 
 disk_rules: CMD_LOAD filename device_num opt_address end_cmd
@@ -504,7 +517,7 @@ disk_rules: CMD_LOAD filename device_num opt_address end_cmd
 
 cmd_file_rules: CMD_RECORD filename end_cmd
                 { mon_record_commands($2); }
-              | CMD_STOP end_cmd
+              | CMD_MON_STOP end_cmd
                 { mon_end_recording(); }
               | CMD_PLAYBACK filename end_cmd
                 { mon_playback_init($2); }
@@ -539,8 +552,8 @@ opt_mem_op: MEM_OP { $$ = $1; }
           | { $$ = e_load_store; }
           ;
 
-register: REGISTER          { $$ = new_reg(default_memspace, $1); }
-        | memspace REGISTER { $$ = new_reg($1, $2); }
+register: MON_REGISTER          { $$ = new_reg(default_memspace, $1); }
+        | memspace MON_REGISTER { $$ = new_reg($1, $2); }
         ;
 
 reg_list: reg_list COMMA reg_asgn
@@ -548,7 +561,7 @@ reg_list: reg_list COMMA reg_asgn
         ;
 
 reg_asgn: register EQUALS number 
-          { (monitor_cpu_type.mon_register_set_val)(reg_memspace($1), reg_regid($1), (WORD) $3); }
+          { (monitor_cpu_for_memspace[reg_memspace($1)]->mon_register_set_val)(reg_memspace($1), reg_regid($1), (WORD) $3); }
         ;
 
 breakpt_num: d_number { $$ = $1; }
@@ -661,7 +674,7 @@ hunt_element: number { mon_add_number_to_buffer($1); }
             ;
 
 value: number { $$ = $1; }
-     | register { $$ = (monitor_cpu_type.mon_register_get_val)(reg_memspace($1), reg_regid($1)); }
+     | register { $$ = (monitor_cpu_for_memspace[reg_memspace($1)]->mon_register_get_val)(reg_memspace($1), reg_regid($1)); }
      ;
 
 d_number: D_NUMBER { $$ = $1; }
@@ -689,7 +702,7 @@ assembly_instr_list: assembly_instr_list INST_SEP assembly_instruction
 
 assembly_instruction: OPCODE asm_operand_mode { $$ = 0;
                                                 if ($1) {
-                                                    (monitor_cpu_type.mon_assemble_instr)($1, $2);
+                                                    (monitor_cpu_for_memspace[default_memspace]->mon_assemble_instr)($1, $2);
                                                 } else {
                                                     new_cmd = 1;
                                                     asm_mode = 0;
@@ -769,9 +782,9 @@ void parse_and_execute_line(char *input)
    char *temp_buf;
    int i, rc;
 
-   temp_buf = (char *)lib_malloc(strlen(input) + 3);
+   temp_buf = lib_malloc(strlen(input) + 3);
    strcpy(temp_buf,input);
-   i = strlen(input);
+   i = (int)strlen(input);
    temp_buf[i++] = '\n';
    temp_buf[i++] = '\0';
    temp_buf[i++] = '\0';
@@ -833,6 +846,7 @@ void parse_and_execute_line(char *input)
        asm_mode = 0;
        new_cmd = 1;
    }
+   lib_free(temp_buf);
    free_buffer();
 }
 

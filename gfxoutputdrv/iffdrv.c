@@ -132,7 +132,7 @@ static int iffdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata = (gfxoutputdrv_data_t *)lib_malloc(sizeof(gfxoutputdrv_data_t));
+  sdata = lib_malloc(sizeof(gfxoutputdrv_data_t));
   screenshot->gfxoutputdrv_data = sdata;
   sdata->line = 0;
   sdata->ext_filename=util_add_extension_const(filename, iff_drv.default_extension);
@@ -153,8 +153,8 @@ static int iffdrv_open(screenshot_t *screenshot, const char *filename)
     return -1;
   }
 
-  sdata->data = (BYTE *)lib_malloc(sdata->iff_rowbytes*8);
-  sdata->iff_data = (BYTE *)lib_malloc(sdata->iff_rowbytes);
+  sdata->data = lib_malloc(sdata->iff_rowbytes*8);
+  sdata->iff_data = lib_malloc(sdata->iff_rowbytes);
 
   return 0;
 }
@@ -331,7 +331,7 @@ static int iffdrv_open_memmap(const char *filename, int x_size, int y_size, BYTE
     return -1;
   }
 
-  iffdrv_memmap_iff_data = (BYTE *)lib_malloc(iffdrv_memmap_iff_rowbytes);
+  iffdrv_memmap_iff_data = lib_malloc(iffdrv_memmap_iff_rowbytes);
 
   return 0;
 }
@@ -360,15 +360,17 @@ static gfxoutputdrv_t iff_drv =
     "IFF",
     "IFF screenshot",
     "iff",
+    NULL, /* formatlist */
     iffdrv_open,
     iffdrv_close,
     iffdrv_write,
     iffdrv_save,
-#ifdef FEATURE_CPUMEMHISTORY
     NULL,
-    iffdrv_save_memmap
-#else
+    NULL,
+    NULL,
     NULL
+#ifdef FEATURE_CPUMEMHISTORY
+    ,iffdrv_save_memmap
 #endif
 };
 

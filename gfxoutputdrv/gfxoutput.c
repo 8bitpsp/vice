@@ -42,19 +42,17 @@
 #include "pngdrv.h"
 #endif
 
-#if defined(HAVE_GIF) || defined(WIN32)
-#include "gifdrv.h"
-#endif
-
 #ifdef HAVE_JPEG
 #include "jpegdrv.h"
 #endif
 
 #ifdef HAVE_FFMPEG
 #include "ffmpegdrv.h"
-#include "ffmpeglib.h"
 #endif
 
+#ifdef HAVE_QUICKTIME
+#include "quicktimedrv.h"
+#endif
 
 struct gfxoutputdrv_list_s {
     struct gfxoutputdrv_s *drv;
@@ -93,13 +91,12 @@ gfxoutputdrv_t *gfxoutput_drivers_iter_next(void)
 int gfxoutput_early_init(void)
 {
     /* Initialize graphics output driver list.  */
-    gfxoutputdrv_list
-        = (gfxoutputdrv_list_t *)lib_malloc(sizeof(gfxoutputdrv_list_t));
+    gfxoutputdrv_list = lib_malloc(sizeof(gfxoutputdrv_list_t));
     gfxoutputdrv_list->drv = NULL;
     gfxoutputdrv_list->next = NULL;
 
     gfxoutput_init_bmp();
-#if defined(HAVE_GIF) || defined(WIN32)
+#if defined(HAVE_GIF) || (defined(WIN32) && !defined(USE_SDLUI))
     gfxoutput_init_gif();
 #endif
     gfxoutput_init_iff();
@@ -113,6 +110,9 @@ int gfxoutput_early_init(void)
     gfxoutput_init_ppm();
 #ifdef HAVE_FFMPEG
     gfxoutput_init_ffmpeg();
+#endif
+#ifdef HAVE_QUICKTIME
+    gfxoutput_init_quicktime();
 #endif
 
     return 0;
@@ -132,14 +132,19 @@ void gfxoutput_shutdown(void)
     list = gfxoutputdrv_list;
 
     while (list != NULL) {
+        
+        /* call shutdown function of driver */
+        gfxoutputdrv_t *driver = list->drv;
+        if (driver != NULL) {
+            if (driver->shutdown != NULL) {
+                driver->shutdown();
+            }
+        }
+        
         next = list->next;
         lib_free(list);
         list = next;
     }
-
-#ifdef HAVE_FFMPEG
-    ffmpegdrv_shutdown();
-#endif
 }
 
 /*-----------------------------------------------------------------------*/
@@ -156,8 +161,7 @@ int gfxoutput_register(gfxoutputdrv_t *drv)
 
     /* Fill in entry.  */
     current->drv = drv;
-    current->next = (gfxoutputdrv_list_t *)lib_malloc(
-                    sizeof(gfxoutputdrv_list_t));
+    current->next = lib_malloc(sizeof(gfxoutputdrv_list_t));
     current->next->drv = NULL;
     current->next->next = NULL;
 
@@ -187,22 +191,38 @@ gfxoutputdrv_t *gfxoutput_get_driver(const char *drvname)
     return current->drv;
 }
 
-int  gfxoutput_resources_init()
+int gfxoutput_resources_init()
 {
-#ifdef HAVE_FFMPEG
-    if (ffmpegdrv_resources_init() < 0)
-        return -1;
-#endif
+    gfxoutputdrv_list_t *current = gfxoutputdrv_list;
+
+    while (current->next != NULL) {
+        gfxoutputdrv_t *driver = current->drv;
+        if (driver && (driver->resources_init != NULL)) {
+            int result = driver->resources_init();
+            if (result!=0) {
+                return result;
+            }
+        }
+       current = current->next;
+    }
 
     return 0;
 }
 
 int gfxoutput_cmdline_options_init()
 {
-#ifdef HAVE_FFMPEG
-    if (ffmpegdrv_cmdline_options_init() < 0)
-        return -1;
-#endif
+    gfxoutputdrv_list_t *current = gfxoutputdrv_list;
+
+    while (current->next != NULL) {
+        gfxoutputdrv_t *driver = current->drv;
+        if (driver && (driver->cmdline_options_init != NULL)) {
+            int result = driver->cmdline_options_init();
+            if (result!=0) {
+                return result;
+            }
+        }
+       current = current->next;
+    }
 
     return 0;
 }

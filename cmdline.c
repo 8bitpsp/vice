@@ -46,13 +46,12 @@ static cmdline_option_ram_t *options;
 
 int cmdline_init(void)
 {
-    if (options != NULL)
-        lib_free(options);
+    lib_free(options);
+    options = NULL;
 
     num_allocated_options = 100;
     num_options = 0;
-    options = (cmdline_option_ram_t *)lib_malloc(sizeof(cmdline_option_ram_t)
-              * num_allocated_options);
+    options = lib_malloc(sizeof(cmdline_option_ram_t) * num_allocated_options);
 
     return 0;
 }
@@ -65,8 +64,7 @@ int cmdline_register_options(const cmdline_option_t *c)
     for (; c->name != NULL; c++, p++) {
         if (num_allocated_options <= num_options) {
             num_allocated_options *= 2;
-            options = (cmdline_option_ram_t *)lib_realloc(options,
-                      (sizeof(cmdline_option_ram_t) * num_allocated_options));
+            options = lib_realloc(options, (sizeof(cmdline_option_ram_t) * num_allocated_options));
             p = options + num_options;
         }
 
@@ -270,4 +268,9 @@ char *cmdline_options_string(void)
         cmdline_string = new_cmdline_string;
     }
     return cmdline_string;
+}
+
+int cmdline_get_num_options(void)
+{
+    return num_options;
 }

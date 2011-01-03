@@ -33,6 +33,7 @@
 #include "clkguard.h"
 #include "datasette.h"
 #include "debug.h"
+#include "digiblaster.h"
 #include "drive-cmdline-options.h"
 #include "drive-resources.h"
 #include "drive.h"
@@ -67,6 +68,7 @@
 #include "sid.h"
 #include "sid-cmdline-options.h"
 #include "sid-resources.h"
+#include "sidcartjoy.h"
 #include "sound.h"
 #include "tape.h"
 #include "ted-cmdline-options.h"
@@ -78,6 +80,14 @@
 #include "vsync.h"
 
 int io_source;
+
+/* beos dummy for the generally used cart function in ui_file.cc */
+#ifdef __BEOS__
+int cartridge_attach_image(int type, const char *filename)
+{
+    return 0;
+}
+#endif
 
 machine_context_t machine_context;
 
@@ -243,6 +253,8 @@ int machine_resources_init(void)
         || machine_video_resources_init() < 0
         || plus4_resources_init() < 0
         || ted_resources_init() < 0
+        || digiblaster_resources_init() < 0
+        || sidcartjoy_resources_init() < 0
         || sound_resources_init() < 0
         || sidcart_resources_init() < 0
         || acia_resources_init() < 0
@@ -279,6 +291,8 @@ int machine_cmdline_options_init(void)
         || video_init_cmdline_options() < 0
         || plus4_cmdline_options_init() < 0
         || ted_cmdline_options_init() < 0
+        || digiblaster_cmdline_options_init() < 0
+        || sidcartjoy_cmdline_options_init() < 0
         || sound_cmdline_options_init() < 0
         || sidcart_cmdline_options_init() < 0
         || acia_cmdline_options_init() < 0
@@ -395,11 +409,12 @@ int machine_specific_init(void)
 #if defined (USE_XF86_EXTENSIONS) && \
     (defined(USE_XF86_VIDMODE_EXT) || defined (HAVE_XRANDR))
     {
-	/* set fullscreen if user used `-fullscreen' on cmdline */
-	int fs;
-	resources_get_int("UseFullscreen", &fs);
-	if (fs)
-	    resources_set_int("TEDFullscreen", 1);
+        /* set fullscreen if user used `-fullscreen' on cmdline */
+        int fs;
+        resources_get_int("UseFullscreen", &fs);
+        if (fs) {
+            resources_set_int("TEDFullscreen", 1);
+        }
     }
 #endif
     return 0;
@@ -419,6 +434,8 @@ void machine_specific_reset(void)
     plus4tcbm2_reset();
 
     ted_reset();
+
+    digiblaster_sound_reset();
 
     sid_reset();
 

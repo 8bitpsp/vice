@@ -55,6 +55,10 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+#include <string.h>
+#include <stdlib.h>
+
 #ifdef __OS2__
 #include "snippets/dirport.h"
 #endif
@@ -68,7 +72,7 @@
 #include "ioutil.h"
 #include "lib.h"
 #include "types.h"
-
+#include "util.h"
 
 /* Mostly POSIX compatibily */
 
@@ -139,20 +143,18 @@ int ioutil_errno(unsigned int check)
 #if !defined(HAVE_GETCWD) && !defined(RISCOS)
 char *getcwd (char *buf, size_t len)
 {
-  char ourbuf[PATH_MAX];
-  char *result;
+    char ourbuf[PATH_MAX];
+    char *result;
 
-  result = getwd (ourbuf);
-  if (result)
-  {
-    if (strlen (ourbuf) >= len)
-    {
-      errno = ERANGE;
-      return 0;
+    result = getwd (ourbuf);
+    if (result) {
+        if (strlen (ourbuf) >= len) {
+            errno = ERANGE;
+            return 0;
+        }
+        strcpy (buf, ourbuf);
     }
-    strcpy (buf, ourbuf);
-  }
-  return buf;
+    return buf;
 }
 #endif
 #endif
@@ -200,12 +202,12 @@ char *ioutil_current_dir(void)
     return GetCurrentDirectory();
 #else
     static size_t len = 128;
-    char *p = (char *)lib_malloc(len);
+    char *p = lib_malloc(len);
 
     while (getcwd(p, len) == NULL) {
         if (errno == ERANGE) {
             len *= 2;
-            p = (char *)lib_realloc(p, len);
+            p = lib_realloc(p, len);
         } else
             return NULL;
     }
@@ -214,43 +216,138 @@ char *ioutil_current_dir(void)
 #endif
 }
 
-struct ioutil_dir_s {
-    DIR *dp;
-};
-typedef struct ioutil_dir_s ioutil_dir_t;
+static int dirs_amount = 0;
+static int files_amount = 0;
+
+static int ioutil_compare_names(const void* a, const void* b)
+{
+    ioutil_name_table_t *arg1 = (ioutil_name_table_t*)a;
+    ioutil_name_table_t *arg2 = (ioutil_name_table_t*)b;
+    return strcmp(arg1->name, arg2->name);
+}
+
+static int ioutil_count_dir_items(const char *path)
+{
+    DIR *dirp;
+    struct dirent *dp;
+    unsigned int len, isdir;
+    char *filename;
+
+    dirs_amount = 0;
+    files_amount = 0;
+
+    dirp = opendir(path);
+
+    if (dirp == NULL)
+    {
+        return -1;
+    }
+
+    dp = readdir(dirp);
+
+    while (dp != NULL)
+    {
+        filename = util_concat(path, FSDEV_DIR_SEP_STR, dp->d_name, NULL);
+        ioutil_stat(filename, &len, &isdir);
+        if (isdir) {
+            dirs_amount++;
+        } else {
+            files_amount++;
+        }
+        dp = readdir(dirp);
+        lib_free(filename);
+    }
+    closedir(dirp);
+
+    return 0;
+}
+
+static void ioutil_filldir(const char *path,
+                           ioutil_name_table_t *dirs,
+                           ioutil_name_table_t *files)
+{
+    DIR *dirp = NULL;
+    struct dirent *dp = NULL;
+    int dir_count=0;
+    int file_count=0;
+    unsigned int len, isdir;
+    char *filename;
+
+    dirp = opendir(path);
+
+    dp = readdir(dirp);
+
+    while (dp != NULL) {
+        filename = util_concat(path, FSDEV_DIR_SEP_STR, dp->d_name, NULL);
+        ioutil_stat(filename, &len, &isdir);
+        if (isdir) {
+            dirs[dir_count].name = lib_stralloc(dp->d_name);
+            dir_count++;
+        } else {
+            files[file_count].name = lib_stralloc(dp->d_name);
+            file_count++;
+        }
+        dp = readdir(dirp);
+        lib_free(filename);
+    }
+    closedir(dirp);
+}
 
 ioutil_dir_t *ioutil_opendir(const char *path)
 {
-    DIR *dp;
+    int retval;
     ioutil_dir_t *ioutil_dir;
 
-    dp = opendir((char*)path);
-
-    if (dp == NULL)
+    retval=ioutil_count_dir_items(path);
+    if (retval < 0) {
         return NULL;
+    }
 
-    ioutil_dir = (ioutil_dir_t *)lib_malloc(sizeof(ioutil_dir_t));
+    ioutil_dir = lib_malloc(sizeof(ioutil_dir_t));
 
-    ioutil_dir->dp = dp;
+    ioutil_dir->dirs = lib_malloc(sizeof(ioutil_name_table_t)*dirs_amount);
+    ioutil_dir->files = lib_malloc(sizeof(ioutil_name_table_t)*files_amount);
+
+    ioutil_filldir(path, ioutil_dir->dirs, ioutil_dir->files);
+    qsort(ioutil_dir->dirs, dirs_amount, sizeof(ioutil_name_table_t), ioutil_compare_names);
+    qsort(ioutil_dir->files, files_amount, sizeof(ioutil_name_table_t), ioutil_compare_names);
+
+    ioutil_dir->dir_amount = dirs_amount;
+    ioutil_dir->file_amount = files_amount;
+    ioutil_dir->counter = 0;
 
     return ioutil_dir;
 }
 
 char *ioutil_readdir(ioutil_dir_t *ioutil_dir)
 {
-    struct dirent *dirp;
+    char *retval;
 
-    dirp = readdir(ioutil_dir->dp);
-
-    if (dirp == NULL)
+    if (ioutil_dir->counter >= (ioutil_dir->dir_amount+ioutil_dir->file_amount)) {
         return NULL;
+    }
 
-    return (char *)(dirp->d_name);
+    if (ioutil_dir->counter >= ioutil_dir->dir_amount) {
+        retval = ioutil_dir->files[ioutil_dir->counter-ioutil_dir->dir_amount].name;
+    } else {
+        retval = ioutil_dir->dirs[ioutil_dir->counter].name;
+    }
+    ioutil_dir->counter++;
+
+    return retval;
 }
 
 void ioutil_closedir(ioutil_dir_t *ioutil_dir)
 {
-    closedir(ioutil_dir->dp);
+    int i;
+
+    for (i=0; i<ioutil_dir->dir_amount; i++) {
+        lib_free(ioutil_dir->dirs[i].name);
+    }
+    for (i=0; i<ioutil_dir->file_amount; i++) {
+        lib_free(ioutil_dir->files[i].name);
+    }
+    lib_free(ioutil_dir->dirs);
+    lib_free(ioutil_dir->files);
     lib_free(ioutil_dir);
 }
-

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _CBMFILE_H
-#define _CBMFILE_H
+#ifndef VICE_CBMFILE_H
+#define VICE_CBMFILE_H
 
 #include "types.h"
 
@@ -44,6 +44,7 @@ extern unsigned int cbmfile_ferror(struct fileio_info_s *info);
 extern unsigned int cbmfile_rename(const char *src_name, const char *dst_name,
                                    const char *path);
 extern unsigned int cbmfile_scratch(const char *file_name, const char *path);
+extern unsigned int cbmfile_get_bytes_left(struct fileio_info_s *info);
 
 #endif
 

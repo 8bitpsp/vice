@@ -32,6 +32,7 @@
 
 #include "archdep.h"
 #include "cmdline.h"
+#include "embedded.h"
 #include "findpath.h"
 #include "ioutil.h"
 #include "lib.h"
@@ -53,10 +54,7 @@ static int set_system_path(const char *val, void *param)
 
     util_string_set(&system_path, val);
 
-    if (expanded_system_path != NULL) {
-        lib_free(expanded_system_path);
-    }
-
+    lib_free(expanded_system_path);
     expanded_system_path = NULL; /* will subsequently be replaced */
 
     tmp_path_save = util_subst(system_path, "$$", default_path); /* malloc'd */
@@ -96,7 +94,7 @@ static int set_system_path(const char *val, void *param)
         expanded_system_path = s;
 
         tmp_path = p + strlen(ARCHDEP_FINDPATH_SEPARATOR_STRING);
-    } while(p != NULL);
+    } while (p != NULL);
 
     lib_free(current_dir);
     lib_free(tmp_path_save);
@@ -250,6 +248,23 @@ int sysfile_load(const char *name, BYTE *dest, int minsize, int maxsize)
     size_t rsize = 0;
     char *complete_path = NULL;
 
+
+/*
+ * This feature is only active when --enable-embedded is given to the
+ * configure script, its main use is to make developing new ports easier
+ * and to allow ports for platforms which don't have a filesystem, or a
+ * filesystem which is hard/impossible to load data files from.
+ *
+ * when USE_EMBEDDED is defined this will check if a
+ * default system file is loaded, when USE_EMBEDDED
+ * is not defined the function is just 0 and will
+ * be optimized away.
+ */
+
+    if ((rsize = embedded_check_file(name, dest, minsize, maxsize)) != 0) {
+        return rsize;
+    }
+
     fp = sysfile_open(name, &complete_path, MODE_READ);
     if (fp == NULL)
         goto fail;
@@ -281,10 +296,9 @@ int sysfile_load(const char *name, BYTE *dest, int minsize, int maxsize)
 
     fclose(fp);
     lib_free(complete_path);
-    return rsize;  /* return ok */
+    return (int)rsize;  /* return ok */
 
 fail:
     lib_free(complete_path);
     return -1;
 }
-

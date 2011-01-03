@@ -31,6 +31,7 @@
 
 #include "autostart.h"
 #include "cartridge.h"
+#include "cart/vic20cartmem.h"
 #include "clkguard.h"
 #include "cmdline.h"
 #include "datasette.h"
@@ -82,6 +83,11 @@
 #include "vic20via.h"
 #include "video.h"
 #include "vsync.h"
+
+#ifdef HAVE_MOUSE
+#include "lightpen.h"
+#include "mouse.h"
+#endif
 
 int io_source;
 
@@ -231,6 +237,10 @@ int machine_resources_init(void)
         || rsuser_resources_init() < 0
         || serial_resources_init() < 0
         || printer_resources_init() < 0
+#ifdef HAVE_MOUSE
+        || lightpen_resources_init() < 0
+        || mouse_resources_init() < 0
+#endif
 #ifndef COMMON_KBD
         || kbd_resources_init() < 0
 #endif
@@ -275,6 +285,10 @@ int machine_cmdline_options_init(void)
         || rsuser_cmdline_options_init() < 0
         || serial_cmdline_options_init() < 0
         || printer_cmdline_options_init() < 0
+#ifdef HAVE_MOUSE
+        || lightpen_cmdline_options_init() < 0
+        || mouse_cmdline_options_init() < 0
+#endif
 #ifndef COMMON_KBD
         || kbd_cmdline_options_init() < 0
 #endif
@@ -399,6 +413,16 @@ int machine_specific_init(void)
 
     vic20iec_init();
 
+    cartridge_init();
+
+#ifdef HAVE_MOUSE
+    mouse_init();
+
+    /* Initialize lightpen support and register VICII callbacks */
+    lightpen_init();
+    lightpen_register_timing_callback(vic_lightpen_timing, 0);
+    lightpen_register_trigger_callback(vic_trigger_light_pen);
+#endif
 #ifdef HAVE_MIDI
     midi_init();
 #endif
@@ -408,11 +432,12 @@ int machine_specific_init(void)
 #if defined (USE_XF86_EXTENSIONS) && \
     (defined(USE_XF86_VIDMODE_EXT) || defined (HAVE_XRANDR))
     {
-	/* set fullscreen if user used `-fullscreen' on cmdline */
-	int fs;
-	resources_get_int("UseFullscreen", &fs);
-	if (fs)
-	    resources_set_int("VICFullscreen", 1);
+        /* set fullscreen if user used `-fullscreen' on cmdline */
+        int fs;
+        resources_get_int("UseFullscreen", &fs);
+        if (fs) {
+            resources_set_int("VICFullscreen", 1);
+        }
     }
 #endif
     return 0;
@@ -439,6 +464,8 @@ void machine_specific_reset(void)
 #endif
 
     printer_reset();
+
+    cartridge_reset();
     drive_reset();
     datasette_reset();
 }
@@ -451,6 +478,9 @@ void machine_specific_shutdown(void)
 {
     /* and the tape */
     tape_image_detach_internal(1);
+
+    /* and cartridge */
+    cartridge_detach_image();
 
     viacore_shutdown(machine_context.via1);
     viacore_shutdown(machine_context.via2);

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64_CIA_H
-#define _C64_CIA_H
+#ifndef VICE_C64_CIA_H
+#define VICE_C64_CIA_H
 
 #include "types.h"
 
@@ -50,4 +50,3 @@ extern void cia2_set_flagx(void);
 extern void cia2_set_sdrx(BYTE received_byte);
 
 #endif
-

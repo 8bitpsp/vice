@@ -53,6 +53,9 @@
 #include "maincpu.h"
 #include "mem.h"
 #include "monitor.h"
+#ifdef HAVE_NETWORK
+#include "monitor_network.h"
+#endif
 #include "network.h"
 #include "printer.h"
 #include "resources.h"
@@ -62,7 +65,7 @@
 #include "tape.h"
 #include "traps.h"
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "video.h"
 #include "vsync.h"
 #include "zfile.h"
@@ -164,8 +167,7 @@ static void machine_maincpu_clk_overflow_callback(CLOCK sub, void *data)
 void machine_maincpu_init(void)
 {
     maincpu_init();
-    maincpu_monitor_interface = (monitor_interface_t *)lib_malloc(
-                                sizeof(monitor_interface_t));
+    maincpu_monitor_interface = lib_malloc(sizeof(monitor_interface_t));
 }
 
 void machine_early_init(void)
@@ -252,6 +254,7 @@ void machine_shutdown(void)
 
     network_shutdown();
 
+    autostart_resources_shutdown();
     fsdevice_resources_shutdown();
     disk_image_resources_shutdown();
     machine_resources_shutdown();
@@ -261,7 +264,9 @@ void machine_shutdown(void)
     log_resources_shutdown();
     fliplist_resources_shutdown();
     romset_resources_shutdown();
-
+#ifdef HAVE_NETWORK
+    monitor_network_resources_shutdown();
+#endif
     archdep_shutdown();
 
     lib_debug_check();

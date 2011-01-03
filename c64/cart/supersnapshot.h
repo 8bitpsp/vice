@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _SUPERSNAPSHOT_H
-#define _SUPERSNAPSHOT_H
+#ifndef VICE_SUPERSNAPSHOT_H
+#define VICE_SUPERSNAPSHOT_H
 
 #include "types.h"
 
@@ -57,4 +57,3 @@ extern void supersnapshot_v4_detach(void);
 extern void supersnapshot_v5_detach(void);
 
 #endif
-

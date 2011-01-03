@@ -3,7 +3,7 @@
 
 #include "vice.h"
 #include "types.h"
-#include "video.h"
+#include "arch/psp/lib/video.h"
 
 struct video_canvas_s {
     unsigned int initialized;

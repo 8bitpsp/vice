@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _CRT_H
-#define _CRT_H
+#ifndef VICE_CRT_H
+#define VICE_CRT_H
 
 #include "types.h"
 
@@ -35,4 +35,3 @@ extern int crt_save_expert(const char *filename);
 extern int crttype;
 
 #endif
-

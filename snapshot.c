@@ -162,7 +162,7 @@ static int snapshot_write_string(FILE *f, const char *s)
         if (snapshot_write_byte(f, s[i]) < 0)
             return -1;
 
-    return len + sizeof(WORD);
+    return (int)(len + sizeof(WORD));
 }
 
 static int snapshot_read_byte(FILE *f, BYTE *b_return)
@@ -238,10 +238,8 @@ static int snapshot_read_string(FILE *f, char **s)
     char *p = NULL;
 
     /* first free the previous string */
-    if (*s) {
-        lib_free(*s);
-        *s = NULL;      /* don't leave a bogus pointer */
-    }
+    lib_free(*s);
+    *s = NULL;      /* don't leave a bogus pointer */
 
     if (snapshot_read_word(f, &w) < 0)
         return -1;
@@ -249,7 +247,7 @@ static int snapshot_read_string(FILE *f, char **s)
     len = (int)w;
 
     if (len) {
-        p = (char *)lib_malloc(len);
+        p = lib_malloc(len);
         *s = p;
 
         for (i = 0; i < len; i++) {
@@ -497,7 +495,7 @@ snapshot_module_t *snapshot_module_open(snapshot_t *s,
 {
     snapshot_module_t *m;
     char n[SNAPSHOT_MODULE_NAME_LEN];
-    unsigned int name_len = strlen(name);
+    unsigned int name_len = (unsigned int)strlen(name);
 
     if (fseek(s->file, s->first_module_offset, SEEK_SET) < 0)
         return NULL;
@@ -639,7 +637,7 @@ snapshot_t *snapshot_open(const char *filename,
         goto fail;
 
     /* Check machine name.  */
-    machine_name_len = strlen(snapshot_machine_name);
+    machine_name_len = (int)strlen(snapshot_machine_name);
     if (memcmp(read_name, snapshot_machine_name, machine_name_len) != 0
         || (machine_name_len != SNAPSHOT_MODULE_NAME_LEN
             && read_name[machine_name_len] != 0)) {

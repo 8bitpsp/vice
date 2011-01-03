@@ -24,10 +24,9 @@
  *
  */
 
-#ifndef _C128_CMDLINE_OPTIONS_H
-#define _C128_CMDLINE_OPTIONS_H
+#ifndef VICE_C128_CMDLINE_OPTIONS_H
+#define VICE_C128_CMDLINE_OPTIONS_H
 
 extern int c128_cmdline_options_init(void);
 
 #endif
-

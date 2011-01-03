@@ -48,7 +48,7 @@
 #include "gfxoutput.h"
 #include "init.h"
 #include "initcmdline.h"
-#ifdef WIN32
+#ifdef HAS_TRANSLATION
 #include "intl.h"
 #endif
 #include "lib.h"
@@ -62,7 +62,7 @@
 #include "translate.h"
 #endif
 #include "types.h"
-#include "ui.h"
+#include "uiapi.h"
 #include "version.h"
 #include "video.h"
 
@@ -72,6 +72,7 @@ int vsid_mode = 0;
 const
 #endif
 int console_mode = 0;
+int video_disabled_mode = 0;
 static int init_done;
 
 /* ------------------------------------------------------------------------- */
@@ -90,13 +91,29 @@ int main_program(int argc, char **argv)
 #ifndef __OS2__
         if (strcmp(argv[i], "-console") == 0) {
             console_mode = 1;
+            video_disabled_mode = 1;
         } else
 #endif
         if (strcmp(argv[i], "-vsid") == 0) {
             vsid_mode = 1;
+#ifndef USE_SDLUI
+            video_disabled_mode = 1;
+#endif
         } else if (strcmp(argv[i], "-config") == 0) {
             if ((i+1) < argc) {
                 vice_config_file = lib_stralloc(argv[++i]);
+            }
+        }  else if (strcmp(argv[i], "-model") == 0 &&
+                    (machine_class == VICE_MACHINE_CBM5x0 ||
+                     machine_class == VICE_MACHINE_CBM6x0)) {
+            if ((i+1) < argc) {
+                machine_class = (atoi(argv[++i]) == 510) ? VICE_MACHINE_CBM5x0 : VICE_MACHINE_CBM6x0;
+            }
+        }  else if (strcmp(argv[i], "-modelline") == 0 &&
+                    (machine_class == VICE_MACHINE_CBM5x0 ||
+                     machine_class == VICE_MACHINE_CBM6x0)) {
+            if ((i+1) < argc) {
+                machine_class = (atoi(argv[++i]) == 2) ? VICE_MACHINE_CBM5x0 : VICE_MACHINE_CBM6x0;
             }
         }
     }
@@ -125,6 +142,8 @@ int main_program(int argc, char **argv)
 
     /* Initialize system file locator.  */
     sysfile_init(machine_name);
+
+    gfxoutput_early_init();
 
     if (init_resources() < 0 || init_cmdline_options() < 0)
         return -1;
@@ -165,8 +184,6 @@ int main_program(int argc, char **argv)
     } else {
         int retval;
 
-        gfxoutput_early_init();
-
         retval = resources_load(NULL);
 
         if (retval < 0) {
@@ -196,7 +213,8 @@ int main_program(int argc, char **argv)
     log_message(LOG_DEFAULT, "Current VICE team members:");
     log_message(LOG_DEFAULT, "A. Boose, D. Lem, T. Biczo, A. Dehmel, T. Bretz, A. Matthies,");
     log_message(LOG_DEFAULT, "M. Pottendorfer, M. Brenner, S. Trikaliotis, M. van den Heuvel,");
-    log_message(LOG_DEFAULT, "C. Vogelgsang, F. Gennari, M. Kiesel, H. Nuotio, D. Kahlin.");
+    log_message(LOG_DEFAULT, "C. Vogelgsang, F. Gennari, M. Kiesel, H. Nuotio, D. Kahlin,");
+    log_message(LOG_DEFAULT, "A. Lankila.");
     log_message(LOG_DEFAULT, " ");
     log_message(LOG_DEFAULT, "This is free software with ABSOLUTELY NO WARRANTY.");
     log_message(LOG_DEFAULT, "See the \"About VICE\" command for more info.");

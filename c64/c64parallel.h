@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64PARALLEL_H
-#define _C64PARALLEL_H
+#ifndef VICE_C64PARALLEL_H
+#define VICE_C64PARALLEL_H
 
 #include "types.h"
 
@@ -36,4 +36,3 @@ extern BYTE parallel_cable_cpu_read(void);
 extern void parallel_cable_cpu_undump(BYTE data);
 
 #endif
-

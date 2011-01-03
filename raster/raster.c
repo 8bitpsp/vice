@@ -70,8 +70,7 @@ static int raster_draw_buffer_alloc(video_canvas_t *canvas,
 
     /* FIXME: Allocate one more line to prevent access violations by the
        scale2x render.  */
-    canvas->draw_buffer->draw_buffer = (BYTE *)lib_malloc(fb_width
-                                                          * (fb_height + 1));
+    canvas->draw_buffer->draw_buffer = lib_malloc(fb_width * (fb_height + 1));
     *fb_pitch = fb_width;
     return 0;
 }
@@ -84,8 +83,8 @@ static void raster_draw_buffer_free(video_canvas_t *canvas)
 	return;
     }
 
-    if (canvas->draw_buffer->draw_buffer != NULL)
-        lib_free(canvas->draw_buffer->draw_buffer);
+    lib_free(canvas->draw_buffer->draw_buffer);
+    canvas->draw_buffer->draw_buffer = NULL;
 }
 
 static void raster_draw_buffer_clear(video_canvas_t *canvas, BYTE value,
@@ -158,7 +157,7 @@ static int realize_canvas(raster_t *raster)
 
     raster->intialized = 1;
 
-    if (!console_mode && !vsid_mode) {
+    if (!video_disabled_mode) {
         new_canvas = video_canvas_create(raster->canvas,
                      &raster->canvas->draw_buffer->canvas_width,
                      &raster->canvas->draw_buffer->canvas_height, 1);
@@ -167,6 +166,11 @@ static int realize_canvas(raster_t *raster)
             return -1;
 
         raster->canvas = new_canvas;
+
+#ifdef USE_SDLUI
+        /* A hack to allow raster_force_repaint() calls for SDL UI & vkbd */
+        raster->canvas->parent_raster = raster;
+#endif
 
         video_canvas_create_set(raster->canvas);
     }
@@ -182,7 +186,8 @@ static int realize_canvas(raster_t *raster)
 
 static int perform_mode_change(raster_t *raster)
 {
-    if (raster->canvas && raster->canvas->palette != NULL) {
+    if (!video_disabled_mode
+        && raster->canvas && raster->canvas->palette != NULL) {
         if (video_canvas_set_palette(raster->canvas,
             raster->canvas->palette) < 0)
             return -1;
@@ -226,7 +231,7 @@ int raster_init(raster_t *raster,
 {
     raster->intialized = 0;
 
-    raster->modes = (raster_modes_t *)lib_malloc(sizeof(raster_modes_t));
+    raster->modes = lib_malloc(sizeof(raster_modes_t));
     raster_modes_init(raster->modes, num_modes);
     raster_canvas_init(raster);
     raster_changes_init(raster);
@@ -242,6 +247,7 @@ int raster_init(raster_t *raster,
     raster->num_cached_lines = 0;
 
     raster->fake_draw_buffer_line = NULL;
+
     raster->can_disable_border = 0;
     raster->border_disable = 0;
 
@@ -414,7 +420,7 @@ int raster_realize(raster_t *raster)
 
     video_canvas_refresh_all(raster->canvas);
 
-    rlist = (raster_list_t *)lib_malloc(sizeof(raster_list_t));
+    rlist = lib_malloc(sizeof(raster_list_t));
     rlist->raster = raster;
     rlist->next = NULL;
     if (ActiveRasters == NULL) {

@@ -1,15 +1,8 @@
 /*
- * joy.h - Joystick support for Linux.
+ * joy.h - Joystick support for MS-DOS.
  *
  * Written by
- *  Bernhard Kuhn <kuhn@eikon.e-technik.tu-muenchen.de>
- *  Ulmer Lionel <ulmer@poly.polytechnique.fr>
- *
- * Patches by
- *  Daniel Sladic <sladic@eecg.toronto.edu>
- *
- * 1.1.xxx Linux API by
- *  Luca Montecchiani <m.luca@usa.net> (http://i.am/m.luca)
+ *  Ettore Perazzoli <ettore@comm2000.it>
  *
  * This file is part of VICE, the Versatile Commodore Emulator.
  * See README for copyright notice.
@@ -31,17 +24,21 @@
  *
  */
 
-#ifndef _JOY_H
-#define _JOY_H
+#ifndef VICE_JOY_H
+#define VICE_JOY_H
 
-#define JOYDEV_NUMPAD       1
-#define JOYDEV_KEYSET1      2
-#define JOYDEV_KEYSET2      3
+#include "kbd.h"
 
 extern int joy_arch_init(void);
+extern void joystick_close(void);
 extern int joystick_arch_init_resources(void);
+extern int joystick_init_cmdline_options(void);
+extern void joystick_update(void);
 
-extern int joystick_port_map[2];
+#define JOYDEV_NONE     0
+#define JOYDEV_NUMPAD   1
+#define JOYDEV_KEYSET1  2
+#define JOYDEV_KEYSET2  3
+#define JOYDEV_JOYSTICK 4
 
 #endif
-

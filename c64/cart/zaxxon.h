@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _ZAXXON_H
-#define _ZAXXON_H
+#ifndef VICE_ZAXXON_H
+#define VICE_ZAXXON_H
 
 #include <stdio.h>
 
@@ -39,4 +39,3 @@ extern int zaxxon_crt_attach(FILE *fd, BYTE *rawcart);
 extern void zaxxon_detach(void);
 
 #endif
-

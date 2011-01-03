@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _GEORAM_H
-#define _GEORAM_H
+#ifndef VICE_GEORAM_H
+#define VICE_GEORAM_H
 
 #include "types.h"
 
@@ -47,4 +47,3 @@ extern int georam_write_snapshot_module(struct snapshot_s *s);
 extern int georam_enabled;
 
 #endif
-

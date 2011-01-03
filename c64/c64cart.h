@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64CART_H
-#define _C64CART_H
+#ifndef VICE_C64CART_H
+#define VICE_C64CART_H
 
 #include "types.h"
 
@@ -68,7 +68,7 @@ extern BYTE roml_banks[], romh_banks[];
 extern int roml_bank, romh_bank, export_ram;
 
 /* Cartridge RAM limit = 32Kb */
-#define C64CART_RAM_LIMIT               0x8000
+#define C64CART_RAM_LIMIT 0x8000
 
 /* Expansion port signals.  */
 typedef struct {
@@ -84,4 +84,3 @@ extern int c64cart_type;
 extern int try_cartridge_init(int c);
 
 #endif
-

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _DEBUG_H
-#define _DEBUG_H
+#ifndef VICE_DEBUG_H
+#define VICE_DEBUG_H
 
 #include "types.h"
 
@@ -45,6 +45,15 @@ typedef struct debug_s {
     int maincpu_traceflg;
     int drivecpu_traceflg[4];
     int trace_mode;
+
+     /*
+      * if this is set, the CPU will break into the monitor before executing the 
+      * next statement. This is often handy for debugging.
+      */
+    int perform_break_into_monitor;
+
+    /*! If this is set, inputs and outputs to the IEC bus are output. */
+    int iec;
 #endif
     int do_core_dumps;
 } debug_t;
@@ -61,7 +70,8 @@ extern void debug_set_machine_parameter(unsigned int cycles,
 extern void debug_maincpu(DWORD reg_pc, CLOCK mclk, const char *dis,
                           BYTE reg_a, BYTE reg_x, BYTE reg_y, BYTE reg_sp);
 extern void debug_drive(DWORD reg_pc, CLOCK mclk, const char *dis,
-                        BYTE reg_a, BYTE reg_x, BYTE reg_y, BYTE reg_sp);
+                        BYTE reg_a, BYTE reg_x, BYTE reg_y, BYTE reg_sp,
+                        unsigned int driveno);
 extern void debug_irq(struct interrupt_cpu_status_s *cs, CLOCK iclk);
 extern void debug_nmi(struct interrupt_cpu_status_s *cs, CLOCK iclk);
 extern void debug_dma(const char *txt, CLOCK dclk, int num);
@@ -74,5 +84,44 @@ extern void debug_set_milestone(void);
 extern void debug_reset_milestone(void);
 extern void debug_check_autoplay_mode(void);
 
+
+#ifdef DEBUG
+
+extern void debug_iec_drv_write(unsigned int data);
+extern void debug_iec_drv_read(unsigned int data);
+
+extern void debug_iec_bus_write(unsigned int data);
+extern void debug_iec_bus_read(unsigned int data);
+
+# define DEBUG_IEC_DRV_WRITE(_data) debug_iec_drv_write(_data)
+# define DEBUG_IEC_DRV_READ(_data) debug_iec_drv_read(_data)
+
+# define DEBUG_IEC_BUS_WRITE(_data) debug_iec_bus_write(_data)
+# define DEBUG_IEC_BUS_READ(_data) debug_iec_bus_read(_data)
+
+#else
+
+# define DEBUG_IEC_DRV_WRITE(_data)
+# define DEBUG_IEC_DRV_READ(_data)
+
+# define DEBUG_IEC_BUS_WRITE(_data)
+# define DEBUG_IEC_BUS_READ(_data)
+
 #endif
 
+
+#ifdef NDEBUG
+
+# define STATIC_ASSERT(_x)
+
+#else
+
+# define STATIC_ASSERT(_x) \
+    { \
+        BYTE dummy[1 - 2 * ((_x) == 0)]; \
+        dummy[0] = dummy[0] - dummy[0]; /* prevent "unused variable" warning */ \
+    }
+
+#endif
+
+#endif

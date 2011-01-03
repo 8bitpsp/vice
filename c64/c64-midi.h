@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _C64_MIDI_H
-#define _C64_MIDI_H
+#ifndef VICE_C64_MIDI_H
+#define VICE_C64_MIDI_H
 
 #include "midi.h"
 
@@ -37,11 +37,12 @@ extern int c64_midi_resources_init(void);
 extern int c64_midi_cmdline_options_init(void);
 
 /* Emulated interfaces */
-enum { MIDI_MODE_SEQUENTIAL = 0,   /* Sequential Circuits Inc. */
-       MIDI_MODE_PASSPORT,         /* Passport & Syntech */
-       MIDI_MODE_DATEL,            /* DATEL/Siel/JMS */
-       MIDI_MODE_NAMESOFT,         /* Namesoft */
-       MIDI_MODE_MAPLIN            /* Electronics - Maplin magazine */
+enum {
+    MIDI_MODE_SEQUENTIAL = 0,   /* Sequential Circuits Inc. */
+    MIDI_MODE_PASSPORT,         /* Passport & Syntech */
+    MIDI_MODE_DATEL,            /* DATEL/Siel/JMS */
+    MIDI_MODE_NAMESOFT,         /* Namesoft */
+    MIDI_MODE_MAPLIN            /* Electronics - Maplin magazine */
 };
 
 #endif

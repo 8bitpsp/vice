@@ -169,7 +169,7 @@ static int output_graphics_open(unsigned int prnr,
     output_gfx[prnr].screenshot.palette = output_parameter->palette;
 
     lib_free(output_gfx[prnr].line);
-    output_gfx[prnr].line = (BYTE *)lib_malloc(output_parameter->maxcol);
+    output_gfx[prnr].line = lib_malloc(output_parameter->maxcol);
     memset(output_gfx[prnr].line, OUTPUT_PIXEL_WHITE, output_parameter->maxcol);
 
     output_gfx[prnr].line_pos = 0;
@@ -186,7 +186,7 @@ static void output_graphics_close(unsigned int prnr)
   output_gfx_t *o = &(output_gfx[prnr]);
 
   /* only do this if something has actually been printed on this page */
-  if( o->isopen )
+  if ( o->isopen )
     {
       unsigned int i;
 
@@ -206,11 +206,8 @@ static void output_graphics_close(unsigned int prnr)
     }
 
   /* free filename */
-  if( o->filename != NULL )
-    {
-      lib_free(o->filename);
-      o->filename = NULL;
-    }
+  lib_free(o->filename);
+  o->filename = NULL;
 }
 
 static int output_graphics_putc(unsigned int prnr, BYTE b)
@@ -220,12 +217,12 @@ static int output_graphics_putc(unsigned int prnr, BYTE b)
   if (b == OUTPUT_NEWLINE)
     {
       /* if output is not open yet, open it now */
-      if( !o->isopen )
+      if ( !o->isopen )
         {
           int i;
 
           /* increase page count in filename */
-          i = strlen(o->filename);
+          i = (int)strlen(o->filename);
           o->filename[i-1]++;
           if (o->filename[i-1] > '9')
             {
@@ -248,7 +245,7 @@ static int output_graphics_putc(unsigned int prnr, BYTE b)
 
       /* check for bottom of page.  If so, close output file */
       o->line_no++;
-      if( o->line_no == o->screenshot.height )
+      if ( o->line_no == o->screenshot.height )
         {
           o->gfxoutputdrv->close(&o->screenshot);
           o->isopen = 0;

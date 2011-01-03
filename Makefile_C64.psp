@@ -8,7 +8,7 @@ PSP_FW_VERSION=200
 export PSP_FW_VERSION
 
 PSP_APP_NAME=VICE PSP C64
-PSP_APP_VER=2.1.21
+PSP_APP_VER=2.2.1
 
 TARGET=vicepsp
 EXTRA_TARGETS=EBOOT.PBP
@@ -39,14 +39,15 @@ BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            c64/cart/zaxxon.o c64/cart/delaep256.o \
            c64/cart/magicformel.o c64/cart/delaep64.o \
            c64/cart/mikroass.o c64/cart/stardos.o c64/cart/actionreplay4.o \
-           c64/isepic.o c64/dqbb.o c64/psid.o \
+           c64/isepic.o c64/dqbb.o c64/psid.o c64/cart/easyflash.o \
+           c64/sfx_soundexpander.o c64/fmopl.o c64/sfx_soundsampler.o \
            vicii/vicii-badline.o vicii/vicii.o vicii/vicii-stubs.o \
            vicii/vicii-cmdline-options.o vicii/vicii-color.o \
            vicii/vicii-draw.o vicii/vicii-fetch.o vicii/vicii-irq.o \
            vicii/vicii-mem.o vicii/vicii-phi1.o vicii/vicii-resources.o \
            vicii/vicii-snapshot.o vicii/vicii-sprites.o vicii/vicii-timing.o \
            core/ciacore.o core/riotcore.o core/viacore.o \
-           core/ciatimer.o core/tpicore.o \
+           core/ciatimer.o core/tpicore.o core/flash040core.o \
            diskimage/diskimage.o diskimage/fsimage-create.o \
            diskimage/rawimage.o diskimage/fsimage.o \
            diskimage/fsimage-gcr.o diskimage/realimage.o \
@@ -66,6 +67,7 @@ BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            monitor/mon_file.o monitor/monitor.o monitor/mon_lex.o \
            monitor/mon_memory.o monitor/mon_parse.o monitor/mon_register6502.o \
            monitor/mon_registerz80.o monitor/mon_ui.o monitor/mon_util.o \
+           monitor/monitor_network.o \
            parallel/parallel.o parallel/parallel-trap.o \
            printerdrv/driver-select.o printerdrv/drv-ascii.o \
            printerdrv/drv-mps803.o printerdrv/drv-nl10.o \
@@ -142,9 +144,9 @@ BUILD_EMUL=c64/c64_256k.o c64/c64_256k.o c64/c64export.o \
            serial/serial-iec-device.o serial/serial-iec-lib.o \
            serial/serial-realdevice.o serial/serial-trap.o \
            sounddrv/soundiff.o sounddrv/soundaiff.o sounddrv/soundvoc.o \
-           sounddrv/soundwav.o sounddrv/sounddump.o sounddrv/soundspeed.o \
+           sounddrv/soundwav.o sounddrv/sounddump.o sounddrv/soundmovie.o \
            sounddrv/soundfs.o sounddrv/sounddummy.o \
-           translate.o crc32.o 
+           translate.o crc32.o autostart-prg.o
 BUILD_PORT=arch/psp/joy.o arch/psp/video.o arch/psp/ui.o arch/psp/stubs.o \
            arch/psp/main.o arch/psp/archdep.o arch/psp/vsidui.o \
            arch/psp/blockdev.o arch/psp/c64ui.o arch/psp/console.o \
@@ -157,7 +159,8 @@ BASE_DEFS=-DPSP -DPSP_APP_VER=\"$(PSP_APP_VER)\" -DPSP_APP_NAME="\"$(PSP_APP_NAM
 CFLAGS=-O2 -G0 -Wall $(BASE_DEFS) $(DEFINES)
 CXXFLAGS=$(CFLAGS) -fno-exceptions -fno-rtti
 ASFLAGS=$(CFLAGS)
-INCDIR=$(PSPAPP) sid drive vicii tape c64 c64dtv vdc raster crtc vdrive
+INCDIR=$(PSPAPP) sid drive vicii tape c64 c64dtv vdc raster crtc vdrive c64/cart \
+       imagecontents
 LIBDIR=$(PSPLIB) $(MZLIB)
 LIBS=-lminizip -lpsplib -lpng -lpspgu -lpsppower \
      -lz -lm -lc -lpspaudio -lpsprtc -lpspwlan -lpspnet_adhoc \

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _MON_UTIL_H
-#define _MON_UTIL_H
+#ifndef VICE_MON_UTIL_H
+#define VICE_MON_UTIL_H
 
 #include "monitor.h"
 #include "types.h"
@@ -35,6 +35,7 @@ struct console_s;
 extern char *mon_disassemble_with_label(MEMSPACE memspace, WORD loc,
                                         int hex, unsigned *opc_size_p,
                                         unsigned *label_p);
+extern char *mon_dump_with_label(MEMSPACE memspace, WORD loc, int hex, unsigned *label_p);
 extern void mon_set_command(struct console_s *console_log, char *command,
                             void (*)(void));
 

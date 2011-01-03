@@ -25,8 +25,8 @@
  *
  */
 
-#ifndef _CMDLINE_H
-#define _CMDLINE_H
+#ifndef VICE_CMDLINE_H
+#define VICE_CMDLINE_H
 
 /* This describes a command-line option.  */
 /* Warning: all the pointers should point to areas that are valid throughout
@@ -129,5 +129,6 @@ extern void cmdline_show_help(void *userparam);
 extern char *cmdline_options_string(void);
 extern char *cmdline_options_get_param(int counter);
 extern char *cmdline_options_get_description(int counter);
+extern int cmdline_get_num_options(void);
 
 #endif

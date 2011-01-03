@@ -86,8 +86,6 @@ inline static void line_becomes_bad(const int cycle)
         if (cycle <= VICII_FETCH_CYCLE + 2)
             vicii.raster.ycounter = 0;
 
-        vicii.ycounter_reset_checked = 1;
-
         xpos = cycle - (VICII_FETCH_CYCLE + 3);
 
         if (vicii.viciidtv) {
@@ -99,8 +97,12 @@ inline static void line_becomes_bad(const int cycle)
         num_chars = VICII_SCREEN_TEXTCOLS - xpos;
 
         /* Take over the bus until the memory fetch is done.  */
-        if (vicii.fastmode == 0 && !vicii.badline_disable && !vicii.colorfetch_disable)
+        if (vicii.fastmode == 0 && !vicii.badline_disable && !vicii.colorfetch_disable) {
             dma_maincpu_steal_cycles(maincpu_clk, num_chars, 0);
+        } else if (vicii.viciidtv && !vicii.colorfetch_disable) {
+            /* Steal cycles from DMA/Blitter */
+            dtvclockneg += num_chars;
+        }
 
         if (num_chars <= VICII_SCREEN_TEXTCOLS) {
             /* Matrix fetches starts immediately, but the VICII needs
@@ -151,9 +153,6 @@ inline static void line_becomes_bad(const int cycle)
         /* Remember we have done a DMA.  */
         vicii.memory_fetch_done = 2;
 
-        /* Force screen on even if the store that triggered the DMA has
-           set the blank bit.  */
-        vicii.raster.blank_off = 1;
     } else if (cycle <= VICII_FETCH_CYCLE + VICII_SCREEN_TEXTCOLS + 6) {
         /* Bad line has been generated after fetch interval, but
            before `vicii.raster.ycounter' is incremented.  */
@@ -172,6 +171,7 @@ inline static void line_becomes_bad(const int cycle)
            must happen in as in idle state.  */
         vicii.force_display_state = 1;
     }
+    vicii.ycounter_reset_checked = 1;
 }
 
 void vicii_badline_check_state(BYTE value, const int cycle,

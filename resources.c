@@ -148,8 +148,7 @@ static void resources_add_callback(resource_callback_desc_t **where,
     if (callback != NULL) {
         resource_callback_desc_t *cbd;
 
-        cbd = (resource_callback_desc_t *)lib_malloc(
-              sizeof(resource_callback_desc_t));
+        cbd = lib_malloc(sizeof(resource_callback_desc_t));
         cbd->func = callback;
         cbd->param = param;
         cbd->next = *where;
@@ -236,7 +235,7 @@ int resources_register_int(const resource_int_t *r)
 
         dp->name = lib_stralloc(sp->name);
         dp->type = RES_INTEGER;
-        dp->factory_value = (resource_value_t)(sp->factory_value);
+        dp->factory_value = uint_to_void_ptr(sp->factory_value);
         dp->value_ptr = (void *)(sp->value_ptr);
         dp->event_relevant = sp->event_relevant;
         dp->event_strict_value = sp->event_strict_value;
@@ -375,18 +374,18 @@ static void resource_create_event_data(char **event_data, int *data_size,
     int name_size;
     const char *name = r->name;
 
-    name_size = strlen(name) + 1;
+    name_size = (int)strlen(name) + 1;
 
     if (r->type == RES_INTEGER)
         *data_size = name_size + sizeof(DWORD);
     else
-        *data_size = name_size + strlen((char *)value) + 1;
+        *data_size = name_size + (int)strlen((char *)value) + 1;
 
     *event_data = lib_malloc(*data_size);
     strcpy(*event_data, name);
 
     if (r->type == RES_INTEGER)
-        *(DWORD *)(*event_data + name_size) = (DWORD)value;
+        *(DWORD *)(*event_data + name_size) = vice_ptr_to_uint(value);
     else
         strcpy(*event_data + name_size, (char *)value);
 }
@@ -413,12 +412,11 @@ int resources_init(const char *machine)
     machine_id = lib_stralloc(machine);
     num_allocated_resources = 100;
     num_resources = 0;
-    resources = (resource_ram_t *)lib_malloc(num_allocated_resources
-                                             * sizeof(resource_ram_t));
+    resources = lib_malloc(num_allocated_resources * sizeof(resource_ram_t));
 
     /* hash table maps hash keys to index in resources array rather than
        pointers into the array because the array may be reallocated. */
-    hashTable = (int *)lib_malloc((1 << logHashSize) * sizeof(int));
+    hashTable = lib_malloc((1 << logHashSize) * sizeof(int));
 
     for (i = 0; i < (unsigned int)(1 << logHashSize); i++)
         hashTable[i] = -1;
@@ -433,7 +431,7 @@ static int resources_set_value_internal(resource_ram_t *r,
 
     switch (r->type) {
       case RES_INTEGER:
-        status = (*r->set_func_int)((int)value, r->param);
+        status = (*r->set_func_int)(vice_ptr_to_int(value), r->param);
         break;
       case RES_STRING:
         status = (*r->set_func_string)((const char *)value, r->param);
@@ -524,7 +522,7 @@ int resources_set_int(const char *name, int value)
 
     if (r->event_relevant == RES_EVENT_SAME && network_connected())
     {
-        resource_record_event(r, (resource_value_t)value);
+        resource_record_event(r, uint_to_void_ptr(value));
         return 0;
     }
 
@@ -747,7 +745,7 @@ int resources_get_default_value(const char *name, void *value_return)
 
     switch (r->type) {
       case RES_INTEGER:
-        *(int *)value_return = (int)(r->factory_value);
+        *(int *)value_return = vice_ptr_to_int(r->factory_value);
         break;
       case RES_STRING:
         *(char **)value_return = (char *)(r->factory_value);
@@ -768,7 +766,7 @@ int resources_set_defaults(void)
     for (i = 0; i < num_resources; i++) {
         switch (resources[i].type) {
           case RES_INTEGER:
-            if ((*resources[i].set_func_int)((int)(resources[i].factory_value),
+            if ((*resources[i].set_func_int)(vice_ptr_to_int(resources[i].factory_value),
                 resources[i].param) < 0) {
                 /*printf("Cannot set resource %s", resources[i].name);*/
                 return -1;
@@ -800,7 +798,7 @@ int resources_set_event_safe(void)
         switch (resources[i].type) {
           case RES_INTEGER:
             if (resources[i].event_relevant == RES_EVENT_STRICT) {
-                if ((*resources[i].set_func_int)((int)(resources[i].event_strict_value),
+                if ((*resources[i].set_func_int)(vice_ptr_to_int(resources[i].event_strict_value),
                     resources[i].param) < 0)
                     return -1;
             }
@@ -863,7 +861,7 @@ int resources_toggle(const char *name, int *new_value_return)
         *new_value_return = value;
 
     if (r->event_relevant == RES_EVENT_SAME && network_connected()) {
-        resource_record_event(r, (resource_value_t)value);
+        resource_record_event(r, uint_to_void_ptr(value));
         return 0;
     }
 
@@ -1061,7 +1059,7 @@ static char *string_resource_item(int num, const char *delim)
     switch (resources[num].type) {
       case RES_INTEGER:
         v = (resource_value_t)*(int *)resources[num].value_ptr;
-        line = lib_msprintf("%s=%d%s", resources[num].name, (int)v, delim);
+        line = lib_msprintf("%s=%d%s", resources[num].name, vice_ptr_to_int(v), delim);
         break;
       case RES_STRING:
         v = *resources[num].value_ptr;

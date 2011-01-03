@@ -73,9 +73,6 @@ static char *kernal_rom_name = NULL;
 /* Kernal revision for ROM patcher.  */
 char *kernal_revision = NULL;
 
-/* Flag: Do we enable the Emulator ID?  */
-int emu_id_enabled;
-
 static int set_chargen_rom_name(const char *val, void *param)
 {
     if (util_string_set(&chargen_rom_name, val))
@@ -98,17 +95,6 @@ static int set_basic_rom_name(const char *val, void *param)
         return 0;
 
     return c64rom_load_basic(basic_rom_name);
-}
-
-static int set_emu_id_enabled(int val, void *param)
-{
-    if (!val) {
-        emu_id_enabled = 0;
-        return 0;
-    } else {
-        emu_id_enabled = 1;
-        return 0;
-    }
 }
 
 /* FIXME: Should patch the ROM on-the-fly.  */
@@ -146,31 +132,18 @@ static int set_sync_factor(int val, void *param)
 
 static int set_romset_firmware(int val, void *param)
 {
-    unsigned int num = (unsigned int)param;
+    unsigned int num = vice_ptr_to_uint(param);
 
     romset_firmware[num] = val;
 
     return 0;
 }
 
-int c64dtv_hummer_userport_device = HUMMER_USERPORT_NONE;
-unsigned int c64dtv_hummer_userport_joy_port=2;
+int c64dtv_hummer_adc_enabled = 0;
 
-static int c64dtv_hummer_userport_set(int val, void *param)
+static int c64dtv_hummer_adc_set(int val, void *param)
 {
-    c64dtv_hummer_userport_device = val;
-    return 0;
-}
-
-static int c64dtv_set_hummer_joyport(int val, void *param)
-{
-    unsigned int temp = (unsigned int)val;
-
-    if (temp<1 || temp>2)
-        temp = 2;
-
-    c64dtv_hummer_userport_joy_port = temp;
-
+    c64dtv_hummer_adc_enabled = val;
     return 0;
 }
 
@@ -212,16 +185,12 @@ static const resource_int_t resources_int[] = {
     { "RomsetBasicName", 0, RES_EVENT_NO, NULL,
       /* FIXME: should be same but names may differ */
       &romset_firmware[2], set_romset_firmware, (void *)2 },
-    { "EmuID", 0, RES_EVENT_SAME, NULL,
-      &emu_id_enabled, set_emu_id_enabled, NULL },
 #ifdef COMMON_KBD
     { "KeymapIndex", KBD_INDEX_C64_DEFAULT, RES_EVENT_NO, NULL,
       &machine_keymap_index, keyboard_set_keymap_index, NULL },
 #endif
-    { "HummerUserportDevice", 0, RES_EVENT_SAME, NULL,
-      (int *)&c64dtv_hummer_userport_device, c64dtv_hummer_userport_set, NULL },
-    { "HummerUserportJoyPort", 2, RES_EVENT_SAME, NULL,
-      (int *)&c64dtv_hummer_userport_joy_port, c64dtv_set_hummer_joyport, NULL },
+    { "HummerADC", 0, RES_EVENT_SAME, NULL,
+      (int *)&c64dtv_hummer_adc_enabled, c64dtv_hummer_adc_set, NULL },
     { NULL }
 };
 

@@ -24,8 +24,8 @@
  *
  */
 
-#ifndef _C64MEMROM_H
-#define _C64MEMROM_H
+#ifndef VICE_C64MEMROM_H
+#define VICE_C64MEMROM_H
 
 #include "types.h"
 
@@ -42,4 +42,3 @@ extern BYTE REGPARM1 c64memrom_rom64_read(WORD addr);
 extern void REGPARM2 c64memrom_rom64_store(WORD addr, BYTE value);
 
 #endif
-

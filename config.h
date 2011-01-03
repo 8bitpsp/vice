@@ -1,9 +1,6 @@
 /* src/config.h.  Generated from config.h.in by configure.  */
 /* src/config.h.in.  Generated from configure.in by autoheader.  */
 
-/* Should we enable Amiga Amithlon support. */
-/* #undef AMIGA_AMITHLON */
-
 /* Should we enable AROS support. */
 /* #undef AMIGA_AROS */
 
@@ -19,23 +16,26 @@
 /* Enable alternate OS4 includes. */
 /* #undef AMIGA_OS4_ALT */
 
-/* Should we enable PPC Amiga PowerUP support. */
-/* #undef AMIGA_POWERUP */
-
 /* Should we enable Amigaos support. */
 /* #undef AMIGA_SUPPORT */
 
-/* Should we enable PPC Amiga WarpOS support. */
-/* #undef AMIGA_WARPOS */
-
 /* Enable support for BSD style joysticks. */
 /* #undef BSD_JOYSTICK */
+
+/* Enable cegcc support. */
+/* #undef CEGCC_COMPILE */
 
 /* NLS datadirname. */
 #define DATADIRNAME ""
 
 /* Use debugging of the zfile */
 /* #undef DEBUG_ZFILE */
+
+/* Enable DINGUX compilation */
+/* #undef DINGUX */
+
+/* Enable SDL DINGUX compilation */
+/* #undef DINGUX_SDL */
 
 /* Can we use the dos WATTCP library? */
 /* #undef DOS_TCP */
@@ -47,7 +47,7 @@
 /* #undef DWORD_IS_LONG */
 
 /* Define if NLS support is enabled. */
-/* #define ENABLE_NLS */
+/* #undef ENABLE_NLS */
 
 /* Enable support for the TextField widget. */
 #define ENABLE_TEXTFIELD 
@@ -58,10 +58,13 @@
 /* Enable GP2X compilation */
 /* #undef GP2X */
 
+/* Enable SDL GP2X compilation */
+/* #undef GP2X_SDL */
+
 /* Enable emulation for digital joysticks. */
 /* #undef HAS_DIGITAL_JOYSTICK */
 
-/* Enable Joystick emulation. */
+/* Enable joystick emulation. */
 #define HAS_JOYSTICK 
 
 /* Support 64bit integer for Win32 performance counter */
@@ -85,17 +88,23 @@
 /* Define to 1 if you have the <allegro.h> header file. */
 /* #undef HAVE_ALLEGRO_H */
 
+/* Define to 1 if you have the <alloca.h> header file. */
+/* #define HAVE_ALLOCA_H 1 */
+
 /* Define to 1 if you have the <alsa/asoundlib.h> header file. */
 /* #undef HAVE_ALSA_ASOUNDLIB_H */
 
 /* Define to 1 if you have the <arpa/inet.h> header file. */
-#define HAVE_ARPA_INET_H 1
+/* #define HAVE_ARPA_INET_H 1 */
 
 /* Define to 1 if you have the <artsc.h> header file. */
 /* #undef HAVE_ARTSC_H */
 
 /* Define to 1 if you have the `atexit' function. */
 /* #define HAVE_ATEXIT 1 */
+
+/* Enable AudioUnit support. */
+/* #undef HAVE_AUDIO_UNIT */
 
 /* Define to 1 if you have the `bind' function. */
 /* #define HAVE_BIND 1 */
@@ -115,6 +124,9 @@
 /* Define to 1 if you have the <cwsid.h> header file. */
 /* #undef HAVE_CWSID_H */
 
+/* Support for DirectX9. */
+/* #undef HAVE_D3D9_H */
+
 /* Define to 1 if you have the `dcgettext' function. */
 /* #undef HAVE_DCGETTEXT */
 
@@ -126,12 +138,21 @@
 /* Define to 1 if you have the <devices/ahi.h> header file. */
 /* #undef HAVE_DEVICES_AHI_H */
 
+/* Use DirectInput joystick driver */
+/* #undef HAVE_DINPUT */
+
+/* dinput.lib or libdinput.a are present */
+/* #undef HAVE_DINPUT_LIB */
+
 /* Define to 1 if you have the <direct.h> header file. */
 /* #undef HAVE_DIRECT_H */
 
 /* Define to 1 if you have the <dirent.h> header file, and it defines `DIR'.
    */
 #define HAVE_DIRENT_H 1
+
+/* Define to 1 if you have the `dirname' function. */
+#define HAVE_DIRNAME 1
 
 /* Define to 1 if you have the <dir.h> header file. */
 /* #undef HAVE_DIR_H */
@@ -142,6 +163,12 @@
 /* Can we use the dos NET library? */
 /* #undef HAVE_DOS_LIBNET */
 
+/* Support for dynamic library loading. */
+/* #define HAVE_DYNLIB_SUPPORT */
+
+/* Have editline library */
+/* #undef HAVE_EDITLINE */
+
 /* Define to 1 if you have the <errno.h> header file. */
 #define HAVE_ERRNO_H 1
 
@@ -151,11 +178,14 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 /* #define HAVE_FCNTL_H 1 */
 
-/* Enable FFMPEG library support */
+/* Have FFMPEG av* libs available */
 /* #undef HAVE_FFMPEG */
 
-/* Define to 1 if you have the <ffmpeg/avformat.h> header file. */
-/* #undef HAVE_FFMPEG_AVFORMAT_H */
+/* FFMPEG uses subdirs for headers */
+/* #undef HAVE_FFMPEG_HEADER_SUBDIRS */
+
+/* Have FFMPEG swscale lib available */
+/* #undef HAVE_FFMPEG_SWSCALE */
 
 /* Define to 1 if you have the `fork' function. */
 /* #define HAVE_FORK 1 */
@@ -173,7 +203,7 @@
 /* #define HAVE_GETHOSTBYNAME 1 */
 
 /* Define if gethostbyname2 can be used */
-/* #define HAVE_GETHOSTBYNAME2 */
+/* #undef HAVE_GETHOSTBYNAME2 */
 
 /* Define if getipnodebyname can be used */
 /* #undef HAVE_GETIPNODEBYNAME */
@@ -182,7 +212,7 @@
 /* #define HAVE_GETRLIMIT 1 */
 
 /* Define if gettext if available. */
-/* #define HAVE_GETTEXT  */
+/* #undef HAVE_GETTEXT */
 
 /* Define to 1 if you have the `gettimeofday' function. */
 /* #define HAVE_GETTIMEOFDAY 1 */
@@ -227,13 +257,10 @@
 /* #undef HAVE_IO_H */
 
 /* Define if ipv6 can be used */
-/* #define HAVE_IPV6  */
+/* #undef HAVE_IPV6 */
 
 /* Can we use the JPEG library? */
 /* #undef HAVE_JPEG */
-
-/* Define to 1 if you have the <lame/lame.h> header file. */
-/* #undef HAVE_LAME_LAME_H */
 
 /* Define to 1 if you have the `amd64' library (-lamd64). */
 /* #undef HAVE_LIBAMD64 */
@@ -241,11 +268,14 @@
 /* Define to 1 if you have the `bsd' library (-lbsd). */
 /* #undef HAVE_LIBBSD */
 
+/* Define to 1 if you have the <libgen.h> header file. */
+/* #define HAVE_LIBGEN_H 1 */
+
 /* Define to 1 if you have the `ieee1284' library (-lieee1284). */
 /* #undef HAVE_LIBIEEE1284 */
 
 /* use libintl for NLS. */
-/* #define HAVE_LIBINTL_H */
+/* #undef HAVE_LIBINTL_H */
 
 /* Define to 1 if you have the `m' library (-lm). */
 #define HAVE_LIBM 1
@@ -296,10 +326,13 @@
 #define HAVE_MEMMOVE 1
 
 /* Define to 1 if you have the <memory.h> header file. */
-/* #define HAVE_MEMORY_H 1 */
+/* #undef HAVE_MEMORY_H */
 
 /* Define to 1 if you have the <midasdll.h> header file. */
 /* #undef HAVE_MIDASDLL_H */
+
+/* Enable MIDI emulation. */
+/* #define HAVE_MIDI */
 
 /* Define to 1 if you have the `mkstemp' function. */
 #define HAVE_MKSTEMP 1
@@ -308,7 +341,10 @@
 /* #undef HAVE_MMAP_DEVICE_IO */
 
 /* Enable 1351 mouse support */
-/* #define HAVE_MOUSE  */
+/* #define HAVE_MOUSE */
+
+/* Use nanosleep instead of usleep */
+/* #define HAVE_NANOSLEEP */
 
 /* Define to 1 if you have the <ndir.h> header file, and it defines `DIR'. */
 /* #undef HAVE_NDIR_H */
@@ -324,9 +360,6 @@
 
 /* Support for OpenCBM (former CBM4Linux). */
 /* #undef HAVE_OPENCBM */
-
-/* OpenCBM header file is available. */
-/* #undef HAVE_OPENCBM_H */
 
 /* Enable openGL synchronization */
 /* #undef HAVE_OPENGL_SYNC */
@@ -346,11 +379,20 @@
 /* Define to 1 if you have the <proto/cybergraphics.h> header file. */
 /* #undef HAVE_PROTO_CYBERGRAPHICS_H */
 
+/* Define to 1 if you have the <proto/openpci.h> header file. */
+/* #undef HAVE_PROTO_OPENPCI_H */
+
 /* Define to 1 if you have the <proto/Picasso96API.h> header file. */
 /* #undef HAVE_PROTO_PICASSO96API_H */
 
 /* Define to 1 if you have the <proto/Picasso96.h> header file. */
 /* #undef HAVE_PROTO_PICASSO96_H */
+
+/* Define to 1 if you have the <pulse/simple.h> header file. */
+/* #undef HAVE_PULSE_SIMPLE_H */
+
+/* Enable QuickTime support. */
+/* #undef HAVE_QUICKTIME */
 
 /* Support for block device disk image access. */
 /* #define HAVE_RAWDRIVE */
@@ -367,6 +409,12 @@
 /* This version provides ReSID support. */
 #define HAVE_RESID 
 
+/* This version provides ReSID-DTV support. */
+#define HAVE_RESID_DTV 
+
+/* This version provides ReSID_FP support. */
+/* #define HAVE_RESID_FP */
+
 /* Define to 1 if you have the `rewinddir' function. */
 /* #define HAVE_REWINDDIR 1 */
 
@@ -376,8 +424,20 @@
 /* Enable RS232 emulation. */
 /* #define HAVE_RS232 */
 
+/* Enable SDLmain replacement */
+/* #define HAVE_SDLMAIN */
+
+/* Define to 1 if you have the `SDL_NumJoysticks' function. */
+/* #define HAVE_SDL_NUMJOYSTICKS 1 */
+
 /* Define to 1 if you have the <SDL/SDL_audio.h> header file. */
-/* #undef HAVE_SDL_SDL_AUDIO_H */
+/* #define HAVE_SDL_SDL_AUDIO_H 1 */
+
+/* Define to 1 if you have the <SDL/SDL.h> header file. */
+/* #define HAVE_SDL_SDL_H 1 */
+
+/* Define to 1 if you have the <SDL/SDL_main.h> header file. */
+/* #define HAVE_SDL_SDL_MAIN_H 1 */
 
 /* Define to 1 if you have the `seekdir' function. */
 /* #define HAVE_SEEKDIR 1 */
@@ -391,23 +451,38 @@
 /* Define to 1 if you have the <signal.h> header file. */
 #define HAVE_SIGNAL_H 1
 
+/* Use more accurate buffer fill reporting */
+/* AKTODO #define HAVE_SND_PCM_AVAIL */
+
 /* Define to 1 if you have the `socket' function. */
 /* #define HAVE_SOCKET 1 */
 
 /* Define to 1 if you have the <socket.h> header file. */
 /* #undef HAVE_SOCKET_H */
 
+/* Define if the socklen_t type is present. */
+/* #define HAVE_SOCKLEN_T */
+
 /* Define to 1 if you have the <soundcard.h> header file. */
 /* #undef HAVE_SOUNDCARD_H */
 
+/* Static linking for lame libs */
+/* #undef HAVE_STATIC_LAME */
+
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1
+
+/* We are using stdlib.h */
+#define HAVE_STDLIB 1
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #define HAVE_STDLIB_H 1
 
 /* Define to 1 if you have the `strcasecmp' function. */
 #define HAVE_STRCASECMP 1
+
+/* Define to 1 if you have the `strdup' function. */
+#define HAVE_STRDUP 
 
 /* Define to 1 if you have the `strerror' function. */
 #define HAVE_STRERROR 1
@@ -585,6 +660,9 @@
 /* Define to the version of this package. */
 #define PACKAGE_VERSION ""
 
+/* The current arch, cpu and compiler used. */
+/* #undef PLATFORM */
+
 /* Where do we want to install the executable? */
 #define PREFIX "/usr/local"
 
@@ -606,6 +684,12 @@
 /* Enable SCO Unixware 7.x support */
 /* #undef UNIXWARE_COMPILE */
 
+/* Are we compiling for unix? */
+/* #define UNIX_COMPILE */
+
+/* Define if this version is unstable. */
+/* #undef UNSTABLE */
+
 /* Enable aix sound support. */
 /* #undef USE_AIX_AUDIO */
 
@@ -616,7 +700,7 @@
 /* #undef USE_ARTS */
 
 /* Enable new color management code. */
-#define USE_COLOR_MANAGEMENT 
+/* #define USE_COLOR_MANAGEMENT */
 
 /* Enable CoreAudio support. */
 /* #undef USE_COREAUDIO */
@@ -624,8 +708,17 @@
 /* Enable sgi sound support. */
 /* #undef USE_DMEDIA */
 
+/* Enable directx sound support. */
+/* #undef USE_DXSOUND */
+
+/* Use embedded data files. */
+/* #undef USE_EMBEDDED */
+
 /* Enable esd sound support. */
-/* #undef USE_ESD */
+/* #define USE_ESD */
+
+/* Define when using gcc */
+#define USE_GCC 
 
 /* Use GNOME UI. */
 /* #undef USE_GNOMEUI */
@@ -642,6 +735,12 @@
 /* Enable oss support. */
 /* #define USE_OSS */
 
+/* Enable pulseaudio support. */
+/* #undef USE_PULSE */
+
+/* Enable sdl ui support. */
+/* #define USE_SDLUI */
+
 /* Enable sdl sound support. */
 /* #undef USE_SDL_AUDIO */
 
@@ -652,13 +751,22 @@
 /* #undef USE_XF86_VIDMODE_EXT */
 
 /* Version number of package */
-#define VERSION "2.1"
+/* #define VERSION "2.2" */
 
 /* Win32 Version string. */
 #define VERSION_RC "$VERSION_RC"
 
 /* Support for The Final Ethernet */
 /* #undef VICE_USE_LIBNET_1_1 */
+
+/* Are we compiling for win32? */
+/* #undef WIN32_COMPILE */
+
+/* Enable WIZ compilation */
+/* #undef WIZ */
+
+/* Enable SDL WIZ compilation */
+/* #undef WIZ_SDL */
 
 /* Define to 1 if your processor stores words with the most significant byte
    first (like Motorola and SPARC, unlike Intel and VAX). */
@@ -670,6 +778,9 @@
 /* Define to 1 if `lex' declares `yytext' as a `char *' by default, not a
    `char[]'. */
 #define YYTEXT_POINTER 1
+
+/* define when using the alpha compaq compiler */
+/* #undef __DECALPHA__ */
 
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */

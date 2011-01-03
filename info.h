@@ -25,12 +25,17 @@
  *
  */
 
-#ifndef _INFO_H
-#define _INFO_H
+#ifndef VICE_INFO_H
+#define VICE_INFO_H
 
 extern const char info_license_text[];
 extern const char info_contrib_text[];
 extern const char info_warranty_text[];
+
+#ifdef USE_SDLUI
+extern const char info_license_text40[];
+extern const char info_warranty_text40[];
+#endif
 
 #endif
 
