@@ -229,6 +229,7 @@ PL_MENU_OPTIONS_BEGIN(MappableButtons)
   PL_MENU_OPTION(">", CK(5,4,8))
   PL_MENU_OPTION("?", CK(6,7,8))
   /* Digits */
+  PL_MENU_OPTION("<-",CK(7,1,8))
   PL_MENU_OPTION("1", CK(7,0,8))
   PL_MENU_OPTION("2", CK(7,3,8))
   PL_MENU_OPTION("3", CK(1,0,8))
